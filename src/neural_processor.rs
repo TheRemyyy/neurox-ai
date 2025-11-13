@@ -145,12 +145,12 @@ impl NeuralProcessor {
     fn encode_tokens_gpu(&mut self, tokens: &[i32]) -> Result<(), Box<dyn std::error::Error>> {
         let n_tokens = tokens.len().min(self.max_token_buffer);
 
-        // Copy only the tokens we need
-        let tokens_to_copy = &tokens[..n_tokens];
-        let temp_tokens = self.device.htod_sync_copy(tokens_to_copy)?;
+        // Memory pooling: reuse existing buffer by padding to match size
+        let mut padded_tokens = vec![0i32; self.max_token_buffer];
+        padded_tokens[..n_tokens].copy_from_slice(&tokens[..n_tokens]);
 
-        // Copy into our buffer (reuse allocation)
-        self.tokens_gpu = temp_tokens;
+        // Single allocation reuse (no repeated alloc/free)
+        self.device.htod_sync_copy_into(&padded_tokens, &mut self.tokens_gpu)?;
 
         let total_elements = n_tokens * self.pattern_dim;
         let config = KernelConfig::for_neurons(total_elements);
@@ -196,10 +196,12 @@ impl NeuralProcessor {
 
         let n_tokens = tokens.len().min(self.max_token_buffer);
 
-        // Copy only the tokens we need
-        let tokens_to_copy = &tokens[..n_tokens];
-        let temp_tokens = self.device.htod_sync_copy(tokens_to_copy)?;
-        self.tokens_gpu = temp_tokens;
+        // Memory pooling: reuse existing buffer by padding to match size
+        let mut padded_tokens = vec![0i32; self.max_token_buffer];
+        padded_tokens[..n_tokens].copy_from_slice(&tokens[..n_tokens]);
+
+        // Single allocation reuse (no repeated alloc/free)
+        self.device.htod_sync_copy_into(&padded_tokens, &mut self.tokens_gpu)?;
 
         // Use sparse matrix update (saves 90%+ memory!)
         self.sparse_transitions.update(&self.tokens_gpu, n_tokens as i32, 0.1)?;
