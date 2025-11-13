@@ -154,6 +154,7 @@ impl Drop for CudaContext {
 
 #[cfg(test)]
 mod tests {
+    use cudarc::driver::DeviceSlice;
     use super::*;
 
     #[test]

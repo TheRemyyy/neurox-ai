@@ -51,7 +51,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("✓ Načteno {} řádků z training souboru", czech_training.len());
     } else {
         println!("⚠ Training soubor nenalezen, používám základní data");
-        czech_training = vec![
+        let basic_data = vec![
         // Základní konverzace
         "ahoj jak se máš",
         "mám se dobře díky",
@@ -198,6 +198,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "máš smysl pro humor",
         "snažím se být zábavný",
     ];
+        czech_training = basic_data.iter().map(|s| s.to_string()).collect();
     }
 
     // Training s context awareness
