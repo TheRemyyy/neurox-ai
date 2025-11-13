@@ -23,6 +23,13 @@ pub mod memory;
 pub mod language;
 pub mod brain;
 
+// New biological systems
+pub mod basal_ganglia;
+pub mod neuromodulation;
+pub mod oscillations;
+pub mod spatial;
+pub mod semantics;
+
 // GPU-accelerated neural processor (100% GPU, zero CPU bottlenecks)
 pub mod neural_processor;
 

@@ -4,9 +4,17 @@
 
 pub mod lif;
 pub mod hierarchical;
+pub mod interneurons;
+pub mod dendritic;
 
 pub use lif::LIFNeuron;
 pub use hierarchical::{NeuronLevel, RegionGroup, MeanFieldRegion, HierarchicalBrain, StreamingBuffer};
+pub use interneurons::{
+    PVInterneuron, SSTInterneuron, VIPInterneuron, InterneuronCircuit, InterneuronStats,
+};
+pub use dendritic::{
+    DendriticBranch, DendriticNeuron, DendriticLayer, DendriticNeuronStats, DendriticLayerStats,
+};
 
 use serde::{Deserialize, Serialize};
 
