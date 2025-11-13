@@ -3,8 +3,10 @@
 //! Implements biologically-inspired spiking neuron models with GPU-optimized data layouts.
 
 pub mod lif;
+pub mod hierarchical;
 
 pub use lif::LIFNeuron;
+pub use hierarchical::{NeuronLevel, RegionGroup, MeanFieldRegion, HierarchicalBrain};
 
 use serde::{Deserialize, Serialize};
 

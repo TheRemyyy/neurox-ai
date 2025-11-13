@@ -2,6 +2,10 @@
 //!
 //! Implements STDP, homeostatic plasticity, and STP mechanisms.
 
+pub mod stdp;
+
+pub use stdp::{TripletSTDP, HomeostaticPlasticity};
+
 use serde::{Deserialize, Serialize};
 
 /// Spike-Timing-Dependent Plasticity (STDP) parameters

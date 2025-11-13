@@ -1,5 +1,9 @@
 //! Simulation engine for spiking neural networks
 
+pub mod event_queue;
+
+pub use event_queue::{EventQueue, SpikeEvent, DelayBuffer};
+
 use crate::cuda::{CudaContext, KernelConfig};
 use crate::connectivity::SparseConnectivity;
 use cudarc::driver::CudaSlice;
