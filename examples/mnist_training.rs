@@ -160,7 +160,8 @@ fn create_mnist_connectivity(
         // Each hidden neuron connects to ~300 input neurons (random)
         let n_connections = 300;
         let mut inputs: Vec<usize> = (0..n_input).collect();
-        inputs.sort_by_key(|_| rng.gen::<u32>());
+        use rand::seq::SliceRandom;
+        inputs.shuffle(&mut rng);
 
         for &input_idx in inputs.iter().take(n_connections) {
             let weight = rng.gen_range(0.0..1.0); // Random initial weight
