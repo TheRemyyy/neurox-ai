@@ -124,8 +124,8 @@ fn run_chat_interface(
     println!();
     println!("Initializing GPU brain...");
 
-    // Initialize CUDA device
-    let device = Arc::new(CudaDevice::new(0)?);
+    // Initialize CUDA device (CudaDevice::new already returns Arc)
+    let device = CudaDevice::new(0)?;
     println!("✓ CUDA device initialized: {}", device.name()?);
 
     // Create GPU brain
