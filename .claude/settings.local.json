@@ -17,7 +17,8 @@
       "Bash(cargo build:*)",
       "Bash(cargo clean:*)",
       "Bash(cargo run:*)",
-      "Bash(nvcc:*)"
+      "Bash(nvcc:*)",
+      "Bash(export PATH=\"/c/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.6/bin:$PATH\")"
     ],
     "deny": [],
     "ask": []

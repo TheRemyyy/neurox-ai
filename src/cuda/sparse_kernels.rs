@@ -135,16 +135,20 @@ pub struct SparseTransitionMatrix {
 }
 
 impl SparseTransitionMatrix {
-    /// Create sparse transition matrix
+    /// Create sparse transition matrix with dynamic growth
+    /// Starts small (10k entries) and grows as needed up to max_nnz
     pub fn new(
         device: Arc<CudaDevice>,
         vocab_size: usize,
         max_nnz: usize,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        // Allocate CSR buffers
+        // Start with small initial allocation (1% of max, min 10k)
+        let initial_nnz = (max_nnz / 100).max(10_000).min(max_nnz);
+
+        // Allocate CSR buffers (start small!)
         let row_ptr = device.alloc_zeros::<i32>(vocab_size + 1)?;
-        let col_idx = device.alloc_zeros::<i32>(max_nnz)?;
-        let values = device.alloc_zeros::<f32>(max_nnz)?;
+        let col_idx = device.alloc_zeros::<i32>(initial_nnz)?;
+        let values = device.alloc_zeros::<f32>(initial_nnz)?;
         let nnz_counter = device.alloc_zeros::<i32>(1)?;
 
         // Compile kernels
@@ -160,10 +164,12 @@ impl SparseTransitionMatrix {
         device.load_ptx(lookup_ptx, "sparse_lookup", &["sparse_lookup_row"])?;
         let lookup_kernel = device.get_func("sparse_lookup", "sparse_lookup_row").unwrap();
 
-        let memory_mb = (max_nnz * (4 + 4 + 4)) / (1024 * 1024);
-        log::info!("  Sparse transition matrix: {} MB (max {} non-zeros)", memory_mb, max_nnz);
+        let initial_mb = (initial_nnz * 12) / (1024 * 1024);
+        let max_mb = (max_nnz * 12) / (1024 * 1024);
+        log::info!("  Sparse transition matrix: {} MB initial, {} MB max", initial_mb, max_mb);
+        log::info!("  Dynamic growth: starts at {}% capacity", (initial_nnz * 100) / max_nnz);
         log::info!("  Memory savings vs dense: {}%",
-            100 - (memory_mb * 100) / ((vocab_size * vocab_size * 4) / (1024 * 1024)));
+            100 - (max_mb * 100) / ((vocab_size * vocab_size * 4) / (1024 * 1024)));
 
         Ok(Self {
             device,
@@ -180,8 +186,47 @@ impl SparseTransitionMatrix {
         })
     }
 
-    /// Update with new transitions
+    /// Grow buffers when needed (doubles size up to max)
+    fn grow_if_needed(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        let current_capacity = self.col_idx.len();
+        let usage_percent = (self.current_nnz * 100) / current_capacity;
+
+        // Grow when 80% full
+        if usage_percent >= 80 && current_capacity < self.max_nnz {
+            let new_capacity = (current_capacity * 2).min(self.max_nnz);
+
+            log::info!("Growing sparse matrix: {} → {} entries ({} MB → {} MB)",
+                current_capacity, new_capacity,
+                (current_capacity * 12) / (1024 * 1024),
+                (new_capacity * 12) / (1024 * 1024));
+
+            // Download existing data
+            let old_col_idx = self.device.dtoh_sync_copy(&self.col_idx)?;
+            let old_values = self.device.dtoh_sync_copy(&self.values)?;
+
+            // Allocate larger buffers
+            let mut new_col_idx = vec![0i32; new_capacity];
+            let mut new_values = vec![0f32; new_capacity];
+
+            // Copy existing data
+            new_col_idx[..self.current_nnz].copy_from_slice(&old_col_idx[..self.current_nnz]);
+            new_values[..self.current_nnz].copy_from_slice(&old_values[..self.current_nnz]);
+
+            // Upload to GPU
+            self.col_idx = self.device.htod_sync_copy(&new_col_idx)?;
+            self.values = self.device.htod_sync_copy(&new_values)?;
+
+            log::info!("✓ Growth complete");
+        }
+
+        Ok(())
+    }
+
+    /// Update with new transitions (with automatic growth)
     pub fn update(&mut self, tokens: &CudaSlice<i32>, n_tokens: i32, learning_rate: f32) -> Result<(), Box<dyn std::error::Error>> {
+        // Check if we need to grow before updating
+        self.grow_if_needed()?;
+
         let config = crate::cuda::KernelConfig::for_neurons(n_tokens as usize);
 
         let params = (
