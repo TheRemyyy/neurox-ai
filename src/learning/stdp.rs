@@ -77,6 +77,21 @@ impl TripletSTDP {
     pub fn update_weight(&self, weight: f32, dw: f32) -> f32 {
         (weight + dw).clamp(self.config.w_min, self.config.w_max)
     }
+
+    /// Get pre-synaptic traces (for model export)
+    pub fn get_pre_traces(&self) -> Vec<f32> {
+        self.pre_traces.clone()
+    }
+
+    /// Get post-synaptic traces (first, for model export)
+    pub fn get_post_traces_1(&self) -> Vec<f32> {
+        self.post_traces_1.clone()
+    }
+
+    /// Get post-synaptic traces (second, for model export)
+    pub fn get_post_traces_2(&self) -> Vec<f32> {
+        self.post_traces_2.clone()
+    }
 }
 
 /// Homeostatic plasticity for network stability

@@ -14,6 +14,7 @@ pub mod learning;
 pub mod utils;
 pub mod datasets;
 pub mod training;
+pub mod serialization;
 
 // Re-export key types
 pub use neuron::{LIFNeuron, NeuronState};
@@ -22,6 +23,7 @@ pub use simulation::Simulator;
 pub use connectivity::{ProceduralConnectivity, SparseConnectivity, ConnectivityType};
 pub use datasets::{MNISTDataset, MNISTImage};
 pub use training::{TrainingConfig, MNISTTrainer, train_mnist};
+pub use serialization::{NeuromorphicModel, ModelMetadata, NeuronParameters, PlasticityState};
 
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

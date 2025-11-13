@@ -312,6 +312,71 @@ impl MNISTTrainer {
     pub fn stats(&self) -> &[TrainingStats] {
         &self.stats
     }
+
+    /// Export trained model as neuromorphic brain state (not LLM weights!)
+    pub fn export_model(&self, architecture_desc: String) -> Result<crate::serialization::NeuromorphicModel, Box<dyn std::error::Error>> {
+        use crate::serialization::{NeuromorphicModel, ModelMetadata, NeuronParameters, PlasticityState};
+        use crate::SparseConnectivity;
+
+        log::info!("Exporting neuromorphic model (brain-like, not LLM!)...");
+
+        // Get connectivity from GPU
+        let conn_gpu = self.simulator.get_connectivity()
+            .ok_or("No connectivity found in simulator")?;
+
+        let device = self.simulator.cuda.device();
+        let weights = conn_gpu.download_weights(device)?;
+        let row_ptr = conn_gpu.download_row_ptr(device)?;
+        let col_idx = conn_gpu.download_col_idx(device)?;
+
+        let connectivity = SparseConnectivity {
+            row_ptr,
+            col_idx,
+            weights,
+            nnz: conn_gpu.weights.len(),
+            n_neurons: self.simulator.n_neurons(),
+        };
+
+        // Get neuron parameters from GPU
+        let thresholds = self.simulator.get_thresholds()?;
+        let tau_m = self.simulator.get_tau_m()?;
+        let v_reset = self.simulator.get_v_reset()?;
+        let membrane_v = Some(self.simulator.get_voltages()?);
+
+        let neuron_params = NeuronParameters {
+            thresholds,
+            tau_m,
+            v_reset,
+            membrane_v,
+        };
+
+        // Get plasticity state (STDP traces, STP dynamics)
+        let plasticity = PlasticityState {
+            pre_traces: Some(self.stdp.get_pre_traces()),
+            post_traces_1: Some(self.stdp.get_post_traces_1()),
+            post_traces_2: Some(self.stdp.get_post_traces_2()),
+            stp_u: self.stp.as_ref().map(|stp| stp.iter().map(|s| s.u).collect()),
+            stp_x: self.stp.as_ref().map(|stp| stp.iter().map(|s| s.x).collect()),
+        };
+
+        // Create metadata
+        let final_accuracy = self.stats.last()
+            .map(|s| s.test_accuracy)
+            .unwrap_or(0.0);
+
+        let metadata = ModelMetadata {
+            n_neurons: self.simulator.n_neurons(),
+            n_synapses: connectivity.nnz,
+            dt: self.simulator.dt(),
+            architecture: architecture_desc,
+            training_epochs: self.config.n_epochs,
+            final_accuracy,
+        };
+
+        log::info!("Model exported: {} neurons, {} synapses", metadata.n_neurons, metadata.n_synapses);
+
+        Ok(NeuromorphicModel::new(metadata, connectivity, neuron_params, plasticity))
+    }
 }
 
 /// Full training pipeline

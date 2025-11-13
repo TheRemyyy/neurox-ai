@@ -136,7 +136,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         log::info!("Average weight: {:.4}", stats.avg_weight);
     }
 
-    // Save model (TODO: implement serialization)
+    // Save brain-like model (neuromorphic, NOT LLM!)
+    log::info!("\n=== Saving Neuromorphic Model ===");
+    let architecture_desc = format!("MNIST-{}-{}-{} (Triplet STDP + WTA + Homeostasis)",
+                                     N_INPUT, n_hidden, N_OUTPUT);
+    let model = trainer.export_model(architecture_desc)?;
+
+    let model_path = "mnist_brain.nrx";  // .nrx = NeuroX binary format
+    model.save(model_path)?;
+
+    log::info!("Model saved to: {}", model_path);
+    log::info!("  Format: .nrx (neuromorphic binary, NOT LLM weights!)");
+    log::info!("  Contains: sparse synapses, STDP traces, STP dynamics, membrane states");
+    log::info!("  Size: {:.2} MB", std::fs::metadata(model_path)?.len() as f64 / 1024.0 / 1024.0);
     log::info!("Training complete!");
 
     Ok(())

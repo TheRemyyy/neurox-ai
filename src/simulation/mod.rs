@@ -12,7 +12,7 @@ use std::sync::Arc;
 /// Main simulator for GPU-accelerated SNN
 pub struct Simulator {
     /// CUDA context
-    cuda: Arc<CudaContext>,
+    pub(crate) cuda: Arc<CudaContext>,
 
     /// Number of neurons
     n_neurons: usize,
@@ -53,11 +53,35 @@ pub struct Simulator {
 }
 
 /// GPU-resident sparse connectivity
-struct SparseConnectivityGPU {
-    row_ptr: CudaSlice<i32>,
-    col_idx: CudaSlice<i32>,
-    weights: CudaSlice<f32>,
+pub struct SparseConnectivityGPU {
+    pub(crate) row_ptr: CudaSlice<i32>,
+    pub(crate) col_idx: CudaSlice<i32>,
+    pub(crate) weights: CudaSlice<f32>,
     n_synapses: usize,
+}
+
+impl SparseConnectivityGPU {
+    /// Download weights from GPU
+    pub fn download_weights(&self, device: &cudarc::driver::CudaDevice) -> Result<Vec<f32>, Box<dyn std::error::Error>> {
+        let mut weights = vec![0.0; self.n_synapses];
+        device.dtoh_sync_copy_into(&self.weights, &mut weights)?;
+        Ok(weights)
+    }
+
+    /// Download row pointers from GPU
+    pub fn download_row_ptr(&self, device: &cudarc::driver::CudaDevice) -> Result<Vec<i32>, Box<dyn std::error::Error>> {
+        let n_rows = (self.row_ptr.len());
+        let mut row_ptr = vec![0; n_rows];
+        device.dtoh_sync_copy_into(&self.row_ptr, &mut row_ptr)?;
+        Ok(row_ptr)
+    }
+
+    /// Download column indices from GPU
+    pub fn download_col_idx(&self, device: &cudarc::driver::CudaDevice) -> Result<Vec<i32>, Box<dyn std::error::Error>> {
+        let mut col_idx = vec![0; self.n_synapses];
+        device.dtoh_sync_copy_into(&self.col_idx, &mut col_idx)?;
+        Ok(col_idx)
+    }
 }
 
 impl Simulator {
@@ -344,6 +368,38 @@ impl Simulator {
     /// Synchronize GPU
     pub fn synchronize(&self) -> Result<(), Box<dyn std::error::Error>> {
         self.cuda.synchronize()
+    }
+
+    /// Get neuron thresholds from GPU
+    pub fn get_thresholds(&self) -> Result<Vec<f32>, Box<dyn std::error::Error>> {
+        let mut thresholds = vec![0.0; self.n_neurons];
+        self.cuda
+            .device()
+            .dtoh_sync_copy_into(&self.thresholds, &mut thresholds)?;
+        Ok(thresholds)
+    }
+
+    /// Get tau_m from GPU
+    pub fn get_tau_m(&self) -> Result<Vec<f32>, Box<dyn std::error::Error>> {
+        let mut tau_m = vec![0.0; self.n_neurons];
+        self.cuda
+            .device()
+            .dtoh_sync_copy_into(&self.tau_m, &mut tau_m)?;
+        Ok(tau_m)
+    }
+
+    /// Get v_reset from GPU
+    pub fn get_v_reset(&self) -> Result<Vec<f32>, Box<dyn std::error::Error>> {
+        let mut v_reset = vec![0.0; self.n_neurons];
+        self.cuda
+            .device()
+            .dtoh_sync_copy_into(&self.v_reset, &mut v_reset)?;
+        Ok(v_reset)
+    }
+
+    /// Get sparse connectivity (clone)
+    pub fn get_connectivity(&self) -> Option<&SparseConnectivityGPU> {
+        self.connectivity.as_ref()
     }
 }
 
