@@ -7,19 +7,19 @@ use super::STDPConfig;
 /// Triplet STDP implementation
 pub struct TripletSTDP {
     /// Configuration
-    config: STDPConfig,
+    pub config: STDPConfig,
 
     /// Pre-synaptic traces (per neuron)
-    pre_traces: Vec<f32>,
+    pub pre_traces: Vec<f32>,
 
     /// Post-synaptic traces (per neuron, dual)
-    post_traces_1: Vec<f32>,
-    post_traces_2: Vec<f32>,
+    pub post_traces_1: Vec<f32>,
+    pub post_traces_2: Vec<f32>,
 
     /// Time constants
-    tau_pre: f32,
-    tau_post1: f32,
-    tau_post2: f32,
+    pub tau_pre: f32,
+    pub tau_post1: f32,
+    pub tau_post2: f32,
 }
 
 impl TripletSTDP {
