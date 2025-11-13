@@ -5,9 +5,11 @@
 
 pub mod kernels;
 pub mod context;
+pub mod cognitive_kernels;
 
 pub use context::CudaContext;
 pub use kernels::*;
+pub use cognitive_kernels::*;
 
 use cudarc::driver::LaunchConfig;
 

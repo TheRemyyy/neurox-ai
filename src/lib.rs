@@ -23,6 +23,9 @@ pub mod memory;
 pub mod language;
 pub mod brain;
 
+// GPU-accelerated brain (100% GPU, zero CPU bottlenecks)
+pub mod gpu_brain;
+
 // Re-export key types
 pub use neuron::{LIFNeuron, NeuronState};
 pub use cuda::CudaContext;
@@ -38,6 +41,9 @@ pub use attention::{AttentionSystem, AttentionStats};
 pub use memory::{Hippocampus, HippocampusStats};
 pub use language::{LanguageSystem, LanguageStats};
 pub use brain::{NeuromorphicBrain, BrainStats};
+
+// Re-export GPU brain
+pub use gpu_brain::{GpuBrain, GpuBrainStats};
 
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
