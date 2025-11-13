@@ -326,15 +326,26 @@ impl MNISTTrainer {
             .ok_or("No connectivity found in simulator")?;
 
         let device = self.simulator.cuda.device();
-        let weights = conn_gpu.download_weights(device)?;
-        let row_ptr = conn_gpu.download_row_ptr(device)?;
-        let col_idx = conn_gpu.download_col_idx(device)?;
+
+        // Download weights
+        let nnz = conn_gpu.weights.len();
+        let mut weights = vec![0.0; nnz];
+        device.dtoh_sync_copy_into(&conn_gpu.weights, &mut weights)?;
+
+        // Download row pointers
+        let n_rows = conn_gpu.row_ptr.len();
+        let mut row_ptr = vec![0; n_rows];
+        device.dtoh_sync_copy_into(&conn_gpu.row_ptr, &mut row_ptr)?;
+
+        // Download column indices
+        let mut col_idx = vec![0; nnz];
+        device.dtoh_sync_copy_into(&conn_gpu.col_idx, &mut col_idx)?;
 
         let connectivity = SparseConnectivity {
             row_ptr,
             col_idx,
             weights,
-            nnz: conn_gpu.weights.len(),
+            nnz,
             n_neurons: self.simulator.n_neurons(),
         };
 
