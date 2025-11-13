@@ -72,9 +72,9 @@ fn display_welcome() {
     println!();
     println!("Commands:");
     println!("  neurox-ai info    - Display GPU device information");
-    println!("  neurox-ai chat    - Interactive chat with GPU brain (100% GPU!)");
+    println!("  neurox-ai chat    - Interactive neural processor console");
     println!();
-    println!("Chat with the brain:");
+    println!("Quick start:");
     println!("  cargo run --release chat");
     println!();
 }
@@ -196,13 +196,12 @@ fn run_chat_interface(
 
         if input.starts_with("/gen ") {
             let prompt = input.strip_prefix("/gen ").unwrap();
-            println!("Generating from: \"{}\"", prompt);
             match brain.generate_text_gpu(prompt, 20) {
                 Ok(generated) => {
-                    println!("brain> {}", generated);
+                    println!("← {}", generated);
                 }
                 Err(e) => {
-                    println!("✗ Error generating: {}", e);
+                    println!("✗ Error: {}", e);
                 }
             }
             println!();
