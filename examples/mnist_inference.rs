@@ -90,18 +90,26 @@ fn create_simulator_from_model(
     cuda: Arc<CudaContext>,
 ) -> Result<Simulator, Box<dyn std::error::Error>> {
     // Create simulator with connectivity
-    let simulator = Simulator::with_connectivity(
+    let mut simulator = Simulator::with_connectivity(
         model.metadata.n_neurons,
         model.metadata.dt,
         cuda.clone(),
         &model.connectivity,
     )?;
 
-    // TODO: Restore neuron parameters (thresholds, tau_m, etc.)
-    // TODO: Restore membrane potentials
-    // For now, simulator uses default biological parameters
+    // Restore neuron parameters (biological state)
+    log::info!("Restoring neuron parameters...");
+    simulator.set_thresholds(&model.neuron_params.thresholds)?;
+    simulator.set_tau_m(&model.neuron_params.tau_m)?;
+    simulator.set_v_reset(&model.neuron_params.v_reset)?;
 
-    log::info!("Brain restored to GPU");
+    // Restore membrane potentials if saved
+    if let Some(ref membrane_v) = model.neuron_params.membrane_v {
+        log::info!("Restoring membrane potentials...");
+        simulator.set_voltages(membrane_v)?;
+    }
+
+    log::info!("Brain state fully restored to GPU");
     Ok(simulator)
 }
 

@@ -378,6 +378,50 @@ impl Simulator {
     pub fn get_connectivity(&self) -> Option<&SparseConnectivityGPU> {
         self.connectivity.as_ref()
     }
+
+    /// Restore neuron thresholds from saved model
+    pub fn set_thresholds(&mut self, thresholds: &[f32]) -> Result<(), Box<dyn std::error::Error>> {
+        if thresholds.len() != self.n_neurons {
+            return Err(format!("Threshold count mismatch: expected {}, got {}", self.n_neurons, thresholds.len()).into());
+        }
+        self.cuda
+            .device()
+            .htod_sync_copy_into(thresholds, &mut self.thresholds)?;
+        Ok(())
+    }
+
+    /// Restore tau_m from saved model
+    pub fn set_tau_m(&mut self, tau_m: &[f32]) -> Result<(), Box<dyn std::error::Error>> {
+        if tau_m.len() != self.n_neurons {
+            return Err(format!("tau_m count mismatch: expected {}, got {}", self.n_neurons, tau_m.len()).into());
+        }
+        self.cuda
+            .device()
+            .htod_sync_copy_into(tau_m, &mut self.tau_m)?;
+        Ok(())
+    }
+
+    /// Restore v_reset from saved model
+    pub fn set_v_reset(&mut self, v_reset: &[f32]) -> Result<(), Box<dyn std::error::Error>> {
+        if v_reset.len() != self.n_neurons {
+            return Err(format!("v_reset count mismatch: expected {}, got {}", self.n_neurons, v_reset.len()).into());
+        }
+        self.cuda
+            .device()
+            .htod_sync_copy_into(v_reset, &mut self.v_reset)?;
+        Ok(())
+    }
+
+    /// Restore membrane potentials from saved model
+    pub fn set_voltages(&mut self, voltages: &[f32]) -> Result<(), Box<dyn std::error::Error>> {
+        if voltages.len() != self.n_neurons {
+            return Err(format!("Voltage count mismatch: expected {}, got {}", self.n_neurons, voltages.len()).into());
+        }
+        self.cuda
+            .device()
+            .htod_sync_copy_into(voltages, &mut self.membrane_v)?;
+        Ok(())
+    }
 }
 
 struct InitialState {
