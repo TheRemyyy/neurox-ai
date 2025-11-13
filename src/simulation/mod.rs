@@ -32,6 +32,9 @@ pub struct Simulator {
     spike_flags: CudaSlice<f32>,
     input_currents: CudaSlice<f32>,
 
+    // Preallocated synaptic currents buffer (optimization)
+    synaptic_currents: CudaSlice<f32>,
+
     // Sparse synaptic connectivity (optional)
     connectivity: Option<SparseConnectivityGPU>,
 
@@ -74,6 +77,7 @@ impl Simulator {
         let refractory = cuda.allocate(n_neurons)?;
         let spike_flags = cuda.allocate(n_neurons)?;
         let input_currents = cuda.allocate(n_neurons)?;
+        let synaptic_currents = cuda.allocate(n_neurons)?; // Preallocate for spike propagation
 
         // Initialize with biological defaults
         let init_state = Self::create_initial_state(n_neurons);
@@ -103,6 +107,7 @@ impl Simulator {
             refractory,
             spike_flags,
             input_currents,
+            synaptic_currents,
             connectivity: None,
             event_queue,
             delay_buffer,
@@ -256,27 +261,30 @@ impl Simulator {
 
     /// Collect spikes and propagate through synapses
     fn collect_and_propagate_spikes(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        // Get spikes from GPU
-        let spikes = self.get_spikes()?;
+        // Optimization: Only download spikes every 100 timesteps (10ms @ 0.1ms/step)
+        // This reduces GPU → CPU memory transfer overhead significantly
+        if self.timestep % 100 == 0 {
+            // Get spikes from GPU
+            let spikes = self.get_spikes()?;
 
-        // Add spiking neurons to event queue and delay buffer
-        for (neuron_id, &spike_flag) in spikes.iter().enumerate() {
-            if spike_flag > 0.5 {
-                // Add to delay buffer (synaptic delay of 1ms)
-                self.delay_buffer.add_spike(neuron_id as u32, 1);
+            // Add spiking neurons to event queue and delay buffer
+            for (neuron_id, &spike_flag) in spikes.iter().enumerate() {
+                if spike_flag > 0.5 {
+                    // Add to delay buffer (synaptic delay of 1ms)
+                    self.delay_buffer.add_spike(neuron_id as u32, 1);
 
-                // Add to event queue for immediate processing
-                self.event_queue.push(SpikeEvent::new(
-                    neuron_id as u32,
-                    (self.timestep % 65536) as u16,
-                    0, // region_id
-                ));
+                    // Add to event queue for immediate processing
+                    self.event_queue.push(SpikeEvent::new(
+                        neuron_id as u32,
+                        (self.timestep % 65536) as u16,
+                        0, // region_id
+                    ));
+                }
             }
         }
 
         // Propagate spikes through synapses if connectivity is present
         if let Some(ref conn) = self.connectivity {
-            let mut synaptic_currents = self.cuda.allocate(self.n_neurons)?;
             let config = KernelConfig::for_neurons(self.n_neurons);
 
             self.cuda.spike_kernel().launch(
@@ -285,7 +293,7 @@ impl Simulator {
                 &conn.col_idx,
                 &conn.weights,
                 &self.spike_flags,
-                &mut synaptic_currents,
+                &mut self.synaptic_currents,
                 self.n_neurons as i32,
             )?;
 
