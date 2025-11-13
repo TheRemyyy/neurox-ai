@@ -211,7 +211,6 @@ fn create_mnist_connectivity(
         col_idx,
         weights,
         nnz: col_idx.len(),
-        n_rows: n_neurons,
-        n_cols: n_neurons,
+        n_neurons,
     })
 }

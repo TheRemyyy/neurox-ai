@@ -112,7 +112,7 @@ impl Simulator {
             event_queue,
             delay_buffer,
             active_neurons: Vec::with_capacity(n_neurons / 10), // Expect ~10% sparsity
-            event_driven: true, // Enable by default
+            event_driven: false, // Disabled for now - dense mode is optimized
             sparsity_threshold: 0.15, // Switch to dense mode if >15% active
         })
     }
