@@ -49,9 +49,9 @@ fn display_welcome() {
     println!("╚════════════════════════════════════════════════════════════╝");
     println!();
     println!("Available examples:");
-    println!("  cargo run --release --example mnist_training    - Train on MNIST dataset");
-    println!("  cargo run --release --example scale_test_1m     - Test 100K-1M neuron scaling");
-    println!("  cargo run --release --example phase2_sparse_network - Sparse connectivity validation");
+    println!("  cargo run --release --example mnist_training           - Train on MNIST dataset");
+    println!("  cargo run --release --example scale_test_1m            - Test 100K-1M neuron scaling");
+    println!("  cargo run --release --example connectivity_validation  - Sparse connectivity validation");
     println!();
     println!("Commands:");
     println!("  neurox-ai info    - Display GPU device information");
