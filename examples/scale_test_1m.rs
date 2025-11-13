@@ -102,7 +102,7 @@ fn run_scale_test(
         exc_ratio: 0.8, // Dale's principle
     };
 
-    let connectivity = connectivity_gen.to_sparse_matrix(n_neurons)?;
+    let connectivity = SparseConnectivity::from_procedural(n_neurons, &connectivity_gen);
     log::info!("  Synapses: {}", connectivity.nnz);
     log::info!("  Memory: {:.2} MB", connectivity.memory_footprint() as f64 / 1024.0 / 1024.0);
     log::info!("  Sparsity: {:.4}%", connectivity.sparsity() * 100.0);
