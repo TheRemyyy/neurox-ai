@@ -23,12 +23,12 @@ enum Commands {
 
     /// Interactive neural processor console
     Chat {
-        /// Max vocabulary size
-        #[arg(long, default_value_t = 50000)]
+        /// Max vocabulary size (10k = 400MB, 20k = 1.6GB)
+        #[arg(long, default_value_t = 10000)]
         vocab: usize,
 
-        /// Pattern dimension
-        #[arg(long, default_value_t = 1024)]
+        /// Pattern dimension (512 = balanced, 1024 = high quality)
+        #[arg(long, default_value_t = 512)]
         pattern_dim: usize,
     },
 }

@@ -18,8 +18,12 @@ pub struct NeuralProcessor {
     token_patterns: CudaSlice<f32>,
     transition_matrix: CudaSlice<f32>,
     tokens_gpu: CudaSlice<i32>,
-    long_term_memory: CudaSlice<f32>, // Real memory storage
+    long_term_memory: CudaSlice<f32>,
     memory_metadata: Vec<MemoryEntry>,
+
+    // Buffer sizes
+    max_token_buffer: usize,
+    max_ltm_entries: usize,
 
     // GPU Kernels
     spike_corr_kernel: SpikeCorrelationKernel,
@@ -58,10 +62,20 @@ impl NeuralProcessor {
         log::info!("  Max vocabulary: {} (dynamic growth)", max_vocab_size);
         log::info!("  Pattern dimension: {}", pattern_dim);
 
-        let token_patterns = device.alloc_zeros::<f32>(pattern_dim * 1000)?;
-        let transition_matrix = device.alloc_zeros::<f32>(max_vocab_size * max_vocab_size)?;
-        let tokens_gpu = device.alloc_zeros::<i32>(1000)?;
-        let long_term_memory = device.alloc_zeros::<f32>(10000 * pattern_dim)?;
+        // Calculate memory usage
+        let matrix_size = max_vocab_size * max_vocab_size;
+        let matrix_mb = (matrix_size * 4) / (1024 * 1024);
+        log::info!("  Transition matrix: {} MB", matrix_mb);
+
+        // Optimize long-term memory based on pattern dim
+        let ltm_entries = (5000).min(50000 / (pattern_dim / 128));
+        let ltm_mb = (ltm_entries * pattern_dim * 4) / (1024 * 1024);
+        log::info!("  Long-term memory: {} entries ({} MB)", ltm_entries, ltm_mb);
+
+        let token_patterns = device.alloc_zeros::<f32>(pattern_dim * 500)?; // 500 token buffer
+        let transition_matrix = device.alloc_zeros::<f32>(matrix_size)?;
+        let tokens_gpu = device.alloc_zeros::<i32>(500)?; // 500 tokens
+        let long_term_memory = device.alloc_zeros::<f32>(ltm_entries * pattern_dim)?;
 
         log::info!("Loading GPU kernels...");
         let spike_corr_kernel = SpikeCorrelationKernel::new(device.clone())?;
@@ -81,6 +95,8 @@ impl NeuralProcessor {
             tokens_gpu,
             long_term_memory,
             memory_metadata: Vec::new(),
+            max_token_buffer: 500,
+            max_ltm_entries: ltm_entries,
             spike_corr_kernel,
             cosine_kernel,
             token_kernel,
@@ -131,7 +147,7 @@ impl NeuralProcessor {
     }
 
     fn encode_tokens_gpu(&mut self, tokens: &[i32]) -> Result<(), Box<dyn std::error::Error>> {
-        let n_tokens = tokens.len().min(1000);
+        let n_tokens = tokens.len().min(self.max_token_buffer);
 
         self.device.htod_sync_copy_into(tokens, &mut self.tokens_gpu)?;
 
@@ -158,11 +174,11 @@ impl NeuralProcessor {
             access_count: 0,
         });
 
-        let memory_idx = (self.memory_metadata.len() - 1) % 10000;
+        let memory_idx = (self.memory_metadata.len() - 1) % self.max_ltm_entries;
         let pattern_offset = memory_idx * self.pattern_dim;
 
         let all_patterns = self.device.dtoh_sync_copy(&self.token_patterns)?;
-        let pattern_slice = &all_patterns[0..tokens.len().min(1000) * self.pattern_dim];
+        let pattern_slice = &all_patterns[0..tokens.len().min(self.max_token_buffer) * self.pattern_dim];
 
         let mut ltm_data = self.device.dtoh_sync_copy(&self.long_term_memory)?;
         let copy_len = pattern_slice.len().min(ltm_data.len() - pattern_offset);
@@ -177,7 +193,7 @@ impl NeuralProcessor {
             return Ok(());
         }
 
-        let n_tokens = tokens.len().min(1000);
+        let n_tokens = tokens.len().min(self.max_token_buffer);
         self.device.htod_sync_copy_into(tokens, &mut self.tokens_gpu)?;
 
         let config = KernelConfig::for_neurons(n_tokens);
