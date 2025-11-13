@@ -193,12 +193,16 @@ impl Simulator {
         let active_count = self.event_queue.len();
         let sparsity = active_count as f32 / self.n_neurons as f32;
 
-        if self.event_driven && sparsity < self.sparsity_threshold {
-            // Event-driven mode: Process only active neurons
-            self.step_sparse()?;
-        } else {
+        // Use dense mode if:
+        // - Event-driven is disabled
+        // - No events yet (bootstrap phase)
+        // - Activity above sparsity threshold
+        if !self.event_driven || active_count == 0 || sparsity >= self.sparsity_threshold {
             // Dense mode: Process all neurons (traditional time-stepped)
             self.step_dense()?;
+        } else {
+            // Event-driven mode: Process only active neurons
+            self.step_sparse()?;
         }
 
         self.timestep += 1;
