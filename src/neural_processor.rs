@@ -5,6 +5,7 @@
 
 use crate::cuda::KernelConfig;
 use crate::cuda::cognitive_kernels::*;
+use crate::cuda::sparse_kernels::*;
 use cudarc::driver::{CudaDevice, CudaSlice};
 use std::sync::Arc;
 use std::collections::HashMap;
@@ -16,10 +17,11 @@ pub struct NeuralProcessor {
 
     // GPU Memory Buffers
     token_patterns: CudaSlice<f32>,
-    transition_matrix: CudaSlice<f32>,
+    sparse_transitions: SparseTransitionMatrix,
     tokens_gpu: CudaSlice<i32>,
     long_term_memory: CudaSlice<f32>,
     memory_metadata: Vec<MemoryEntry>,
+    dense_row_buffer: CudaSlice<f32>, // For generation
 
     // Buffer sizes
     max_token_buffer: usize,
@@ -30,8 +32,6 @@ pub struct NeuralProcessor {
     cosine_kernel: CosineSimilarityKernel,
     token_kernel: TokenEncodingKernel,
     storage_kernel: PatternStorageKernel,
-    transition_kernel: TransitionUpdateKernel,
-    normalize_kernel: TransitionNormalizeKernel,
 
     // Vocabulary (dynamic, no hard limits)
     word_to_token: HashMap<String, i32>,
@@ -62,28 +62,25 @@ impl NeuralProcessor {
         log::info!("  Max vocabulary: {} (dynamic growth)", max_vocab_size);
         log::info!("  Pattern dimension: {}", pattern_dim);
 
-        // Calculate memory usage
-        let matrix_size = max_vocab_size * max_vocab_size;
-        let matrix_mb = (matrix_size * 4) / (1024 * 1024);
-        log::info!("  Transition matrix: {} MB", matrix_mb);
-
         // Optimize long-term memory based on pattern dim
         let ltm_entries = (5000).min(50000 / (pattern_dim / 128));
         let ltm_mb = (ltm_entries * pattern_dim * 4) / (1024 * 1024);
         log::info!("  Long-term memory: {} entries ({} MB)", ltm_entries, ltm_mb);
 
-        let token_patterns = device.alloc_zeros::<f32>(pattern_dim * 500)?; // 500 token buffer
-        let transition_matrix = device.alloc_zeros::<f32>(matrix_size)?;
-        let tokens_gpu = device.alloc_zeros::<i32>(500)?; // 500 tokens
+        let token_patterns = device.alloc_zeros::<f32>(pattern_dim * 500)?;
+        let tokens_gpu = device.alloc_zeros::<i32>(500)?;
         let long_term_memory = device.alloc_zeros::<f32>(ltm_entries * pattern_dim)?;
+        let dense_row_buffer = device.alloc_zeros::<f32>(max_vocab_size)?;
 
         log::info!("Loading GPU kernels...");
         let spike_corr_kernel = SpikeCorrelationKernel::new(device.clone())?;
         let cosine_kernel = CosineSimilarityKernel::new(device.clone())?;
         let token_kernel = TokenEncodingKernel::new(device.clone())?;
         let storage_kernel = PatternStorageKernel::new(device.clone())?;
-        let transition_kernel = TransitionUpdateKernel::new(device.clone())?;
-        let normalize_kernel = TransitionNormalizeKernel::new(device.clone())?;
+
+        // Create sparse transition matrix (saves 90%+ memory!)
+        let max_nnz = (max_vocab_size * 100).min(10_000_000); // ~1% sparsity
+        let sparse_transitions = SparseTransitionMatrix::new(device.clone(), max_vocab_size, max_nnz)?;
 
         log::info!("✓ Neural processor initialized");
 
@@ -91,18 +88,17 @@ impl NeuralProcessor {
             device,
             pattern_dim,
             token_patterns,
-            transition_matrix,
+            sparse_transitions,
             tokens_gpu,
             long_term_memory,
             memory_metadata: Vec::new(),
+            dense_row_buffer,
             max_token_buffer: 500,
             max_ltm_entries: ltm_entries,
             spike_corr_kernel,
             cosine_kernel,
             token_kernel,
             storage_kernel,
-            transition_kernel,
-            normalize_kernel,
             word_to_token: HashMap::new(),
             token_to_word: HashMap::new(),
             next_token_id: 1,
@@ -149,7 +145,12 @@ impl NeuralProcessor {
     fn encode_tokens_gpu(&mut self, tokens: &[i32]) -> Result<(), Box<dyn std::error::Error>> {
         let n_tokens = tokens.len().min(self.max_token_buffer);
 
-        self.device.htod_sync_copy_into(tokens, &mut self.tokens_gpu)?;
+        // Copy only the tokens we need
+        let tokens_to_copy = &tokens[..n_tokens];
+        let temp_tokens = self.device.htod_sync_copy(tokens_to_copy)?;
+
+        // Copy into our buffer (reuse allocation)
+        self.tokens_gpu = temp_tokens;
 
         let total_elements = n_tokens * self.pattern_dim;
         let config = KernelConfig::for_neurons(total_elements);
@@ -194,36 +195,23 @@ impl NeuralProcessor {
         }
 
         let n_tokens = tokens.len().min(self.max_token_buffer);
-        self.device.htod_sync_copy_into(tokens, &mut self.tokens_gpu)?;
 
-        let config = KernelConfig::for_neurons(n_tokens);
+        // Copy only the tokens we need
+        let tokens_to_copy = &tokens[..n_tokens];
+        let temp_tokens = self.device.htod_sync_copy(tokens_to_copy)?;
+        self.tokens_gpu = temp_tokens;
 
-        self.transition_kernel.launch(
-            config,
-            &mut self.transition_matrix,
-            &self.tokens_gpu,
-            n_tokens as i32,
-            self.max_vocab_size as i32,
-            0.1,
-        )?;
+        // Use sparse matrix update (saves 90%+ memory!)
+        self.sparse_transitions.update(&self.tokens_gpu, n_tokens as i32, 0.1)?;
+        self.sparse_transitions.normalize()?;
 
-        let config = KernelConfig::for_neurons(self.max_vocab_size);
-        self.normalize_kernel.launch(
-            config,
-            &mut self.transition_matrix,
-            self.max_vocab_size as i32,
-        )?;
-
-        self.device.synchronize()?;
         Ok(())
     }
 
     fn generate_next_token_gpu(&mut self, current_token: i32) -> Result<i32, Box<dyn std::error::Error>> {
-        let start = current_token as usize * self.max_vocab_size;
-        let end = start + self.max_vocab_size;
-
-        let all_transitions = self.device.dtoh_sync_copy(&self.transition_matrix)?;
-        let probs = &all_transitions[start..end];
+        // Use sparse matrix lookup
+        self.sparse_transitions.lookup_row(current_token, &mut self.dense_row_buffer)?;
+        let probs = self.device.dtoh_sync_copy(&self.dense_row_buffer)?;
 
         let max_idx = probs
             .iter()
