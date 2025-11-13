@@ -284,9 +284,16 @@ impl WorkingMemory {
             neuron.update(dt, self.time);
         }
 
-        // Decay attention gates
-        for gate in &mut self.attention_gates {
-            *gate *= 0.99; // Slow decay
+        // Attention gates decay very slowly (items persist for ~10 seconds)
+        // Only decay gates that are below threshold to eventually remove weak items
+        for (i, gate) in self.attention_gates.iter_mut().enumerate() {
+            if i < self.context_buffer.len() {
+                // Items in buffer: very slow decay (99.9% retention per step)
+                *gate *= 0.999;
+            } else {
+                // Empty slots: fast decay
+                *gate *= 0.9;
+            }
         }
     }
 

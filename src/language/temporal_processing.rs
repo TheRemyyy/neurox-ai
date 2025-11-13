@@ -122,6 +122,8 @@ impl TemporalProcessor {
     pub fn generate_sequence(&self, start_token: usize, max_length: usize) -> Vec<usize> {
         let mut sequence = vec![start_token];
         let mut current = start_token;
+        let mut seen_tokens = std::collections::HashSet::new();
+        seen_tokens.insert(start_token);
 
         for _ in 0..max_length {
             let next = self.predict_next(current);
@@ -131,7 +133,13 @@ impl TemporalProcessor {
                 break;
             }
 
+            // Stop if we're in a loop (token repeated)
+            if seen_tokens.contains(&next) {
+                break;
+            }
+
             sequence.push(next);
+            seen_tokens.insert(next);
             current = next;
         }
 
