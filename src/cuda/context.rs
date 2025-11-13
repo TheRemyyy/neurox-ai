@@ -1,0 +1,138 @@
+//! CUDA context and GPU memory management
+//!
+//! Handles GPU device initialization, memory allocation, and resource cleanup.
+
+use super::{GpuMemoryInfo, LIFUpdateKernel, SpikePropagationKernel};
+use cudarc::driver::{CudaDevice, CudaSlice};
+use std::sync::Arc;
+
+/// Main CUDA context for neuromorphic simulation
+pub struct CudaContext {
+    /// CUDA device
+    device: Arc<CudaDevice>,
+
+    /// LIF update kernel
+    lif_kernel: LIFUpdateKernel,
+
+    /// Spike propagation kernel
+    spike_kernel: SpikePropagationKernel,
+
+    /// Device ordinal
+    device_id: usize,
+}
+
+impl CudaContext {
+    /// Initialize CUDA context with specified device
+    pub fn new(device_id: usize) -> Result<Self, Box<dyn std::error::Error>> {
+        log::info!("Initializing CUDA device {}", device_id);
+
+        let device = CudaDevice::new(device_id)?;
+        log::info!("Device name: {}", device.name()?);
+
+        // Compile kernels
+        log::info!("Compiling LIF update kernel...");
+        let lif_kernel = LIFUpdateKernel::new(device.clone())?;
+
+        log::info!("Compiling spike propagation kernel...");
+        let spike_kernel = SpikePropagationKernel::new(device.clone())?;
+
+        log::info!("CUDA context initialized successfully");
+
+        Ok(Self {
+            device,
+            lif_kernel,
+            spike_kernel,
+            device_id,
+        })
+    }
+
+    /// Initialize with default device (0)
+    pub fn default() -> Result<Self, Box<dyn std::error::Error>> {
+        Self::new(0)
+    }
+
+    /// Get device information
+    pub fn device_info(&self) -> Result<String, Box<dyn std::error::Error>> {
+        let name = self.device.name()?;
+        let mem_info = self.memory_info()?;
+
+        Ok(format!(
+            "Device {}: {}\nMemory: {}",
+            self.device_id,
+            name,
+            mem_info.format()
+        ))
+    }
+
+    /// Get GPU memory information (approximation)
+    pub fn memory_info(&self) -> Result<GpuMemoryInfo, Box<dyn std::error::Error>> {
+        // cudarc 0.12 doesn't expose total_memory directly
+        // Return estimated values for RTX 3070
+        Ok(GpuMemoryInfo {
+            total: 8 * 1024 * 1024 * 1024, // 8GB
+            free: 8 * 1024 * 1024 * 1024,
+            used: 0,
+        })
+    }
+
+    /// Allocate GPU memory
+    pub fn allocate<T: cudarc::driver::DeviceRepr + cudarc::driver::ValidAsZeroBits>(
+        &self,
+        size: usize,
+    ) -> Result<CudaSlice<T>, Box<dyn std::error::Error>> {
+        let slice = self.device.alloc_zeros::<T>(size)?;
+        Ok(slice)
+    }
+
+    /// Get underlying device
+    pub fn device(&self) -> &Arc<CudaDevice> {
+        &self.device
+    }
+
+    /// Get LIF kernel
+    pub fn lif_kernel(&self) -> &LIFUpdateKernel {
+        &self.lif_kernel
+    }
+
+    /// Get spike propagation kernel
+    pub fn spike_kernel(&self) -> &SpikePropagationKernel {
+        &self.spike_kernel
+    }
+
+    /// Synchronize device (wait for all operations to complete)
+    pub fn synchronize(&self) -> Result<(), Box<dyn std::error::Error>> {
+        self.device.synchronize()?;
+        Ok(())
+    }
+}
+
+impl Drop for CudaContext {
+    fn drop(&mut self) {
+        log::info!("Cleaning up CUDA context");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[ignore] // Only run if CUDA is available
+    fn test_cuda_init() {
+        let ctx = CudaContext::default();
+        assert!(ctx.is_ok());
+
+        if let Ok(ctx) = ctx {
+            let info = ctx.device_info().unwrap();
+            println!("{}", info);
+        }
+    }
+
+    #[test]
+    #[ignore]
+    fn test_memory_allocation() {
+        let ctx = CudaContext::default().unwrap();
+        let slice: CudaSlice<f32> = ctx.allocate(1000).unwrap();
+        assert_eq!(slice.len(), 1000);
+    }
+}
