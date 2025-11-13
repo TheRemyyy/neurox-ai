@@ -2,7 +2,7 @@
 //!
 //! Saves 90%+ memory by storing only non-zero values
 
-use cudarc::driver::{CudaDevice, CudaFunction, LaunchAsync, CudaSlice};
+use cudarc::driver::{CudaDevice, CudaFunction, LaunchAsync, CudaSlice, DeviceSlice};
 use std::sync::Arc;
 
 /// Sparse transition matrix update kernel (CSR format)
