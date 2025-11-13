@@ -229,6 +229,5 @@ fn run_chat_interface(
         println!();
     }
 
-    println!("Goodbye!");
     Ok(())
 }
