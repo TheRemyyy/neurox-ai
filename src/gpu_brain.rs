@@ -247,7 +247,7 @@ impl GpuBrain {
         let tokens = self.tokenize(text);
 
         if tokens.is_empty() {
-            return Ok("(empty input)".to_string());
+            return Ok("I need input to process.".to_string());
         }
 
         // Encode on GPU
@@ -256,15 +256,22 @@ impl GpuBrain {
         // Store in working memory (GPU)
         self.store_patterns_gpu(tokens.len(), 0.8)?;
 
+        // Check if we have learned vocabulary
+        if self.word_to_token.len() < 3 {
+            return Ok("I need training first. Use /train to enable training mode and teach me some sentences.".to_string());
+        }
+
         // Generate response (start from last token)
         let start_token = *tokens.last().unwrap_or(&1);
-        let response_tokens = self.generate_sequence_gpu(start_token, 10)?;
+        let response_tokens = self.generate_sequence_gpu(start_token, 15)?;
 
         // Detokenize
         let response = self.detokenize(&response_tokens);
 
-        if response.is_empty() {
-            Ok("...".to_string())
+        if response.is_empty() || response.split_whitespace().count() < 2 {
+            // Fallback: echo input with slight variation
+            let input_text = self.detokenize(&tokens);
+            Ok(format!("I understand: {}", input_text))
         } else {
             Ok(response)
         }
@@ -392,17 +399,16 @@ impl std::fmt::Display for GpuBrainStats {
         write!(
             f,
             "╔════════════════════════════════════════╗\n\
-             ║       GPU Brain Statistics             ║\n\
+             ║     Neural Processor Status            ║\n\
              ╠════════════════════════════════════════╣\n\
-             ║ Vocabulary Size:  {:>6}              ║\n\
-             ║ Learned Words:    {:>6}              ║\n\
+             ║ Vocabulary:       {:>6} / {:>6}      ║\n\
              ║ Pattern Dim:      {:>6}              ║\n\
              ║ Working Memory:   {:>6} slots        ║\n\
              ║ Uptime:           {:>6.2}s           ║\n\
              ║ GPU Memory:       {}        ║\n\
              ╚════════════════════════════════════════╝",
-            self.vocab_size,
             self.learned_words,
+            self.vocab_size,
             self.pattern_dim,
             self.wm_capacity,
             self.time,

@@ -103,18 +103,18 @@ fn run_chat_interface(
     use cudarc::driver::CudaDevice;
 
     println!("╔════════════════════════════════════════════════════════════╗");
-    println!("║         GPU Brain Interactive Chat Interface              ║");
+    println!("║     NeuroxAI Neural Processor - Interactive Console       ║");
     println!("╚════════════════════════════════════════════════════════════╝");
     println!();
-    println!("Initializing GPU brain...");
+    println!("Initializing neural processor...");
 
     // Initialize CUDA device (CudaDevice::new already returns Arc)
     let device = CudaDevice::new(0)?;
     println!("✓ CUDA device initialized: {}", device.name()?);
 
-    // Create GPU brain
+    // Create neural processor
     let mut brain = GpuBrain::new(device, vocab, pattern_dim, wm_capacity)?;
-    println!("✓ GPU brain created");
+    println!("✓ Neural processor ready");
     println!();
 
     // Display stats
@@ -123,13 +123,13 @@ fn run_chat_interface(
     println!();
 
     println!("╔════════════════════════════════════════════════════════════╗");
-    println!("║  Brain is ready! Start chatting (type 'quit' to exit)    ║");
+    println!("║  Neural processor online. Ready for interaction.          ║");
     println!("║  Commands:                                                 ║");
-    println!("║    /stats   - Show brain statistics                        ║");
-    println!("║    /train   - Toggle training mode                         ║");
-    println!("║    /vocab   - Show learned vocabulary                      ║");
-    println!("║    /gen <text> - Generate continuation from prompt         ║");
-    println!("║    quit     - Exit                                         ║");
+    println!("║    /stats   - System statistics                            ║");
+    println!("║    /train   - Toggle learning mode                         ║");
+    println!("║    /vocab   - Display vocabulary                           ║");
+    println!("║    /gen <text> - Generate from prompt                      ║");
+    println!("║    quit     - Shutdown                                     ║");
     println!("╚════════════════════════════════════════════════════════════╝");
     println!();
 
@@ -138,9 +138,9 @@ fn run_chat_interface(
     loop {
         // Print prompt
         if training_mode {
-            print!("train> ");
+            print!("learn> ");
         } else {
-            print!("you> ");
+            print!("> ");
         }
         io::stdout().flush()?;
 
@@ -155,7 +155,7 @@ fn run_chat_interface(
         }
 
         if input == "quit" || input == "exit" {
-            println!("Shutting down brain...");
+            println!("→ Neural processor shutdown initiated");
             break;
         }
 
@@ -168,9 +168,9 @@ fn run_chat_interface(
         if input == "/train" {
             training_mode = !training_mode;
             if training_mode {
-                println!("Training mode ON - your messages will train the brain");
+                println!("→ Learning mode enabled");
             } else {
-                println!("Training mode OFF");
+                println!("→ Learning mode disabled");
             }
             continue;
         }
@@ -211,16 +211,14 @@ fn run_chat_interface(
 
         // Process input
         if training_mode {
-            println!("Training on: \"{}\"", input);
             match brain.train_on_text_gpu(input) {
-                Ok(_) => println!("✓ Trained"),
-                Err(e) => println!("✗ Error training: {}", e),
+                Ok(_) => println!("✓ Learned"),
+                Err(e) => println!("✗ Error: {}", e),
             }
         } else {
-            println!("Processing: \"{}\"", input);
             match brain.process_text_gpu(input) {
                 Ok(response) => {
-                    println!("brain> {}", response);
+                    println!("← {}", response);
                 }
                 Err(e) => {
                     println!("✗ Error: {}", e);
