@@ -12,6 +12,7 @@ pub use kernels::*;
 use cudarc::driver::LaunchConfig;
 
 /// Optimal kernel launch configuration for RTX 3070
+#[derive(Debug, Clone, Copy)]
 pub struct KernelConfig {
     /// Threads per block (256-512, multiple of 32)
     pub threads_per_block: u32,
