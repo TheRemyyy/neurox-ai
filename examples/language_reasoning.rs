@@ -15,25 +15,9 @@ use neurox_ai::*;
 use std::time::Instant;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize logging with colors
+    // Initialize logging
     env_logger::Builder::from_default_env()
         .filter_level(log::LevelFilter::Info)
-        .format(|buf, record| {
-            use std::io::Write;
-            use env_logger::fmt::Color;
-
-            let mut style = buf.style();
-            let level_color = match record.level() {
-                log::Level::Error => Color::Red,
-                log::Level::Warn => Color::Yellow,
-                log::Level::Info => Color::Green,
-                log::Level::Debug => Color::Blue,
-                log::Level::Trace => Color::Cyan,
-            };
-            style.set_color(level_color).set_bold(true);
-
-            writeln!(buf, "{} {}", style.value(record.level()), record.args())
-        })
         .init();
 
     log::info!("=== Neuromorphic Language Reasoning Demo ===");
@@ -89,7 +73,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let wm_stats = brain.stats().working_memory;
     log::info!("Active items in working memory: {}", wm_stats.active_count);
-    log::info!("Total items stored: {}", wm_stats.total_stored);
+    log::info!("Total items stored: {}", wm_stats.stored_patterns);
+    log::info!("Capacity utilization: {:.1}%", wm_stats.utilization * 100.0);
     log::info!("Average attention level: {:.3}", wm_stats.avg_attention);
     log::info!("");
 
@@ -108,20 +93,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let hippocampus_stats = brain.stats().hippocampus;
-    log::info!("Memories stored: {}", hippocampus_stats.stored_count);
-    log::info!("Pattern separation active: {}", hippocampus_stats.dg_active);
-    log::info!("Recall accuracy: {:.1}%", hippocampus_stats.recall_accuracy * 100.0);
+    log::info!("Memory buffer size: {}", hippocampus_stats.buffer_size);
+    log::info!("Max buffer capacity: {}", hippocampus_stats.max_buffer);
+    log::info!("DG sparsity: {:.1}%", hippocampus_stats.dg_sparsity * 100.0);
+    log::info!("Average priority: {:.3}", hippocampus_stats.avg_priority);
     log::info!("");
 
     // === Part 4: Attention and Salience ===
     log::info!("=== Part 4: Attention and Salience ===");
 
     let attention_stats = brain.stats().attention;
-    log::info!("Top-3 attended locations:");
-    for (i, &salience) in attention_stats.top_salience.iter().take(3).enumerate() {
-        log::info!("  Location {}: salience = {:.3}", i + 1, salience);
-    }
-    log::info!("Routing strength: {:.3}", attention_stats.routing_strength);
+    log::info!("Average salience: {:.3}", attention_stats.avg_salience);
+    log::info!("Max salience: {:.3}", attention_stats.max_salience);
+    log::info!("Focused locations: {}", attention_stats.focused_locations);
+    log::info!("Avg top-down signal: {:.3}", attention_stats.avg_top_down);
+    log::info!("Avg bottom-up signal: {:.3}", attention_stats.avg_bottom_up);
     log::info!("");
 
     // === Part 5: Language Statistics ===
@@ -174,7 +160,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let final_hippocampus_stats = brain.stats().hippocampus;
-    log::info!("Total memories after learning: {}", final_hippocampus_stats.stored_count);
+    log::info!("Memory buffer after learning: {}", final_hippocampus_stats.buffer_size);
     log::info!("");
 
     // === Part 9: Brain Dynamics Update ===
@@ -198,11 +184,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     log::info!("  Average attention: {:.3}", final_stats.working_memory.avg_attention);
 
     log::info!("Hippocampus:");
-    log::info!("  Stored memories: {}", final_stats.hippocampus.stored_count);
-    log::info!("  Recall accuracy: {:.1}%", final_stats.hippocampus.recall_accuracy * 100.0);
+    log::info!("  Buffer size: {}", final_stats.hippocampus.buffer_size);
+    log::info!("  Average priority: {:.3}", final_stats.hippocampus.avg_priority);
 
     log::info!("Attention:");
-    log::info!("  Routing strength: {:.3}", final_stats.attention.routing_strength);
+    log::info!("  Average salience: {:.3}", final_stats.attention.avg_salience);
 
     log::info!("Language:");
     log::info!("  Transitions learned: {}", final_stats.language.transition_count);
