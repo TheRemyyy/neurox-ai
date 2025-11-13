@@ -319,6 +319,16 @@ impl Simulator {
         self.timestep as f32 * self.dt
     }
 
+    /// Get number of neurons
+    pub fn n_neurons(&self) -> usize {
+        self.n_neurons
+    }
+
+    /// Get timestep duration (ms)
+    pub fn dt(&self) -> f32 {
+        self.dt
+    }
+
     /// Synchronize GPU
     pub fn synchronize(&self) -> Result<(), Box<dyn std::error::Error>> {
         self.cuda.synchronize()

@@ -1,0 +1,364 @@
+//! Training pipeline for spiking neural networks
+//!
+//! Implements Triplet STDP training with Winner-Take-All dynamics
+
+use crate::simulation::Simulator;
+use crate::datasets::MNISTImage;
+use crate::learning::{TripletSTDP, HomeostaticPlasticity, STDPConfig, STPDynamics};
+use std::sync::Arc;
+
+/// Training configuration
+#[derive(Debug, Clone)]
+pub struct TrainingConfig {
+    /// Number of epochs
+    pub n_epochs: usize,
+
+    /// Batch size
+    pub batch_size: usize,
+
+    /// Presentation duration per image (ms)
+    pub presentation_duration: f32,
+
+    /// Inter-stimulus interval (ms)
+    pub isi_duration: f32,
+
+    /// Learning rate decay factor (per epoch)
+    pub lr_decay: f32,
+
+    /// Winner-Take-All lateral inhibition strength
+    pub wta_strength: f32,
+
+    /// Target firing rate for homeostasis (Hz)
+    pub target_rate: f32,
+
+    /// Apply sleep-like consolidation every N epochs
+    pub consolidation_interval: usize,
+}
+
+impl Default for TrainingConfig {
+    fn default() -> Self {
+        Self {
+            n_epochs: 10,
+            batch_size: 100,
+            presentation_duration: 350.0, // 350ms per image
+            isi_duration: 150.0,           // 150ms rest between images
+            lr_decay: 0.95,
+            wta_strength: 18.0,            // Lateral inhibition strength (17-20)
+            target_rate: 5.0,              // 5 Hz target
+            consolidation_interval: 5,     // Every 5 epochs
+        }
+    }
+}
+
+/// Training statistics
+#[derive(Debug, Clone)]
+pub struct TrainingStats {
+    /// Current epoch
+    pub epoch: usize,
+
+    /// Training accuracy
+    pub train_accuracy: f32,
+
+    /// Test accuracy
+    pub test_accuracy: f32,
+
+    /// Average firing rate (Hz)
+    pub avg_firing_rate: f32,
+
+    /// Total spikes
+    pub total_spikes: u64,
+
+    /// Weight statistics
+    pub avg_weight: f32,
+    pub weight_std: f32,
+}
+
+/// MNIST Trainer with Triplet STDP
+pub struct MNISTTrainer {
+    /// Training configuration
+    config: TrainingConfig,
+
+    /// Simulator
+    simulator: Simulator,
+
+    /// STDP learning
+    stdp: TripletSTDP,
+
+    /// Homeostatic plasticity
+    homeostasis: HomeostaticPlasticity,
+
+    /// STP dynamics (post-training)
+    stp: Option<Vec<STPDynamics>>,
+
+    /// Output neuron assignments (one per class 0-9)
+    output_assignments: Vec<usize>,
+
+    /// Training statistics
+    stats: Vec<TrainingStats>,
+}
+
+impl MNISTTrainer {
+    /// Create new MNIST trainer
+    pub fn new(
+        simulator: Simulator,
+        config: TrainingConfig,
+        stdp_config: STDPConfig,
+    ) -> Self {
+        let n_neurons = simulator.n_neurons();
+
+        // Initialize STDP
+        let stdp = TripletSTDP::new(n_neurons, stdp_config);
+
+        // Initialize homeostasis
+        let homeostasis = HomeostaticPlasticity::new(n_neurons, config.target_rate);
+
+        // Output neurons: last 10 neurons represent digits 0-9
+        let output_start = n_neurons.saturating_sub(10);
+        let output_assignments: Vec<usize> = (output_start..n_neurons).collect();
+
+        Self {
+            config,
+            simulator,
+            stdp,
+            homeostasis,
+            stp: None,
+            output_assignments,
+            stats: Vec::new(),
+        }
+    }
+
+    /// Train on single image
+    pub fn train_on_image(&mut self, image: &MNISTImage) -> Result<(), Box<dyn std::error::Error>> {
+        // Convert image to input currents (784 pixels → 784 input neurons)
+        let input_currents = image.to_input_currents(10.0); // Scale factor
+
+        // Present image for configured duration
+        let n_steps = (self.config.presentation_duration / self.simulator.dt()) as usize;
+
+        for _ in 0..n_steps {
+            // Update simulator
+            self.simulator.step(Some(&input_currents))?;
+
+            // Get spikes
+            let spikes = self.simulator.get_spikes()?;
+
+            // Apply Winner-Take-All lateral inhibition
+            let winner_idx = self.apply_wta(&spikes);
+
+            // Update STDP traces
+            for (neuron_id, &spike) in spikes.iter().enumerate() {
+                if spike > 0.5 {
+                    self.stdp.on_pre_spike(neuron_id);
+                    self.stdp.on_post_spike(neuron_id);
+                    self.homeostasis.record_spike(neuron_id);
+                }
+            }
+
+            // Decay traces
+            self.stdp.decay_traces(self.simulator.dt());
+        }
+
+        // Rest period (ISI)
+        let isi_steps = (self.config.isi_duration / self.simulator.dt()) as usize;
+        for _ in 0..isi_steps {
+            self.simulator.step(None)?;
+            self.stdp.decay_traces(self.simulator.dt());
+        }
+
+        Ok(())
+    }
+
+    /// Apply Winner-Take-All lateral inhibition
+    /// Returns index of winning neuron (highest spike count)
+    fn apply_wta(&self, spikes: &[f32]) -> Option<usize> {
+        let mut max_idx = None;
+        let mut max_spikes = 0.0;
+
+        // Find neuron with most spikes (winner)
+        for (idx, &spike) in spikes.iter().enumerate() {
+            if spike > max_spikes {
+                max_spikes = spike;
+                max_idx = Some(idx);
+            }
+        }
+
+        // TODO: Suppress other neurons via lateral inhibition
+        // This would require modifying neuron thresholds or input currents
+
+        max_idx
+    }
+
+    /// Train for one epoch
+    pub fn train_epoch(&mut self, images: &[MNISTImage]) -> Result<(), Box<dyn std::error::Error>> {
+        for image in images {
+            self.train_on_image(image)?;
+        }
+
+        // Apply homeostatic regulation at end of epoch
+        self.apply_homeostasis()?;
+
+        Ok(())
+    }
+
+    /// Apply homeostatic threshold adaptation
+    fn apply_homeostasis(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        // TODO: Update neuron thresholds based on firing rates
+        // This requires accessing simulator internals
+        self.homeostasis.reset();
+        Ok(())
+    }
+
+    /// Evaluate accuracy on test set
+    pub fn evaluate(&mut self, images: &[MNISTImage]) -> Result<f32, Box<dyn std::error::Error>> {
+        let mut correct = 0;
+        let total = images.len();
+
+        for image in images {
+            let predicted = self.predict(image)?;
+            if predicted as u8 == image.label {
+                correct += 1;
+            }
+        }
+
+        Ok(correct as f32 / total as f32)
+    }
+
+    /// Predict label for single image
+    pub fn predict(&mut self, image: &MNISTImage) -> Result<usize, Box<dyn std::error::Error>> {
+        let input_currents = image.to_input_currents(10.0);
+        let n_steps = (self.config.presentation_duration / self.simulator.dt()) as usize;
+
+        // Count spikes per output neuron
+        let mut output_spike_counts = vec![0u32; 10];
+
+        for _ in 0..n_steps {
+            self.simulator.step(Some(&input_currents))?;
+            let spikes = self.simulator.get_spikes()?;
+
+            // Count spikes in output layer
+            for (class_idx, &neuron_idx) in self.output_assignments.iter().enumerate() {
+                if spikes[neuron_idx] > 0.5 {
+                    output_spike_counts[class_idx] += 1;
+                }
+            }
+        }
+
+        // Winner-take-all: class with most spikes
+        let predicted_class = output_spike_counts
+            .iter()
+            .enumerate()
+            .max_by_key(|(_, &count)| count)
+            .map(|(idx, _)| idx)
+            .unwrap_or(0);
+
+        Ok(predicted_class)
+    }
+
+    /// Apply sleep-like consolidation (REM sleep mechanism)
+    pub fn consolidate(&mut self, replay_samples: &[MNISTImage]) -> Result<(), Box<dyn std::error::Error>> {
+        log::info!("Applying sleep-like consolidation...");
+
+        // 1. Replay important samples with 2× learning rate
+        let original_lr_pre = self.stdp.config.lr_pre;
+        let original_lr_post = self.stdp.config.lr_post;
+
+        self.stdp.config.lr_pre *= 2.0;
+        self.stdp.config.lr_post *= 2.0;
+
+        for sample in replay_samples {
+            self.train_on_image(sample)?;
+        }
+
+        // Restore learning rates
+        self.stdp.config.lr_pre = original_lr_pre;
+        self.stdp.config.lr_post = original_lr_post;
+
+        // 2. Global weight scaling (synaptic downscaling)
+        // TODO: Scale all weights by 0.98
+        // This requires accessing connectivity weights
+
+        // 3. Prune weak connections
+        // TODO: Set weights < 0.1 to zero
+
+        log::info!("Consolidation complete");
+        Ok(())
+    }
+
+    /// Enable post-training STP adaptation
+    pub fn enable_stp(&mut self, n_synapses: usize) {
+        log::info!("Enabling post-training STP...");
+
+        let mut stp_dynamics = Vec::with_capacity(n_synapses);
+        for _ in 0..n_synapses {
+            // Mix of facilitation and depression dynamics
+            if rand::random::<f32>() < 0.8 {
+                stp_dynamics.push(STPDynamics::facilitation()); // Excitatory
+            } else {
+                stp_dynamics.push(STPDynamics::depression()); // Inhibitory
+            }
+        }
+
+        self.stp = Some(stp_dynamics);
+        log::info!("STP enabled for {} synapses", n_synapses);
+    }
+
+    /// Get training statistics
+    pub fn stats(&self) -> &[TrainingStats] {
+        &self.stats
+    }
+}
+
+/// Full training pipeline
+pub fn train_mnist(
+    simulator: Simulator,
+    train_images: &[MNISTImage],
+    test_images: &[MNISTImage],
+    config: TrainingConfig,
+) -> Result<MNISTTrainer, Box<dyn std::error::Error>> {
+    log::info!("Starting MNIST training...");
+    log::info!("Configuration: {:?}", config);
+
+    // Initialize trainer
+    let stdp_config = STDPConfig {
+        lr_pre: 0.0001,
+        lr_post: 0.01,
+        tau_pre: 20.0,
+        tau_post: 20.0,
+        w_min: 0.0,
+        w_max: 1.0,
+    };
+
+    let mut trainer = MNISTTrainer::new(simulator, config.clone(), stdp_config);
+
+    // Training loop
+    for epoch in 0..config.n_epochs {
+        log::info!("Epoch {}/{}", epoch + 1, config.n_epochs);
+
+        // Train
+        trainer.train_epoch(train_images)?;
+
+        // Evaluate
+        let train_acc = trainer.evaluate(&train_images[0..1000.min(train_images.len())])?;
+        let test_acc = trainer.evaluate(test_images)?;
+
+        log::info!("  Train accuracy: {:.2}%", train_acc * 100.0);
+        log::info!("  Test accuracy: {:.2}%", test_acc * 100.0);
+
+        // Consolidation
+        if (epoch + 1) % config.consolidation_interval == 0 {
+            let replay_samples = &train_images[0..200.min(train_images.len())];
+            trainer.consolidate(replay_samples)?;
+        }
+
+        // Learning rate decay
+        trainer.stdp.config.lr_pre *= config.lr_decay;
+        trainer.stdp.config.lr_post *= config.lr_decay;
+    }
+
+    // Enable post-training STP
+    trainer.enable_stp(10_000); // Assuming 10K synapses
+
+    log::info!("Training complete!");
+
+    Ok(trainer)
+}
