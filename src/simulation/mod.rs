@@ -6,7 +6,7 @@ pub use event_queue::{EventQueue, SpikeEvent, DelayBuffer};
 
 use crate::cuda::{CudaContext, KernelConfig};
 use crate::connectivity::SparseConnectivity;
-use cudarc::driver::CudaSlice;
+use cudarc::driver::{CudaSlice, DeviceSlice};
 use std::sync::Arc;
 
 /// Main simulator for GPU-accelerated SNN
@@ -63,23 +63,19 @@ pub struct SparseConnectivityGPU {
 impl SparseConnectivityGPU {
     /// Download weights from GPU
     pub fn download_weights(&self, device: &cudarc::driver::CudaDevice) -> Result<Vec<f32>, Box<dyn std::error::Error>> {
-        let mut weights = vec![0.0; self.n_synapses];
-        device.dtoh_sync_copy_into(&self.weights, &mut weights)?;
+        let weights = device.dtoh_sync_copy(&self.weights)?;
         Ok(weights)
     }
 
     /// Download row pointers from GPU
     pub fn download_row_ptr(&self, device: &cudarc::driver::CudaDevice) -> Result<Vec<i32>, Box<dyn std::error::Error>> {
-        let n_rows = (self.row_ptr.len());
-        let mut row_ptr = vec![0; n_rows];
-        device.dtoh_sync_copy_into(&self.row_ptr, &mut row_ptr)?;
+        let row_ptr = device.dtoh_sync_copy(&self.row_ptr)?;
         Ok(row_ptr)
     }
 
     /// Download column indices from GPU
     pub fn download_col_idx(&self, device: &cudarc::driver::CudaDevice) -> Result<Vec<i32>, Box<dyn std::error::Error>> {
-        let mut col_idx = vec![0; self.n_synapses];
-        device.dtoh_sync_copy_into(&self.col_idx, &mut col_idx)?;
+        let col_idx = device.dtoh_sync_copy(&self.col_idx)?;
         Ok(col_idx)
     }
 }

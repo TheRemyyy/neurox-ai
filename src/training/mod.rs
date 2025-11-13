@@ -5,6 +5,7 @@
 use crate::simulation::Simulator;
 use crate::datasets::MNISTImage;
 use crate::learning::{TripletSTDP, HomeostaticPlasticity, STDPConfig, STPDynamics};
+use cudarc::driver::DeviceSlice;
 
 /// Training configuration
 #[derive(Debug, Clone)]
@@ -355,8 +356,8 @@ impl MNISTTrainer {
             pre_traces: Some(self.stdp.get_pre_traces()),
             post_traces_1: Some(self.stdp.get_post_traces_1()),
             post_traces_2: Some(self.stdp.get_post_traces_2()),
-            stp_u: self.stp.as_ref().map(|stp| stp.iter().map(|s| s.u).collect()),
-            stp_x: self.stp.as_ref().map(|stp| stp.iter().map(|s| s.x).collect()),
+            stp_u: self.stp.as_ref().map(|stp| stp.iter().map(|s| s.u_s).collect()),
+            stp_x: self.stp.as_ref().map(|stp| stp.iter().map(|s| s.x_s).collect()),
         };
 
         // Create metadata
