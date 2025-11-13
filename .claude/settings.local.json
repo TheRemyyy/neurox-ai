@@ -6,7 +6,8 @@
       "Bash(git mv:*)",
       "Bash(git rm:*)",
       "Bash(Select-String -Pattern \"Finished|error\")",
-      "Bash(timeout 120 cargo run:*)"
+      "Bash(timeout 120 cargo run:*)",
+      "Bash(timeout 60 cargo run:*)"
     ],
     "deny": [],
     "ask": []
