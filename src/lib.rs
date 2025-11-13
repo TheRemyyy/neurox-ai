@@ -26,7 +26,7 @@ pub mod brain;
 // Re-export key types
 pub use neuron::{LIFNeuron, NeuronState};
 pub use cuda::CudaContext;
-pub use simulation::Simulator;
+pub use simulation::{Simulator, OptimizationStats};
 pub use connectivity::{ProceduralConnectivity, SparseConnectivity, ConnectivityType};
 pub use datasets::{MNISTDataset, MNISTImage};
 pub use training::{TrainingConfig, MNISTTrainer, train_mnist};
