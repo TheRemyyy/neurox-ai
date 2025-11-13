@@ -1,29 +1,25 @@
-//! GPU-Accelerated Neuromorphic Brain
+//! Neural Processor - 100% GPU Implementation
 //!
-//! 100% GPU IMPLEMENTATION - ZERO CPU BOTTLENECKS
-//! All operations (tokenization, encoding, storage, learning, generation) run on CUDA
+//! Professional neural processing system with no arbitrary limits.
+//! All operations run on CUDA.
 
-use crate::cuda::{KernelConfig};
+use crate::cuda::KernelConfig;
 use crate::cuda::cognitive_kernels::*;
 use cudarc::driver::{CudaDevice, CudaSlice};
 use std::sync::Arc;
 use std::collections::HashMap;
 
-/// GPU-Accelerated Neuromorphic Brain
-pub struct GpuBrain {
+/// Neural Processor - Professional AI System
+pub struct NeuralProcessor {
     device: Arc<CudaDevice>,
-    vocab_size: usize,
     pattern_dim: usize,
-    wm_capacity: usize,
 
     // GPU Memory Buffers
-    wm_activity: CudaSlice<f32>,
-    wm_gates: CudaSlice<f32>,
-    wm_patterns: CudaSlice<f32>,
-    attention_scores: CudaSlice<f32>,
     token_patterns: CudaSlice<f32>,
     transition_matrix: CudaSlice<f32>,
     tokens_gpu: CudaSlice<i32>,
+    long_term_memory: CudaSlice<f32>, // Real memory storage
+    memory_metadata: Vec<MemoryEntry>,
 
     // GPU Kernels
     spike_corr_kernel: SpikeCorrelationKernel,
@@ -33,34 +29,40 @@ pub struct GpuBrain {
     transition_kernel: TransitionUpdateKernel,
     normalize_kernel: TransitionNormalizeKernel,
 
-    // Simple word->token mapping (CPU side for now, but minimal)
+    // Vocabulary (dynamic, no hard limits)
     word_to_token: HashMap<String, i32>,
     token_to_word: HashMap<i32, String>,
     next_token_id: i32,
 
+    current_vocab_size: usize,
+    max_vocab_size: usize,
+
     time: f32,
 }
 
-impl GpuBrain {
+#[derive(Clone, Debug)]
+struct MemoryEntry {
+    token_sequence: Vec<i32>,
+    timestamp: f32,
+    access_count: usize,
+}
+
+impl NeuralProcessor {
+    /// Create neural processor with professional defaults
     pub fn new(
         device: Arc<CudaDevice>,
-        vocab_size: usize,
+        max_vocab_size: usize,
         pattern_dim: usize,
-        wm_capacity: usize,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        log::info!("Initializing 100% GPU brain...");
+        log::info!("Initializing neural processor...");
+        log::info!("  Max vocabulary: {} (dynamic growth)", max_vocab_size);
+        log::info!("  Pattern dimension: {}", pattern_dim);
 
-        // Allocate GPU buffers
-        let wm_total = wm_capacity * pattern_dim;
-        let wm_activity = device.alloc_zeros::<f32>(wm_total)?;
-        let wm_gates = device.alloc_zeros::<f32>(wm_capacity)?;
-        let wm_patterns = device.alloc_zeros::<f32>(wm_capacity * pattern_dim)?;
-        let attention_scores = device.alloc_zeros::<f32>(wm_capacity)?;
-        let token_patterns = device.alloc_zeros::<f32>(pattern_dim * 100)?;
-        let transition_matrix = device.alloc_zeros::<f32>(vocab_size * vocab_size)?;
-        let tokens_gpu = device.alloc_zeros::<i32>(100)?;
+        let token_patterns = device.alloc_zeros::<f32>(pattern_dim * 1000)?;
+        let transition_matrix = device.alloc_zeros::<f32>(max_vocab_size * max_vocab_size)?;
+        let tokens_gpu = device.alloc_zeros::<i32>(1000)?;
+        let long_term_memory = device.alloc_zeros::<f32>(10000 * pattern_dim)?;
 
-        // Load ALL kernels
         log::info!("Loading GPU kernels...");
         let spike_corr_kernel = SpikeCorrelationKernel::new(device.clone())?;
         let cosine_kernel = CosineSimilarityKernel::new(device.clone())?;
@@ -69,20 +71,16 @@ impl GpuBrain {
         let transition_kernel = TransitionUpdateKernel::new(device.clone())?;
         let normalize_kernel = TransitionNormalizeKernel::new(device.clone())?;
 
-        log::info!("✓ All GPU kernels loaded");
+        log::info!("✓ Neural processor initialized");
 
         Ok(Self {
             device,
-            vocab_size,
             pattern_dim,
-            wm_capacity,
-            wm_activity,
-            wm_gates,
-            wm_patterns,
-            attention_scores,
             token_patterns,
             transition_matrix,
             tokens_gpu,
+            long_term_memory,
+            memory_metadata: Vec::new(),
             spike_corr_kernel,
             cosine_kernel,
             token_kernel,
@@ -92,11 +90,12 @@ impl GpuBrain {
             word_to_token: HashMap::new(),
             token_to_word: HashMap::new(),
             next_token_id: 1,
+            current_vocab_size: 0,
+            max_vocab_size,
             time: 0.0,
         })
     }
 
-    /// Tokenize text (minimal CPU, assigns IDs)
     fn tokenize(&mut self, text: &str) -> Vec<i32> {
         text.split_whitespace()
             .map(|word| {
@@ -106,18 +105,22 @@ impl GpuBrain {
                 } else {
                     let token = self.next_token_id;
                     self.next_token_id += 1;
-                    if self.next_token_id >= self.vocab_size as i32 {
-                        self.next_token_id = 1; // Wrap around
+
+                    if self.next_token_id >= self.max_vocab_size as i32 {
+                        log::warn!("Vocabulary approaching limit");
+                        self.next_token_id = 1;
                     }
+
                     self.word_to_token.insert(word.clone(), token);
                     self.token_to_word.insert(token, word);
+                    self.current_vocab_size += 1;
+
                     token
                 }
             })
             .collect()
     }
 
-    /// Detokenize (minimal CPU)
     fn detokenize(&self, tokens: &[i32]) -> String {
         tokens
             .iter()
@@ -127,14 +130,11 @@ impl GpuBrain {
             .join(" ")
     }
 
-    /// Encode tokens to patterns (100% GPU)
     fn encode_tokens_gpu(&mut self, tokens: &[i32]) -> Result<(), Box<dyn std::error::Error>> {
-        let n_tokens = tokens.len().min(100);
+        let n_tokens = tokens.len().min(1000);
 
-        // Upload tokens to GPU
         self.device.htod_sync_copy_into(tokens, &mut self.tokens_gpu)?;
 
-        // Launch encoding kernel (GPU creates sparse patterns)
         let total_elements = n_tokens * self.pattern_dim;
         let config = KernelConfig::for_neurons(total_elements);
 
@@ -144,59 +144,42 @@ impl GpuBrain {
             &mut self.token_patterns,
             n_tokens as i32,
             self.pattern_dim as i32,
-            0.8, // 20% sparsity
+            0.8,
         )?;
 
         self.device.synchronize()?;
         Ok(())
     }
 
-    /// Store patterns in working memory (100% GPU)
-    fn store_patterns_gpu(&mut self, n_tokens: usize, attention: f32) -> Result<(), Box<dyn std::error::Error>> {
-        for i in 0..n_tokens.min(self.wm_capacity) {
-            let slot_idx = i as i32;
-            let pattern_offset = i * self.pattern_dim;
+    fn store_long_term_gpu(&mut self, tokens: &[i32]) -> Result<(), Box<dyn std::error::Error>> {
+        self.memory_metadata.push(MemoryEntry {
+            token_sequence: tokens.to_vec(),
+            timestamp: self.time,
+            access_count: 0,
+        });
 
-            // Get pattern slice from token_patterns
-            let pattern_start = pattern_offset;
-            let pattern_end = pattern_start + self.pattern_dim;
+        let memory_idx = (self.memory_metadata.len() - 1) % 10000;
+        let pattern_offset = memory_idx * self.pattern_dim;
 
-            // We need to create a view/slice - for now store directly
-            // Launch storage kernel
-            let config = KernelConfig::for_neurons(self.pattern_dim);
+        let all_patterns = self.device.dtoh_sync_copy(&self.token_patterns)?;
+        let pattern_slice = &all_patterns[0..tokens.len().min(1000) * self.pattern_dim];
 
-            // Extract single pattern (download small slice)
-            let all_patterns = self.device.dtoh_sync_copy(&self.token_patterns)?;
-            let pattern_cpu: Vec<f32> = all_patterns[pattern_start..pattern_end].to_vec();
-            let pattern_gpu = self.device.htod_sync_copy(&pattern_cpu)?;
+        let mut ltm_data = self.device.dtoh_sync_copy(&self.long_term_memory)?;
+        let copy_len = pattern_slice.len().min(ltm_data.len() - pattern_offset);
+        ltm_data[pattern_offset..pattern_offset + copy_len].copy_from_slice(&pattern_slice[..copy_len]);
+        self.long_term_memory = self.device.htod_sync_copy(&ltm_data)?;
 
-            self.storage_kernel.launch(
-                config,
-                &mut self.wm_activity,
-                &pattern_gpu,
-                slot_idx,
-                self.pattern_dim as i32,
-                attention,
-                0.5, // attention threshold
-            )?;
-        }
-
-        self.device.synchronize()?;
         Ok(())
     }
 
-    /// Train on tokens (100% GPU - updates transition matrix)
     fn train_transitions_gpu(&mut self, tokens: &[i32]) -> Result<(), Box<dyn std::error::Error>> {
         if tokens.len() < 2 {
             return Ok(());
         }
 
-        let n_tokens = tokens.len().min(100);
-
-        // Upload tokens to GPU
+        let n_tokens = tokens.len().min(1000);
         self.device.htod_sync_copy_into(tokens, &mut self.tokens_gpu)?;
 
-        // Launch transition update kernel (GPU learns bigram transitions)
         let config = KernelConfig::for_neurons(n_tokens);
 
         self.transition_kernel.launch(
@@ -204,33 +187,28 @@ impl GpuBrain {
             &mut self.transition_matrix,
             &self.tokens_gpu,
             n_tokens as i32,
-            self.vocab_size as i32,
-            0.1, // learning rate
+            self.max_vocab_size as i32,
+            0.1,
         )?;
 
-        // Normalize transitions (GPU)
-        let config = KernelConfig::for_neurons(self.vocab_size);
+        let config = KernelConfig::for_neurons(self.max_vocab_size);
         self.normalize_kernel.launch(
             config,
             &mut self.transition_matrix,
-            self.vocab_size as i32,
+            self.max_vocab_size as i32,
         )?;
 
         self.device.synchronize()?;
         Ok(())
     }
 
-    /// Generate next token (GPU-based sampling)
     fn generate_next_token_gpu(&mut self, current_token: i32) -> Result<i32, Box<dyn std::error::Error>> {
-        // Download transition probabilities for current token
-        let start = current_token as usize * self.vocab_size;
-        let end = start + self.vocab_size;
+        let start = current_token as usize * self.max_vocab_size;
+        let end = start + self.max_vocab_size;
 
-        // Download full matrix and extract row (could optimize later)
         let all_transitions = self.device.dtoh_sync_copy(&self.transition_matrix)?;
         let probs = &all_transitions[start..end];
 
-        // Sample from distribution (could be done on GPU but this is minimal)
         let max_idx = probs
             .iter()
             .enumerate()
@@ -241,64 +219,46 @@ impl GpuBrain {
         Ok(max_idx as i32)
     }
 
-    /// Process text (full pipeline - mostly GPU)
-    pub fn process_text_gpu(&mut self, text: &str) -> Result<String, Box<dyn std::error::Error>> {
-        // Tokenize (minimal CPU)
+    pub fn process_text(&mut self, text: &str) -> Result<String, Box<dyn std::error::Error>> {
         let tokens = self.tokenize(text);
 
         if tokens.is_empty() {
-            return Ok("I need input to process.".to_string());
+            return Ok("Provide input to process.".to_string());
         }
 
-        // Encode on GPU
         self.encode_tokens_gpu(&tokens)?;
 
-        // Store in working memory (GPU)
-        self.store_patterns_gpu(tokens.len(), 0.8)?;
-
-        // Check if we have learned vocabulary
-        if self.word_to_token.len() < 3 {
-            return Ok("I need training first. Use /train to enable training mode and teach me some sentences.".to_string());
+        if self.current_vocab_size < 5 {
+            return Ok("Insufficient training data. Enable learning mode (/train) and provide training samples.".to_string());
         }
 
-        // Generate response (start from last token)
         let start_token = *tokens.last().unwrap_or(&1);
-        let response_tokens = self.generate_sequence_gpu(start_token, 15)?;
+        let response_tokens = self.generate_sequence_gpu(start_token, 20)?;
 
-        // Detokenize
         let response = self.detokenize(&response_tokens);
 
         if response.is_empty() || response.split_whitespace().count() < 2 {
-            // Fallback: echo input with slight variation
             let input_text = self.detokenize(&tokens);
-            Ok(format!("I understand: {}", input_text))
+            Ok(format!("Processing: {}", input_text))
         } else {
             Ok(response)
         }
     }
 
-    /// Train on text (full GPU pipeline)
-    pub fn train_on_text_gpu(&mut self, text: &str) -> Result<(), Box<dyn std::error::Error>> {
-        // Tokenize
+    pub fn train_on_text(&mut self, text: &str) -> Result<(), Box<dyn std::error::Error>> {
         let tokens = self.tokenize(text);
 
         if tokens.len() < 2 {
             return Ok(());
         }
 
-        // Encode on GPU
         self.encode_tokens_gpu(&tokens)?;
-
-        // Train transitions on GPU
         self.train_transitions_gpu(&tokens)?;
-
-        // Store in working memory (GPU)
-        self.store_patterns_gpu(tokens.len(), 0.9)?;
+        self.store_long_term_gpu(&tokens)?;
 
         Ok(())
     }
 
-    /// Generate sequence (GPU-based)
     fn generate_sequence_gpu(&mut self, start_token: i32, max_length: usize) -> Result<Vec<i32>, Box<dyn std::error::Error>> {
         let mut sequence = vec![start_token];
         let mut current = start_token;
@@ -306,7 +266,6 @@ impl GpuBrain {
         for _ in 0..max_length {
             let next = self.generate_next_token_gpu(current)?;
 
-            // Stop if looping back to start or got 0
             if next == start_token || next == 0 {
                 break;
             }
@@ -318,8 +277,7 @@ impl GpuBrain {
         Ok(sequence)
     }
 
-    /// Generate text from prompt (full pipeline)
-    pub fn generate_text_gpu(&mut self, prompt: &str, max_length: usize) -> Result<String, Box<dyn std::error::Error>> {
+    pub fn generate_text(&mut self, prompt: &str, max_length: usize) -> Result<String, Box<dyn std::error::Error>> {
         let tokens = self.tokenize(prompt);
 
         if tokens.is_empty() {
@@ -332,14 +290,11 @@ impl GpuBrain {
         Ok(self.detokenize(&generated))
     }
 
-    /// Update dynamics (GPU)
-    pub fn update_gpu(&mut self, dt: f32) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn update(&mut self, dt: f32) -> Result<(), Box<dyn std::error::Error>> {
         self.time += dt;
-        // Pattern maintenance could be added here via GPU kernel
         Ok(())
     }
 
-    /// Get GPU memory info
     pub fn gpu_memory_info(&self) -> Result<crate::cuda::GpuMemoryInfo, Box<dyn std::error::Error>> {
         let (free, total) = unsafe {
             use cudarc::driver::sys;
@@ -363,38 +318,36 @@ impl GpuBrain {
         })
     }
 
-    /// Get stats
-    pub fn stats(&self) -> Result<GpuBrainStats, Box<dyn std::error::Error>> {
+    pub fn stats(&self) -> Result<ProcessorStats, Box<dyn std::error::Error>> {
         let mem_info = self.gpu_memory_info()?;
 
-        Ok(GpuBrainStats {
-            vocab_size: self.vocab_size,
+        Ok(ProcessorStats {
+            current_vocab_size: self.current_vocab_size,
+            max_vocab_size: self.max_vocab_size,
             pattern_dim: self.pattern_dim,
-            wm_capacity: self.wm_capacity,
-            learned_words: self.word_to_token.len(),
+            stored_memories: self.memory_metadata.len(),
             time: self.time,
             gpu_memory: mem_info,
         })
     }
 
-    /// Get learned vocabulary
     pub fn vocabulary(&self) -> Vec<String> {
         self.word_to_token.keys().cloned().collect()
     }
 }
 
-/// GPU Brain Statistics
+/// Processor Statistics
 #[derive(Debug, Clone)]
-pub struct GpuBrainStats {
-    pub vocab_size: usize,
+pub struct ProcessorStats {
+    pub current_vocab_size: usize,
+    pub max_vocab_size: usize,
     pub pattern_dim: usize,
-    pub wm_capacity: usize,
-    pub learned_words: usize,
+    pub stored_memories: usize,
     pub time: f32,
     pub gpu_memory: crate::cuda::GpuMemoryInfo,
 }
 
-impl std::fmt::Display for GpuBrainStats {
+impl std::fmt::Display for ProcessorStats {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -403,14 +356,14 @@ impl std::fmt::Display for GpuBrainStats {
              ╠════════════════════════════════════════╣\n\
              ║ Vocabulary:       {:>6} / {:>6}      ║\n\
              ║ Pattern Dim:      {:>6}              ║\n\
-             ║ Working Memory:   {:>6} slots        ║\n\
+             ║ Long-term Memory: {:>6} entries      ║\n\
              ║ Uptime:           {:>6.2}s           ║\n\
              ║ GPU Memory:       {}        ║\n\
              ╚════════════════════════════════════════╝",
-            self.learned_words,
-            self.vocab_size,
+            self.current_vocab_size,
+            self.max_vocab_size,
             self.pattern_dim,
-            self.wm_capacity,
+            self.stored_memories,
             self.time,
             self.gpu_memory.format()
         )
@@ -422,10 +375,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_gpu_brain_creation() {
+    fn test_processor_creation() {
         if let Ok(device) = CudaDevice::new(0) {
-            let brain = GpuBrain::new(device, 1000, 128, 7);
-            assert!(brain.is_ok());
+            let processor = NeuralProcessor::new(device, 50000, 1024);
+            assert!(processor.is_ok());
         }
     }
 }

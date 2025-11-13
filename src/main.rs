@@ -21,19 +21,15 @@ enum Commands {
     /// Display GPU device information
     Info,
 
-    /// Interactive chat with GPU brain
+    /// Interactive neural processor console
     Chat {
-        /// Vocabulary size
-        #[arg(long, default_value_t = 5000)]
+        /// Max vocabulary size
+        #[arg(long, default_value_t = 50000)]
         vocab: usize,
 
         /// Pattern dimension
-        #[arg(long, default_value_t = 256)]
+        #[arg(long, default_value_t = 1024)]
         pattern_dim: usize,
-
-        /// Working memory capacity
-        #[arg(long, default_value_t = 7)]
-        wm_capacity: usize,
     },
 }
 
@@ -52,9 +48,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(Commands::Chat {
             vocab,
             pattern_dim,
-            wm_capacity,
         }) => {
-            run_chat_interface(vocab, pattern_dim, wm_capacity)?;
+            run_chat_interface(vocab, pattern_dim)?;
         }
         None => {
             display_welcome();
@@ -92,14 +87,13 @@ fn display_system_info() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Run interactive chat interface with GPU brain
+/// Run interactive neural processor console
 fn run_chat_interface(
     vocab: usize,
     pattern_dim: usize,
-    wm_capacity: usize,
 ) -> Result<(), Box<dyn std::error::Error>> {
     use std::io::{self, Write};
-    use neurox_ai::GpuBrain;
+    use neurox_ai::NeuralProcessor;
     use cudarc::driver::CudaDevice;
 
     println!("╔════════════════════════════════════════════════════════════╗");
@@ -108,17 +102,17 @@ fn run_chat_interface(
     println!();
     println!("Initializing neural processor...");
 
-    // Initialize CUDA device (CudaDevice::new already returns Arc)
+    // Initialize CUDA device
     let device = CudaDevice::new(0)?;
     println!("✓ CUDA device initialized: {}", device.name()?);
 
     // Create neural processor
-    let mut brain = GpuBrain::new(device, vocab, pattern_dim, wm_capacity)?;
+    let mut processor = NeuralProcessor::new(device, vocab, pattern_dim)?;
     println!("✓ Neural processor ready");
     println!();
 
     // Display stats
-    let stats = brain.stats()?;
+    let stats = processor.stats()?;
     println!("{}", stats);
     println!();
 
@@ -160,7 +154,7 @@ fn run_chat_interface(
         }
 
         if input == "/stats" {
-            let stats = brain.stats()?;
+            let stats = processor.stats()?;
             println!("{}", stats);
             continue;
         }
@@ -176,7 +170,7 @@ fn run_chat_interface(
         }
 
         if input == "/vocab" {
-            let vocab = brain.vocabulary();
+            let vocab = processor.vocabulary();
             println!("Learned vocabulary ({} words):", vocab.len());
             if vocab.is_empty() {
                 println!("  (no words learned yet - start training!)");
@@ -196,7 +190,7 @@ fn run_chat_interface(
 
         if input.starts_with("/gen ") {
             let prompt = input.strip_prefix("/gen ").unwrap();
-            match brain.generate_text_gpu(prompt, 20) {
+            match processor.generate_text(prompt, 20) {
                 Ok(generated) => {
                     println!("← {}", generated);
                 }
@@ -210,12 +204,12 @@ fn run_chat_interface(
 
         // Process input
         if training_mode {
-            match brain.train_on_text_gpu(input) {
+            match processor.train_on_text(input) {
                 Ok(_) => println!("✓ Learned"),
                 Err(e) => println!("✗ Error: {}", e),
             }
         } else {
-            match brain.process_text_gpu(input) {
+            match processor.process_text(input) {
                 Ok(response) => {
                     println!("← {}", response);
                 }
