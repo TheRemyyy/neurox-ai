@@ -26,6 +26,16 @@ struct Args {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::Builder::from_default_env()
         .filter_level(log::LevelFilter::Info)
+        .format_timestamp(None)
+        .format(|buf, record| {
+            use std::io::Write;
+            writeln!(
+                buf,
+                "[{}] {}",
+                record.level(),
+                record.args()
+            )
+        })
         .init();
 
     let args = Args::parse();
