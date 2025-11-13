@@ -141,10 +141,11 @@ fn run_chat_interface(
     println!("╔════════════════════════════════════════════════════════════╗");
     println!("║  Brain is ready! Start chatting (type 'quit' to exit)    ║");
     println!("║  Commands:                                                 ║");
-    println!("║    /stats  - Show brain statistics                         ║");
-    println!("║    /train  - Train on your input                           ║");
-    println!("║    /clear  - Clear working memory                          ║");
-    println!("║    quit    - Exit                                          ║");
+    println!("║    /stats   - Show brain statistics                        ║");
+    println!("║    /train   - Toggle training mode                         ║");
+    println!("║    /vocab   - Show learned vocabulary                      ║");
+    println!("║    /gen <text> - Generate continuation from prompt         ║");
+    println!("║    quit     - Exit                                         ║");
     println!("╚════════════════════════════════════════════════════════════╝");
     println!();
 
@@ -190,8 +191,37 @@ fn run_chat_interface(
             continue;
         }
 
-        if input == "/clear" {
-            println!("Working memory cleared (not implemented yet)");
+        if input == "/vocab" {
+            let vocab = brain.vocabulary();
+            println!("Learned vocabulary ({} words):", vocab.len());
+            if vocab.is_empty() {
+                println!("  (no words learned yet - start training!)");
+            } else {
+                let mut sorted_vocab = vocab;
+                sorted_vocab.sort();
+                for (i, word) in sorted_vocab.iter().enumerate() {
+                    if i % 10 == 0 && i > 0 {
+                        println!();
+                    }
+                    print!("{:12}", word);
+                }
+                println!();
+            }
+            continue;
+        }
+
+        if input.starts_with("/gen ") {
+            let prompt = input.strip_prefix("/gen ").unwrap();
+            println!("Generating from: \"{}\"", prompt);
+            match brain.generate_text_gpu(prompt, 20) {
+                Ok(generated) => {
+                    println!("brain> {}", generated);
+                }
+                Err(e) => {
+                    println!("✗ Error generating: {}", e);
+                }
+            }
+            println!();
             continue;
         }
 

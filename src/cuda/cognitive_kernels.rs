@@ -522,3 +522,152 @@ impl TokenEncodingKernel {
         Ok(())
     }
 }
+
+/// Wrapper for softmax kernel
+pub struct SoftmaxKernel {
+    device: Arc<CudaDevice>,
+    function: CudaFunction,
+}
+
+impl SoftmaxKernel {
+    pub fn new(device: Arc<CudaDevice>) -> Result<Self, Box<dyn std::error::Error>> {
+        let ptx = cudarc::nvrtc::compile_ptx(SOFTMAX_KERNEL)?;
+        device.load_ptx(ptx, "cognitive_softmax", &["softmax"])?;
+        let function = device.get_func("cognitive_softmax", "softmax").unwrap();
+        Ok(Self { device, function })
+    }
+
+    pub fn launch(
+        &self,
+        config: super::KernelConfig,
+        scores: &mut cudarc::driver::CudaSlice<f32>,
+        n_scores: i32,
+    ) -> Result<(), cudarc::driver::DriverError> {
+        let params = (scores, n_scores);
+        unsafe {
+            self.function.clone().launch(config.to_launch_config(), params)?;
+        }
+        Ok(())
+    }
+}
+
+/// Wrapper for lateral inhibition kernel
+pub struct LateralInhibitionKernel {
+    device: Arc<CudaDevice>,
+    function: CudaFunction,
+}
+
+impl LateralInhibitionKernel {
+    pub fn new(device: Arc<CudaDevice>) -> Result<Self, Box<dyn std::error::Error>> {
+        let ptx = cudarc::nvrtc::compile_ptx(LATERAL_INHIBITION_KERNEL)?;
+        device.load_ptx(ptx, "cognitive_inhibition", &["lateral_inhibition"])?;
+        let function = device.get_func("cognitive_inhibition", "lateral_inhibition").unwrap();
+        Ok(Self { device, function })
+    }
+
+    pub fn launch(
+        &self,
+        config: super::KernelConfig,
+        scores: &mut cudarc::driver::CudaSlice<f32>,
+        n_scores: i32,
+        inhibition_strength: f32,
+        threshold: f32,
+    ) -> Result<(), cudarc::driver::DriverError> {
+        let params = (scores, n_scores, inhibition_strength, threshold);
+        unsafe {
+            self.function.clone().launch(config.to_launch_config(), params)?;
+        }
+        Ok(())
+    }
+}
+
+/// Wrapper for pattern storage kernel
+pub struct PatternStorageKernel {
+    device: Arc<CudaDevice>,
+    function: CudaFunction,
+}
+
+impl PatternStorageKernel {
+    pub fn new(device: Arc<CudaDevice>) -> Result<Self, Box<dyn std::error::Error>> {
+        let ptx = cudarc::nvrtc::compile_ptx(PATTERN_STORAGE_KERNEL)?;
+        device.load_ptx(ptx, "cognitive_storage", &["pattern_storage"])?;
+        let function = device.get_func("cognitive_storage", "pattern_storage").unwrap();
+        Ok(Self { device, function })
+    }
+
+    pub fn launch(
+        &self,
+        config: super::KernelConfig,
+        persistent_activity: &mut cudarc::driver::CudaSlice<f32>,
+        pattern: &cudarc::driver::CudaSlice<f32>,
+        slot_idx: i32,
+        pattern_dim: i32,
+        attention: f32,
+        attention_threshold: f32,
+    ) -> Result<(), cudarc::driver::DriverError> {
+        let params = (persistent_activity, pattern, slot_idx, pattern_dim, attention, attention_threshold);
+        unsafe {
+            self.function.clone().launch(config.to_launch_config(), params)?;
+        }
+        Ok(())
+    }
+}
+
+/// Wrapper for transition update kernel
+pub struct TransitionUpdateKernel {
+    device: Arc<CudaDevice>,
+    function: CudaFunction,
+}
+
+impl TransitionUpdateKernel {
+    pub fn new(device: Arc<CudaDevice>) -> Result<Self, Box<dyn std::error::Error>> {
+        let ptx = cudarc::nvrtc::compile_ptx(TRANSITION_UPDATE_KERNEL)?;
+        device.load_ptx(ptx, "cognitive_transition", &["transition_update"])?;
+        let function = device.get_func("cognitive_transition", "transition_update").unwrap();
+        Ok(Self { device, function })
+    }
+
+    pub fn launch(
+        &self,
+        config: super::KernelConfig,
+        transition_matrix: &mut cudarc::driver::CudaSlice<f32>,
+        tokens: &cudarc::driver::CudaSlice<i32>,
+        n_tokens: i32,
+        vocab_size: i32,
+        learning_rate: f32,
+    ) -> Result<(), cudarc::driver::DriverError> {
+        let params = (transition_matrix, tokens, n_tokens, vocab_size, learning_rate);
+        unsafe {
+            self.function.clone().launch(config.to_launch_config(), params)?;
+        }
+        Ok(())
+    }
+}
+
+/// Wrapper for transition normalization kernel
+pub struct TransitionNormalizeKernel {
+    device: Arc<CudaDevice>,
+    function: CudaFunction,
+}
+
+impl TransitionNormalizeKernel {
+    pub fn new(device: Arc<CudaDevice>) -> Result<Self, Box<dyn std::error::Error>> {
+        let ptx = cudarc::nvrtc::compile_ptx(TRANSITION_NORMALIZE_KERNEL)?;
+        device.load_ptx(ptx, "cognitive_normalize", &["transition_normalize"])?;
+        let function = device.get_func("cognitive_normalize", "transition_normalize").unwrap();
+        Ok(Self { device, function })
+    }
+
+    pub fn launch(
+        &self,
+        config: super::KernelConfig,
+        transition_matrix: &mut cudarc::driver::CudaSlice<f32>,
+        vocab_size: i32,
+    ) -> Result<(), cudarc::driver::DriverError> {
+        let params = (transition_matrix, vocab_size);
+        unsafe {
+            self.function.clone().launch(config.to_launch_config(), params)?;
+        }
+        Ok(())
+    }
+}
