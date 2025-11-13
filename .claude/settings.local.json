@@ -3,7 +3,8 @@
     "allow": [
       "Bash(export PATH:*)",
       "Bash(Select-String -Pattern \"(Finished|error)\")",
-      "Bash(git mv:*)"
+      "Bash(git mv:*)",
+      "Bash(git rm:*)"
     ],
     "deny": [],
     "ask": []

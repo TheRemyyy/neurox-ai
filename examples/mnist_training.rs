@@ -11,12 +11,56 @@
 
 use neurox_ai::*;
 use std::sync::Arc;
+use clap::Parser;
+
+#[derive(Parser)]
+#[command(name = "mnist_training")]
+#[command(about = "MNIST training with Triplet STDP")]
+struct Args {
+    /// Number of hidden neurons
+    #[arg(short = 'H', long, default_value = "500")]
+    hidden: usize,
+
+    /// Number of training epochs
+    #[arg(short, long, default_value = "10")]
+    epochs: usize,
+
+    /// Batch size
+    #[arg(short, long, default_value = "100")]
+    batch_size: usize,
+
+    /// Learning rate for pre-synaptic (depression)
+    #[arg(long, default_value = "0.001")]
+    lr_pre: f32,
+
+    /// Learning rate for post-synaptic (potentiation)
+    #[arg(long, default_value = "0.0015")]
+    lr_post: f32,
+
+    /// Winner-Take-All inhibition strength
+    #[arg(short, long, default_value = "18.0")]
+    wta_strength: f32,
+
+    /// Presentation duration per image (ms)
+    #[arg(short, long, default_value = "350.0")]
+    presentation_duration: f32,
+
+    /// Number of training samples (synthetic)
+    #[arg(long, default_value = "6000")]
+    train_samples: usize,
+
+    /// Number of test samples (synthetic)
+    #[arg(long, default_value = "1000")]
+    test_samples: usize,
+}
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize logging
     env_logger::Builder::from_default_env()
         .filter_level(log::LevelFilter::Info)
         .init();
+
+    let args = Args::parse();
 
     log::info!("=== NeuroxAI MNIST Training ===");
     log::info!("Target: 93.8% accuracy (Triplet STDP + 4-bit weights)");
@@ -28,38 +72,46 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Network architecture
     const N_INPUT: usize = 784;      // 28×28 pixels
-    const N_HIDDEN: usize = 500;     // Hidden layer
     const N_OUTPUT: usize = 10;      // 10 digits
-    const N_NEURONS: usize = N_INPUT + N_HIDDEN + N_OUTPUT;
+    let n_hidden = args.hidden;
+    let n_neurons = N_INPUT + n_hidden + N_OUTPUT;
 
-    log::info!("Network architecture: {}-{}-{}", N_INPUT, N_HIDDEN, N_OUTPUT);
+    log::info!("Network architecture: {}-{}-{}", N_INPUT, n_hidden, N_OUTPUT);
 
     // Create sparse connectivity (input → hidden → output)
     log::info!("Creating sparse connectivity...");
-    let connectivity = create_mnist_connectivity(N_INPUT, N_HIDDEN, N_OUTPUT)?;
+    let connectivity = create_mnist_connectivity(N_INPUT, n_hidden, N_OUTPUT)?;
     log::info!("  Total synapses: {}", connectivity.nnz);
     log::info!("  Memory footprint: {:.2} MB", connectivity.memory_footprint() as f64 / 1024.0 / 1024.0);
 
     // Initialize simulator with connectivity
     log::info!("Creating simulator...");
     let dt = 0.1; // 0.1ms timestep
-    let simulator = Simulator::with_connectivity(N_NEURONS, dt, cuda_ctx.clone(), &connectivity)?;
+    let simulator = Simulator::with_connectivity(n_neurons, dt, cuda_ctx.clone(), &connectivity)?;
 
     // Load MNIST dataset
     log::info!("Loading MNIST dataset...");
     // For demo: use synthetic data (replace with real MNIST loader)
-    let mnist = datasets::load_mnist_synthetic(6000, 1000);
+    let mnist = datasets::load_mnist_synthetic(args.train_samples, args.test_samples);
     log::info!("  Training samples: {}", mnist.train_images.len());
     log::info!("  Test samples: {}", mnist.test_images.len());
 
     // Training configuration
+    log::info!("\nTraining configuration:");
+    log::info!("  Epochs: {}", args.epochs);
+    log::info!("  Batch size: {}", args.batch_size);
+    log::info!("  LR pre (depression): {}", args.lr_pre);
+    log::info!("  LR post (potentiation): {}", args.lr_post);
+    log::info!("  WTA strength: {}", args.wta_strength);
+    log::info!("  Presentation duration: {} ms", args.presentation_duration);
+
     let config = TrainingConfig {
-        n_epochs: 10,
-        batch_size: 100,
-        presentation_duration: 350.0, // 350ms per image
+        n_epochs: args.epochs,
+        batch_size: args.batch_size,
+        presentation_duration: args.presentation_duration,
         isi_duration: 150.0,           // 150ms rest
         lr_decay: 0.95,
-        wta_strength: 18.0,            // Lateral inhibition
+        wta_strength: args.wta_strength,
         target_rate: 5.0,              // 5 Hz homeostasis
         consolidation_interval: 5,     // Every 5 epochs
     };
