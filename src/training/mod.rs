@@ -5,7 +5,6 @@
 use crate::simulation::Simulator;
 use crate::datasets::MNISTImage;
 use crate::learning::{TripletSTDP, HomeostaticPlasticity, STDPConfig, STPDynamics};
-use std::sync::Arc;
 
 /// Training configuration
 #[derive(Debug, Clone)]
@@ -143,7 +142,7 @@ impl MNISTTrainer {
             let spikes = self.simulator.get_spikes()?;
 
             // Apply Winner-Take-All lateral inhibition
-            let winner_idx = self.apply_wta(&spikes);
+            let _winner_idx = self.apply_wta(&spikes);
 
             // Update STDP traces
             for (neuron_id, &spike) in spikes.iter().enumerate() {

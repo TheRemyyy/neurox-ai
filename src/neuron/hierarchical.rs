@@ -156,7 +156,7 @@ impl HierarchicalBrain {
     /// Update abstract regions from medium regions (further aggregation)
     pub fn aggregate_medium_to_abstract(&mut self) {
         // Map medium regions to abstract regions (assuming ~0.13 medium per abstract)
-        let regions_per_abstract = 1; // Simplified: 1:1 mapping for now
+        let _regions_per_abstract = 1; // Simplified: 1:1 mapping for now
 
         for (abs_idx, abs_region) in self.abstract_regions.iter_mut().enumerate() {
             if abs_idx < self.medium_regions.len() {

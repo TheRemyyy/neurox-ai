@@ -6,7 +6,6 @@
 use serde::{Deserialize, Serialize};
 use rand::{Rng, SeedableRng};
 use rand_distr::{Distribution, Normal};
-use std::collections::HashMap;
 
 /// Connectivity topology type
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -148,7 +147,7 @@ impl ProceduralConnectivity {
                 // Gaussian probability based on distance
                 for target_id in target_range.clone() {
                     if target_id != source_id {
-                        let distance = ((target_id as f32 - source_id as f32).abs() / n_targets as f32);
+                        let distance = (target_id as f32 - source_id as f32).abs() / n_targets as f32;
                         let prob = (-distance * distance / (2.0 * sigma * sigma)).exp();
                         if rng.gen::<f64>() < prob as f64 {
                             let mut weight = weight_dist.sample(&mut rng);
