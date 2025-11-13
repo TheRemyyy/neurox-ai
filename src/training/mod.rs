@@ -129,7 +129,10 @@ impl MNISTTrainer {
     /// Train on single image
     pub fn train_on_image(&mut self, image: &MNISTImage) -> Result<(), Box<dyn std::error::Error>> {
         // Convert image to input currents (784 pixels → 784 input neurons)
-        let input_currents = image.to_input_currents(10.0); // Scale factor
+        let mut input_currents = image.to_input_currents(10.0); // Scale factor
+
+        // Pad with zeros for hidden and output neurons
+        input_currents.resize(self.simulator.n_neurons(), 0.0);
 
         // Present image for configured duration
         let n_steps = (self.config.presentation_duration / self.simulator.dt()) as usize;
