@@ -71,9 +71,9 @@ impl NeuromorphicBrain {
         // Hippocampus (10× expansion for DG)
         let hippocampus = Hippocampus::new(pattern_dim, 10, 0.05, 10000);
 
-        // Attention system
-        let connectivity = Self::create_default_connectivity(base_neurons);
-        let attention = AttentionSystem::new(base_neurons, connectivity, 2.0);
+        // Attention system (operates on pattern space, not neuron space)
+        let connectivity = Self::create_default_connectivity(pattern_dim);
+        let attention = AttentionSystem::new(pattern_dim, connectivity, 2.0);
 
         // Language system
         let language = LanguageSystem::new(pattern_dim, vocab_size);
