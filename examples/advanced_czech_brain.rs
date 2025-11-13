@@ -198,6 +198,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "máš smysl pro humor",
         "snažím se být zábavný",
     ];
+    }
 
     // Training s context awareness
     for (i, text) in czech_training.iter().enumerate() {
