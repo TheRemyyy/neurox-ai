@@ -105,7 +105,7 @@ fn run_scale_test(
     let connectivity = SparseConnectivity::from_procedural(n_neurons, &connectivity_gen);
     log::info!("  Synapses: {}", connectivity.nnz);
     log::info!("  Memory: {:.2} MB", connectivity.memory_footprint() as f64 / 1024.0 / 1024.0);
-    log::info!("  Sparsity: {:.4}%", connectivity.sparsity() * 100.0);
+    log::info!("  Sparsity: {:.4}%", connectivity.sparsity());
 
     // Initialize simulator
     log::info!("Creating simulator with event-driven processing...");
