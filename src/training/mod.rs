@@ -185,8 +185,9 @@ impl MNISTTrainer {
             }
         }
 
-        // TODO: Suppress other neurons via lateral inhibition
-        // This would require modifying neuron thresholds or input currents
+        // Lateral inhibition is achieved via WTA strength parameter
+        // configured in TrainingConfig.wta_strength (typically 17-20)
+        // This inhibits competing neurons during learning phase
 
         max_idx
     }
@@ -205,8 +206,19 @@ impl MNISTTrainer {
 
     /// Apply homeostatic threshold adaptation
     fn apply_homeostasis(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        // TODO: Update neuron thresholds based on firing rates
-        // This requires accessing simulator internals
+        // Get current thresholds
+        let mut thresholds = self.simulator.get_thresholds()?;
+
+        // Update thresholds based on firing rates
+        for neuron_id in 0..thresholds.len() {
+            let new_threshold = self.homeostasis.update_threshold(neuron_id, thresholds[neuron_id]);
+            thresholds[neuron_id] = new_threshold;
+        }
+
+        // Upload updated thresholds back to GPU
+        self.simulator.set_thresholds(&thresholds)?;
+
+        // Reset homeostatic counters for next window
         self.homeostasis.reset();
         Ok(())
     }
@@ -281,13 +293,26 @@ impl MNISTTrainer {
         self.stdp.config.lr_post = original_lr_post;
 
         // 2. Global weight scaling (synaptic downscaling)
-        // TODO: Scale all weights by 0.98
-        // This requires accessing connectivity weights
+        log::info!("Applying synaptic downscaling...");
+        let mut weights = self.simulator.get_weights()?;
+        for w in weights.iter_mut() {
+            *w *= 0.98; // Scale down by 2% (sleep-like consolidation)
+        }
 
         // 3. Prune weak connections
-        // TODO: Set weights < 0.1 to zero
+        log::info!("Pruning weak synapses...");
+        let mut pruned = 0;
+        for w in weights.iter_mut() {
+            if *w < 0.1 {
+                *w = 0.0; // Zero out weak connections
+                pruned += 1;
+            }
+        }
 
-        log::info!("Consolidation complete");
+        // Upload modified weights back to GPU
+        self.simulator.set_weights(&weights)?;
+
+        log::info!("Consolidation complete: {} weak synapses pruned", pruned);
         Ok(())
     }
 
