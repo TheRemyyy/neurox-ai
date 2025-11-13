@@ -129,7 +129,7 @@ fn run_chat_interface(
     println!("✓ CUDA device initialized: {}", device.name()?);
 
     // Create GPU brain
-    let mut brain = GpuBrain::new(device.clone(), vocab, pattern_dim, wm_capacity)?;
+    let mut brain = GpuBrain::new(device, vocab, pattern_dim, wm_capacity)?;
     println!("✓ GPU brain created");
     println!();
 

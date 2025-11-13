@@ -13,7 +13,8 @@
       "Bash(timeout 120 cargo build:*)",
       "Bash(Select-String -Pattern \"(Creating|Processing|Active items|Memory buffer|Average|Transitions|Total error|Demo Complete)\" -Context 0,1)",
       "Bash(cat:*)",
-      "Bash(cargo check:*)"
+      "Bash(cargo check:*)",
+      "Bash(cargo build:*)"
     ],
     "deny": [],
     "ask": []
