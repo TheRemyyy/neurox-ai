@@ -10,7 +10,8 @@
       "Bash(timeout 60 cargo run:*)",
       "Bash(Select-String -Pattern \"(Finished|error|warning:)\")",
       "Bash(Select-String -Pattern \"(warning:|error:|Finished)\")",
-      "Bash(timeout 120 cargo build:*)"
+      "Bash(timeout 120 cargo build:*)",
+      "Bash(Select-String -Pattern \"(Creating|Processing|Active items|Memory buffer|Average|Transitions|Total error|Demo Complete)\" -Context 0,1)"
     ],
     "deny": [],
     "ask": []
