@@ -28,6 +28,10 @@ struct Args {
     #[arg(short, long, default_value = "0.01")]
     input_activity: f32,
 
+    /// Input current strength (mA)
+    #[arg(long, default_value = "50.0")]
+    input_current: f32,
+
     /// Run multiple scales (ignores --neurons)
     #[arg(long)]
     multi_scale: bool,
