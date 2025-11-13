@@ -70,21 +70,6 @@ fn display_welcome() {
     println!("║  GPU-Accelerated Spiking Neural Networks                  ║");
     println!("╚════════════════════════════════════════════════════════════╝");
     println!();
-    println!("Available examples:");
-    println!("  cargo run --release --example mnist_training   - Train brain model (saves .nrx)");
-    println!("  cargo run --release --example mnist_inference  - Use trained brain for inference");
-    println!("  cargo run --release --example scale_test_1m    - Performance benchmarks");
-    println!();
-    println!("Example usage:");
-    println!("  # Train a brain model:");
-    println!("  cargo run --release --example mnist_training -- --hidden 500 --epochs 10");
-    println!();
-    println!("  # Use the trained brain:");
-    println!("  cargo run --release --example mnist_inference -- --model mnist_brain.nrx");
-    println!();
-    println!("  # Performance test:");
-    println!("  cargo run --release --example scale_test_1m -- --neurons 500000 --duration 2000");
-    println!();
     println!("Commands:");
     println!("  neurox-ai info    - Display GPU device information");
     println!("  neurox-ai chat    - Interactive chat with GPU brain (100% GPU!)");
@@ -92,7 +77,6 @@ fn display_welcome() {
     println!("Chat with the brain:");
     println!("  cargo run --release chat");
     println!();
-    println!("For documentation, see PROJECT_STATUS.md");
 }
 
 fn display_system_info() -> Result<(), Box<dyn std::error::Error>> {
