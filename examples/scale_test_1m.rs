@@ -38,16 +38,27 @@ struct Args {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize logging
+    // Initialize logging with colors
     env_logger::Builder::from_default_env()
         .filter_level(log::LevelFilter::Info)
-        .format_timestamp(None)
         .format(|buf, record| {
             use std::io::Write;
+            use env_logger::fmt::Color;
+
+            let mut style = buf.style();
+            let level_color = match record.level() {
+                log::Level::Error => Color::Red,
+                log::Level::Warn => Color::Yellow,
+                log::Level::Info => Color::Green,
+                log::Level::Debug => Color::Blue,
+                log::Level::Trace => Color::Cyan,
+            };
+            style.set_color(level_color).set_bold(true);
+
             writeln!(
                 buf,
-                "[{}] {}",
-                record.level(),
+                "{} {}",
+                style.value(record.level()),
                 record.args()
             )
         })
