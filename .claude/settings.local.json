@@ -16,7 +16,8 @@
       "Bash(cargo check:*)",
       "Bash(cargo build:*)",
       "Bash(cargo clean:*)",
-      "Bash(cargo run:*)"
+      "Bash(cargo run:*)",
+      "Bash(nvcc:*)"
     ],
     "deny": [],
     "ask": []
