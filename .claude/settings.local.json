@@ -8,7 +8,8 @@
       "Bash(Select-String -Pattern \"Finished|error\")",
       "Bash(timeout 120 cargo run:*)",
       "Bash(timeout 60 cargo run:*)",
-      "Bash(Select-String -Pattern \"(Finished|error|warning:)\")"
+      "Bash(Select-String -Pattern \"(Finished|error|warning:)\")",
+      "Bash(Select-String -Pattern \"(warning:|error:|Finished)\")"
     ],
     "deny": [],
     "ask": []

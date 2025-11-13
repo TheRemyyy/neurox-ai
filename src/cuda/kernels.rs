@@ -280,6 +280,16 @@ impl LIFUpdateKernel {
 
         Ok(())
     }
+
+    /// Synchronize device after kernel execution
+    pub fn synchronize(&self) -> Result<(), cudarc::driver::DriverError> {
+        self.device.synchronize()
+    }
+
+    /// Get device name for diagnostics
+    pub fn device_name(&self) -> Result<String, cudarc::driver::DriverError> {
+        self.device.name()
+    }
 }
 
 /// CUDA kernel wrapper for spike propagation
@@ -327,6 +337,16 @@ impl SpikePropagationKernel {
         }
 
         Ok(())
+    }
+
+    /// Synchronize device after kernel execution
+    pub fn synchronize(&self) -> Result<(), cudarc::driver::DriverError> {
+        self.device.synchronize()
+    }
+
+    /// Get device name for diagnostics
+    pub fn device_name(&self) -> Result<String, cudarc::driver::DriverError> {
+        self.device.name()
     }
 }
 
@@ -389,6 +409,16 @@ impl TripletSTDPKernel {
 
         Ok(())
     }
+
+    /// Synchronize device after kernel execution
+    pub fn synchronize(&self) -> Result<(), cudarc::driver::DriverError> {
+        self.device.synchronize()
+    }
+
+    /// Get device name for diagnostics
+    pub fn device_name(&self) -> Result<String, cudarc::driver::DriverError> {
+        self.device.name()
+    }
 }
 
 /// CUDA kernel wrapper for STDP trace decay
@@ -442,5 +472,15 @@ impl STDPTraceDecayKernel {
         }
 
         Ok(())
+    }
+
+    /// Synchronize device after kernel execution
+    pub fn synchronize(&self) -> Result<(), cudarc::driver::DriverError> {
+        self.device.synchronize()
+    }
+
+    /// Get device name for diagnostics
+    pub fn device_name(&self) -> Result<String, cudarc::driver::DriverError> {
+        self.device.name()
     }
 }

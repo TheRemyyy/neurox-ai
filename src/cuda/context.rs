@@ -78,14 +78,30 @@ impl CudaContext {
         ))
     }
 
-    /// Get GPU memory information (approximation)
+    /// Get GPU memory information
     pub fn memory_info(&self) -> Result<GpuMemoryInfo, Box<dyn std::error::Error>> {
-        // cudarc 0.12 doesn't expose total_memory directly
-        // Return estimated values for RTX 3070
+        // Get actual GPU memory usage via CUDA driver API
+        let (free, total) = unsafe {
+            use cudarc::driver::sys;
+            let mut free: usize = 0;
+            let mut total: usize = 0;
+
+            // Query actual GPU memory using cuMemGetInfo
+            let result = sys::lib().cuMemGetInfo_v2(&mut free, &mut total);
+            if result == sys::CUresult::CUDA_SUCCESS {
+                (free, total)
+            } else {
+                // Fallback to estimated values if query fails
+                (8 * 1024 * 1024 * 1024, 8 * 1024 * 1024 * 1024)
+            }
+        };
+
+        let used = total.saturating_sub(free);
+
         Ok(GpuMemoryInfo {
-            total: 8 * 1024 * 1024 * 1024, // 8GB
-            free: 8 * 1024 * 1024 * 1024,
-            used: 0,
+            total,
+            free,
+            used,
         })
     }
 

@@ -60,6 +60,30 @@ pub struct SparseConnectivityGPU {
     n_synapses: usize,
 }
 
+impl SparseConnectivityGPU {
+    /// Get total number of synapses
+    pub fn n_synapses(&self) -> usize {
+        self.n_synapses
+    }
+
+    /// Get memory footprint in bytes
+    pub fn memory_footprint(&self) -> usize {
+        // row_ptr: (n_neurons + 1) * 4 bytes
+        // col_idx: n_synapses * 4 bytes
+        // weights: n_synapses * 4 bytes
+        let row_ptr_size = self.row_ptr.len() * std::mem::size_of::<i32>();
+        let col_idx_size = self.n_synapses * std::mem::size_of::<i32>();
+        let weights_size = self.n_synapses * std::mem::size_of::<f32>();
+        row_ptr_size + col_idx_size + weights_size
+    }
+
+    /// Get sparsity ratio (fraction of non-zero connections)
+    pub fn sparsity(&self, n_neurons: usize) -> f64 {
+        let total_possible = n_neurons * n_neurons;
+        self.n_synapses as f64 / total_possible as f64
+    }
+}
+
 
 impl Simulator {
     /// Create new simulator
