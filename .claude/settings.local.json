@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(export PATH:*)",
-      "Bash(Select-String -Pattern \"(Finished|error)\")"
+      "Bash(Select-String -Pattern \"(Finished|error)\")",
+      "Bash(git mv:*)"
     ],
     "deny": [],
     "ask": []
