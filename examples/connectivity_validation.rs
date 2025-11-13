@@ -1,9 +1,11 @@
-//! Phase 2: Sparse Connectivity Test
+//! Sparse Connectivity Validation
 //!
-//! Tests 100K neurons with sparse synaptic connectivity
+//! Demonstrates and validates sparse connectivity patterns:
+//! - Random, Small-World, and Distance-Dependent topologies
+//! - Memory efficiency vs dense connectivity
+//! - Large-scale performance (100K neurons)
 
-use neurox_ai::{CudaContext, ProceduralConnectivity, SparseConnectivity, ConnectivityType};
-use std::sync::Arc;
+use neurox_ai::{ProceduralConnectivity, SparseConnectivity, ConnectivityType};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::Builder::from_default_env()
@@ -11,7 +13,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .init();
 
     log::info!("╔════════════════════════════════════════════════════════════╗");
-    log::info!("║  Phase 2: Sparse Connectivity Validation                  ║");
+    log::info!("║  Sparse Connectivity Validation                           ║");
     log::info!("╚════════════════════════════════════════════════════════════╝\n");
 
     // Test 1: Small network with different topologies
@@ -23,7 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Test 3: Large scale connectivity (100K neurons)
     test_large_scale()?;
 
-    log::info!("\n✓ Phase 2 connectivity tests completed!");
+    log::info!("\n✓ All connectivity validation tests passed!");
 
     Ok(())
 }
