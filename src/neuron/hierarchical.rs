@@ -83,6 +83,7 @@ impl MeanFieldRegion {
 }
 
 /// Hierarchical brain with 3 levels
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HierarchicalBrain {
     /// Detailed neurons (8.6M @ 20 bytes = 172 MB)
     pub detailed_neurons: Vec<LIFNeuron>,
@@ -98,6 +99,41 @@ pub struct HierarchicalBrain {
 }
 
 impl HierarchicalBrain {
+    /// Create hierarchical brain with custom layer configuration
+    ///
+    /// # Arguments
+    /// - `n_layers`: Number of hierarchical layers (typically 3-5)
+    /// - `base_neurons`: Base number of neurons at detailed layer
+    pub fn new(n_layers: usize, base_neurons: usize) -> Self {
+        let detailed_count = base_neurons;
+        let medium_count = (detailed_count as f32 * 0.1) as usize;
+        let abstract_count = (detailed_count as f32 * 0.01) as usize;
+
+        log::info!("Creating hierarchical brain ({} layers):", n_layers);
+        log::info!("  Detailed: {} neurons", detailed_count);
+        log::info!("  Medium: {} regions", medium_count);
+        log::info!("  Abstract: {} regions", abstract_count);
+
+        let detailed_neurons = (0..detailed_count)
+            .map(|i| LIFNeuron::new(i as u32))
+            .collect();
+
+        let medium_regions = (0..medium_count)
+            .map(|i| RegionGroup::new(i as u32, base_neurons / medium_count))
+            .collect();
+
+        let abstract_regions = (0..abstract_count)
+            .map(|i| MeanFieldRegion::new(i as u32, base_neurons * 10))
+            .collect();
+
+        Self {
+            detailed_neurons,
+            medium_regions,
+            abstract_regions,
+            total_neurons: base_neurons * n_layers,
+        }
+    }
+
     /// Create hierarchical brain for 86B neurons
     pub fn for_full_brain() -> Self {
         const DETAILED: usize = 8_600_000; // 0.01% at full detail

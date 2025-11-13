@@ -95,7 +95,7 @@ impl PersistentNeuron {
     /// Create new persistent neuron
     pub fn new(recurrent_weight: f32, tau_persistent: f32) -> Self {
         Self {
-            state: NeuronState::default(),
+            state: NeuronState::new(0),
             recurrent_weight,
             tau_persistent,
             activity_trace: 0.0,

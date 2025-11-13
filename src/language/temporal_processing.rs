@@ -46,7 +46,7 @@ impl TemporalProcessor {
     /// Create new temporal processor
     pub fn new(state_size: usize, vocab_size: usize, learning_rate: f32, tau_context: f32) -> Self {
         Self {
-            context: vec![LIFNeuron::default(); state_size],
+            context: (0..state_size).map(|i| LIFNeuron::new(i as u32)).collect(),
             transitions: HashMap::new(),
             state: vec![0.0; state_size],
             state_size,
@@ -284,11 +284,12 @@ impl LanguageSystem {
             row_ptr[target + 1] = col_idx.len() as i32;
         }
 
+        let nnz = col_idx.len();
         SparseConnectivity {
             row_ptr,
             col_idx,
             weights,
-            nnz: col_idx.len(),
+            nnz,
             n_neurons: n_target,
         }
     }

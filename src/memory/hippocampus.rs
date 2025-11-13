@@ -206,11 +206,12 @@ impl SparseEncoder {
             row_ptr[target + 1] = col_idx.len() as i32;
         }
 
+        let nnz = col_idx.len();
         SparseConnectivity {
             row_ptr,
             col_idx,
             weights,
-            nnz: col_idx.len(),
+            nnz,
             n_neurons: output_dim,
         }
     }
@@ -248,7 +249,7 @@ impl RecurrentNetwork {
         // Create recurrent connectivity
         let connectivity = Self::create_recurrent_connectivity(n_neurons, connection_prob);
 
-        let neurons = vec![LIFNeuron::default(); n_neurons];
+        let neurons = (0..n_neurons).map(|i| LIFNeuron::new(i as u32)).collect();
         let hebbian_weights = vec![0.0; connectivity.nnz];
 
         Self {
@@ -337,11 +338,12 @@ impl RecurrentNetwork {
             row_ptr[target + 1] = col_idx.len() as i32;
         }
 
+        let nnz = col_idx.len();
         SparseConnectivity {
             row_ptr,
             col_idx,
             weights,
-            nnz: col_idx.len(),
+            nnz,
             n_neurons,
         }
     }
@@ -357,7 +359,7 @@ pub struct FeedforwardLayer {
 impl FeedforwardLayer {
     pub fn new(n_neurons: usize) -> Self {
         Self {
-            neurons: vec![LIFNeuron::default(); n_neurons],
+            neurons: (0..n_neurons).map(|i| LIFNeuron::new(i as u32)).collect(),
             n_neurons,
         }
     }

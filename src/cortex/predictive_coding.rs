@@ -47,8 +47,8 @@ impl PredictiveCodingLayer {
         precision: f32,
     ) -> Self {
         Self {
-            prediction: vec![LIFNeuron::default(); n_neurons],
-            error: vec![LIFNeuron::default(); n_neurons],
+            prediction: (0..n_neurons).map(|i| LIFNeuron::new(i as u32)).collect(),
+            error: (0..n_neurons).map(|i| LIFNeuron::new(i as u32)).collect(),
             top_down_weights,
             bottom_up_weights,
             n_neurons,
@@ -190,11 +190,12 @@ impl PredictiveHierarchy {
             row_ptr[target + 1] = col_idx.len() as i32;
         }
 
+        let nnz = col_idx.len();
         SparseConnectivity {
             row_ptr,
             col_idx,
             weights,
-            nnz: col_idx.len(),
+            nnz,
             n_neurons: n_target,
         }
     }

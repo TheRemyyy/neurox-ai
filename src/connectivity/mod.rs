@@ -184,7 +184,7 @@ impl ProceduralConnectivity {
 ///
 /// Memory-efficient representation: ~12 bytes per synapse vs 8 bytes
 /// for dense (but only for non-zero entries).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SparseConnectivity {
     /// Row pointers (n_neurons + 1)
     pub row_ptr: Vec<i32>,
