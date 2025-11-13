@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(export PATH:*)"
+      "Bash(export PATH:*)",
+      "Bash(Select-String -Pattern \"(Finished|error)\")"
     ],
     "deny": [],
     "ask": []

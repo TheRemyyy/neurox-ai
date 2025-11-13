@@ -130,6 +130,104 @@ extern "C" __global__ void homeostatic_adaptation(
 }
 "#;
 
+/// Triplet STDP weight update kernel (Nature SR 2025)
+pub const TRIPLET_STDP_KERNEL: &str = r#"
+// STDP configuration structure
+struct STDPConfig {
+    float lr_pre;
+    float lr_post;
+    float w_min;
+    float w_max;
+};
+
+extern "C" __global__ void triplet_stdp_update(
+    // Synaptic weights (CSR format)
+    const int* row_ptr,
+    const int* col_idx,
+    float* weights,
+
+    // STDP traces (per neuron)
+    const float* a_pre,      // Pre-synaptic trace
+    const float* a_post1,    // Post-synaptic trace 1 (fast)
+    const float* a_post2,    // Post-synaptic trace 2 (slow)
+
+    // Spike flags
+    const float* post_spikes,
+
+    // Configuration (passed as 4 floats)
+    const float lr_pre,
+    const float lr_post,
+    const float w_min,
+    const float w_max,
+
+    const int n_neurons
+) {
+    int post_neuron = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (post_neuron >= n_neurons) return;
+
+    // Check if post-synaptic neuron spiked
+    if (post_spikes[post_neuron] < 0.5f) return;
+
+    // Iterate through incoming synapses (CSR row)
+    int row_start = row_ptr[post_neuron];
+    int row_end = row_ptr[post_neuron + 1];
+
+    for (int i = row_start; i < row_end; i++) {
+        int pre_neuron = col_idx[i];
+        float w = weights[i];
+
+        // Triplet STDP rule:
+        // Δw = -lr_pre * a_post1 + lr_post * a_pre * a_post2
+        float depression = -lr_pre * a_post1[post_neuron];
+        float potentiation = lr_post * a_pre[pre_neuron] * a_post2[post_neuron];
+
+        float dw = depression + potentiation;
+
+        // Update weight with bounds
+        w += dw;
+        w = fminf(fmaxf(w, w_min), w_max);
+
+        weights[i] = w;
+    }
+}
+"#;
+
+/// STDP trace decay kernel
+pub const STDP_TRACE_DECAY_KERNEL: &str = r#"
+extern "C" __global__ void stdp_trace_decay(
+    float* a_pre,
+    float* a_post1,
+    float* a_post2,
+    const float* spike_flags,
+    const float dt,
+    const float tau_pre,
+    const float tau_post1,
+    const float tau_post2,
+    const int n_neurons
+) {
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (tid >= n_neurons) return;
+
+    // Exponential decay
+    float decay_pre = expf(-dt / tau_pre);
+    float decay_post1 = expf(-dt / tau_post1);
+    float decay_post2 = expf(-dt / tau_post2);
+
+    a_pre[tid] *= decay_pre;
+    a_post1[tid] *= decay_post1;
+    a_post2[tid] *= decay_post2;
+
+    // Increment on spike
+    if (spike_flags[tid] > 0.5f) {
+        a_pre[tid] += 1.0f;      // Pre-synaptic trace
+        a_post1[tid] += 1.0f;    // Post-synaptic fast trace
+        a_post2[tid] += 1.0f;    // Post-synaptic slow trace
+    }
+}
+"#;
+
 /// CUDA kernel wrapper for LIF neuron update
 pub struct LIFUpdateKernel {
     device: Arc<CudaDevice>,
@@ -219,6 +317,121 @@ impl SpikePropagationKernel {
             weights,
             spike_flags,
             output_currents,
+            n_neurons,
+        );
+
+        unsafe {
+            self.function
+                .clone()
+                .launch(config.to_launch_config(), params)?;
+        }
+
+        Ok(())
+    }
+}
+
+/// CUDA kernel wrapper for Triplet STDP weight update
+pub struct TripletSTDPKernel {
+    device: Arc<CudaDevice>,
+    function: CudaFunction,
+}
+
+impl TripletSTDPKernel {
+    /// Compile and load kernel
+    pub fn new(device: Arc<CudaDevice>) -> Result<Self, Box<dyn std::error::Error>> {
+        let ptx = cudarc::nvrtc::compile_ptx(TRIPLET_STDP_KERNEL)?;
+        device.load_ptx(ptx, "neurox_stdp", &["triplet_stdp_update"])?;
+        let function = device
+            .get_func("neurox_stdp", "triplet_stdp_update")
+            .unwrap();
+
+        Ok(Self { device, function })
+    }
+
+    /// Launch kernel
+    #[allow(clippy::too_many_arguments)]
+    pub fn launch(
+        &self,
+        config: super::KernelConfig,
+        row_ptr: &cudarc::driver::CudaSlice<i32>,
+        col_idx: &cudarc::driver::CudaSlice<i32>,
+        weights: &mut cudarc::driver::CudaSlice<f32>,
+        a_pre: &cudarc::driver::CudaSlice<f32>,
+        a_post1: &cudarc::driver::CudaSlice<f32>,
+        a_post2: &cudarc::driver::CudaSlice<f32>,
+        post_spikes: &cudarc::driver::CudaSlice<f32>,
+        lr_pre: f32,
+        lr_post: f32,
+        w_min: f32,
+        w_max: f32,
+        n_neurons: i32,
+    ) -> Result<(), cudarc::driver::DriverError> {
+        let params = (
+            row_ptr,
+            col_idx,
+            weights,
+            a_pre,
+            a_post1,
+            a_post2,
+            post_spikes,
+            lr_pre,
+            lr_post,
+            w_min,
+            w_max,
+            n_neurons,
+        );
+
+        unsafe {
+            self.function
+                .clone()
+                .launch(config.to_launch_config(), params)?;
+        }
+
+        Ok(())
+    }
+}
+
+/// CUDA kernel wrapper for STDP trace decay
+pub struct STDPTraceDecayKernel {
+    device: Arc<CudaDevice>,
+    function: CudaFunction,
+}
+
+impl STDPTraceDecayKernel {
+    /// Compile and load kernel
+    pub fn new(device: Arc<CudaDevice>) -> Result<Self, Box<dyn std::error::Error>> {
+        let ptx = cudarc::nvrtc::compile_ptx(STDP_TRACE_DECAY_KERNEL)?;
+        device.load_ptx(ptx, "neurox_trace", &["stdp_trace_decay"])?;
+        let function = device
+            .get_func("neurox_trace", "stdp_trace_decay")
+            .unwrap();
+
+        Ok(Self { device, function })
+    }
+
+    /// Launch kernel
+    pub fn launch(
+        &self,
+        config: super::KernelConfig,
+        a_pre: &mut cudarc::driver::CudaSlice<f32>,
+        a_post1: &mut cudarc::driver::CudaSlice<f32>,
+        a_post2: &mut cudarc::driver::CudaSlice<f32>,
+        spike_flags: &cudarc::driver::CudaSlice<f32>,
+        dt: f32,
+        tau_pre: f32,
+        tau_post1: f32,
+        tau_post2: f32,
+        n_neurons: i32,
+    ) -> Result<(), cudarc::driver::DriverError> {
+        let params = (
+            a_pre,
+            a_post1,
+            a_post2,
+            spike_flags,
+            dt,
+            tau_pre,
+            tau_post1,
+            tau_post2,
             n_neurons,
         );
 

@@ -34,6 +34,19 @@ pub struct Simulator {
 
     // Sparse synaptic connectivity (optional)
     connectivity: Option<SparseConnectivityGPU>,
+
+    // Event-driven processing
+    event_queue: EventQueue,
+    delay_buffer: DelayBuffer,
+
+    // Active neuron indices (for conditional execution)
+    active_neurons: Vec<u32>,
+
+    // Event-driven mode flag
+    event_driven: bool,
+
+    // Sparsity threshold (% active neurons to switch modes)
+    sparsity_threshold: f32,
 }
 
 /// GPU-resident sparse connectivity
@@ -74,6 +87,10 @@ impl Simulator {
 
         log::info!("Simulator initialized successfully");
 
+        // Initialize event-driven components
+        let event_queue = EventQueue::new(n_neurons * 10); // 10× capacity for bursts
+        let delay_buffer = DelayBuffer::new(20); // 20ms max delay (timesteps)
+
         Ok(Self {
             cuda,
             n_neurons,
@@ -87,6 +104,11 @@ impl Simulator {
             spike_flags,
             input_currents,
             connectivity: None,
+            event_queue,
+            delay_buffer,
+            active_neurons: Vec::with_capacity(n_neurons / 10), // Expect ~10% sparsity
+            event_driven: true, // Enable by default
+            sparsity_threshold: 0.15, // Switch to dense mode if >15% active
         })
     }
 
@@ -143,7 +165,7 @@ impl Simulator {
         }
     }
 
-    /// Step simulation forward by one timestep
+    /// Step simulation forward by one timestep (event-driven)
     pub fn step(&mut self, external_input: Option<&[f32]>) -> Result<(), Box<dyn std::error::Error>> {
         // Update input currents if provided
         if let Some(input) = external_input {
@@ -153,7 +175,39 @@ impl Simulator {
                 .htod_sync_copy_into(input, &mut self.input_currents)?;
         }
 
-        // Launch LIF update kernel
+        // Retrieve delayed spikes from delay buffer
+        let delayed_spikes = self.delay_buffer.get_current_spikes();
+        for &neuron_id in delayed_spikes {
+            // Add delayed spike to event queue
+            self.event_queue.push(SpikeEvent::new(
+                neuron_id,
+                (self.timestep % 65536) as u16,
+                0, // region_id
+            ));
+        }
+
+        // Advance delay buffer to next timestep
+        self.delay_buffer.advance();
+
+        // Determine execution mode based on sparsity
+        let active_count = self.event_queue.len();
+        let sparsity = active_count as f32 / self.n_neurons as f32;
+
+        if self.event_driven && sparsity < self.sparsity_threshold {
+            // Event-driven mode: Process only active neurons
+            self.step_sparse()?;
+        } else {
+            // Dense mode: Process all neurons (traditional time-stepped)
+            self.step_dense()?;
+        }
+
+        self.timestep += 1;
+
+        Ok(())
+    }
+
+    /// Dense time-stepped update (all neurons)
+    fn step_dense(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let config = KernelConfig::for_neurons(self.n_neurons);
 
         self.cuda.lif_kernel().launch(
@@ -170,9 +224,56 @@ impl Simulator {
             10.0, // r_m
         )?;
 
+        // Collect spikes and propagate
+        self.collect_and_propagate_spikes()?;
+
+        Ok(())
+    }
+
+    /// Sparse event-driven update (active neurons only)
+    fn step_sparse(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        // Extract active neuron IDs from event queue
+        self.active_neurons.clear();
+        while let Some(event) = self.event_queue.pop() {
+            self.active_neurons.push(event.neuron_id);
+        }
+
+        if self.active_neurons.is_empty() {
+            return Ok(()); // No active neurons, skip computation
+        }
+
+        // TODO: Launch sparse kernel for active neurons only
+        // For now, fall back to dense mode
+        // This requires a new CUDA kernel that processes only active_neurons indices
+        self.step_dense()?;
+
+        Ok(())
+    }
+
+    /// Collect spikes and propagate through synapses
+    fn collect_and_propagate_spikes(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        // Get spikes from GPU
+        let spikes = self.get_spikes()?;
+
+        // Add spiking neurons to event queue and delay buffer
+        for (neuron_id, &spike_flag) in spikes.iter().enumerate() {
+            if spike_flag > 0.5 {
+                // Add to delay buffer (synaptic delay of 1ms)
+                self.delay_buffer.add_spike(neuron_id as u32, 1);
+
+                // Add to event queue for immediate processing
+                self.event_queue.push(SpikeEvent::new(
+                    neuron_id as u32,
+                    (self.timestep % 65536) as u16,
+                    0, // region_id
+                ));
+            }
+        }
+
         // Propagate spikes through synapses if connectivity is present
         if let Some(ref conn) = self.connectivity {
             let mut synaptic_currents = self.cuda.allocate(self.n_neurons)?;
+            let config = KernelConfig::for_neurons(self.n_neurons);
 
             self.cuda.spike_kernel().launch(
                 config,
@@ -184,11 +285,8 @@ impl Simulator {
                 self.n_neurons as i32,
             )?;
 
-            // Add synaptic currents to input for next timestep
-            // (In real implementation, would accumulate into input_currents)
+            // TODO: Accumulate synaptic_currents into input_currents
         }
-
-        self.timestep += 1;
 
         Ok(())
     }

@@ -2,7 +2,7 @@
 //!
 //! Handles GPU device initialization, memory allocation, and resource cleanup.
 
-use super::{GpuMemoryInfo, LIFUpdateKernel, SpikePropagationKernel};
+use super::{GpuMemoryInfo, LIFUpdateKernel, SpikePropagationKernel, TripletSTDPKernel, STDPTraceDecayKernel};
 use cudarc::driver::{CudaDevice, CudaSlice};
 use std::sync::Arc;
 
@@ -16,6 +16,12 @@ pub struct CudaContext {
 
     /// Spike propagation kernel
     spike_kernel: SpikePropagationKernel,
+
+    /// Triplet STDP kernel
+    stdp_kernel: TripletSTDPKernel,
+
+    /// STDP trace decay kernel
+    trace_kernel: STDPTraceDecayKernel,
 
     /// Device ordinal
     device_id: usize,
@@ -36,12 +42,20 @@ impl CudaContext {
         log::info!("Compiling spike propagation kernel...");
         let spike_kernel = SpikePropagationKernel::new(device.clone())?;
 
+        log::info!("Compiling Triplet STDP kernel...");
+        let stdp_kernel = TripletSTDPKernel::new(device.clone())?;
+
+        log::info!("Compiling STDP trace decay kernel...");
+        let trace_kernel = STDPTraceDecayKernel::new(device.clone())?;
+
         log::info!("CUDA context initialized successfully");
 
         Ok(Self {
             device,
             lif_kernel,
             spike_kernel,
+            stdp_kernel,
+            trace_kernel,
             device_id,
         })
     }
@@ -97,6 +111,16 @@ impl CudaContext {
     /// Get spike propagation kernel
     pub fn spike_kernel(&self) -> &SpikePropagationKernel {
         &self.spike_kernel
+    }
+
+    /// Get Triplet STDP kernel
+    pub fn stdp_kernel(&self) -> &TripletSTDPKernel {
+        &self.stdp_kernel
+    }
+
+    /// Get STDP trace decay kernel
+    pub fn trace_kernel(&self) -> &STDPTraceDecayKernel {
+        &self.trace_kernel
     }
 
     /// Synchronize device (wait for all operations to complete)
