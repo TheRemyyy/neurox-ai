@@ -227,7 +227,11 @@ impl MNISTTrainer {
 
     /// Predict label for single image
     pub fn predict(&mut self, image: &MNISTImage) -> Result<usize, Box<dyn std::error::Error>> {
-        let input_currents = image.to_input_currents(10.0);
+        let mut input_currents = image.to_input_currents(10.0);
+
+        // Pad with zeros for hidden and output neurons
+        input_currents.resize(self.simulator.n_neurons(), 0.0);
+
         let n_steps = (self.config.presentation_duration / self.simulator.dt()) as usize;
 
         // Count spikes per output neuron
