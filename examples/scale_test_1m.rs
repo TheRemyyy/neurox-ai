@@ -69,6 +69,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 args.duration,
                 args.sparsity,
                 args.input_activity,
+                args.input_current,
                 cuda_ctx.clone()
             )?;
         }
@@ -80,6 +81,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             args.duration,
             args.sparsity,
             args.input_activity,
+            args.input_current,
             cuda_ctx.clone()
         )?;
     }
@@ -92,6 +94,7 @@ fn run_scale_test(
     sim_duration_ms: f32,
     connection_prob: f64,
     input_activity: f32,
+    input_current: f32,
     cuda_ctx: Arc<CudaContext>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Create sparse connectivity (small-world)
@@ -122,9 +125,10 @@ fn run_scale_test(
     // Generate sparse random input
     let n_active_input = (n_neurons as f32 * input_activity) as usize;
     log::info!("  Input activity: {} neurons ({:.2}%)", n_active_input, input_activity * 100.0);
+    log::info!("  Input current: {} mA", input_current);
     let mut input = vec![0.0; n_neurons];
     for i in 0..n_active_input {
-        input[i] = 10.0; // Strong input current
+        input[i] = input_current;
     }
 
     // Benchmark
