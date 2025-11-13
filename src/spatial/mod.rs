@@ -263,7 +263,7 @@ impl GridCellSystem {
     /// - `base_spacing`: Smallest spacing (cm, typically 30)
     /// - `cells_per_module`: Cells in each module
     pub fn new(n_modules: usize, base_spacing: f32, cells_per_module: usize) -> Self {
-        let spacing_ratio = 1.42;
+        let spacing_ratio: f32 = 1.42;
         let mut modules = Vec::with_capacity(n_modules);
 
         for i in 0..n_modules {

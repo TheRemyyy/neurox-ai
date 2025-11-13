@@ -22,7 +22,7 @@
 //! - Oscillatory coordination for flexible routing
 
 use crate::connectivity::SparseConnectivity;
-use crate::neuron::LIFNeuron;
+use crate::neuron::{LIFNeuron, Neuron};
 use crate::oscillations::OscillatoryCircuit;
 use serde::{Deserialize, Serialize};
 

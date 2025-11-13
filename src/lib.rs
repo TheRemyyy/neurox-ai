@@ -43,11 +43,36 @@ pub use training::{TrainingConfig, MNISTTrainer, train_mnist};
 pub use serialization::{NeuromorphicModel, ModelMetadata, NeuronParameters, PlasticityState};
 
 // Re-export cognitive modules
-pub use cortex::{WorkingMemory, WorkingMemoryStats, PredictiveHierarchy};
+pub use cortex::{
+    WorkingMemory, WorkingMemoryStats, PredictiveHierarchy,
+    EnhancedPredictiveHierarchy, EnhancedPredictiveStats,
+};
 pub use attention::{AttentionSystem, AttentionStats};
 pub use memory::{Hippocampus, HippocampusStats};
-pub use language::{LanguageSystem, LanguageStats};
+pub use language::{
+    LanguageSystem, LanguageStats,
+    DualStreamLanguage, DualStreamStats,
+};
 pub use brain::{NeuromorphicBrain, BrainStats};
+
+// Re-export new biological systems
+pub use basal_ganglia::{BasalGanglia, BasalGangliaStats, DopamineNeuron};
+pub use neuromodulation::{NeuromodulationSystem, NeuromodulationStats};
+pub use oscillations::{OscillatoryCircuit, OscillationStats};
+pub use spatial::{SpatialSystem, PlaceCell, GridCell};
+pub use semantics::{SemanticSystem, SemanticHub, EmbeddingLayer};
+
+// Re-export new neuron types
+pub use neuron::{
+    PVInterneuron, SSTInterneuron, VIPInterneuron, InterneuronCircuit,
+    DendriticNeuron, DendriticLayer,
+};
+
+// Re-export new learning mechanisms
+pub use learning::{
+    HomeostaticSystem, HomeostaticStats, BCMMetaplasticity,
+    CriticalityHomeostasis,
+};
 
 // Re-export neural processor
 pub use neural_processor::{NeuralProcessor, ProcessorStats};

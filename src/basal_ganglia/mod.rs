@@ -18,7 +18,7 @@
 //! - TD learning: δ(t) = r(t) + γV(t) - V(t-1)
 //! - Learning rate α = 0.01-0.1, discount γ = 0.95-0.99
 
-use crate::neuron::LIFNeuron;
+use crate::neuron::{LIFNeuron, Neuron};
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
