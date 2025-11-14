@@ -50,7 +50,6 @@ pub use cortex::{
 pub use attention::{AttentionSystem, AttentionStats};
 pub use memory::{Hippocampus, HippocampusStats};
 pub use language::{
-    LanguageSystem, LanguageStats,
     DualStreamLanguage, DualStreamStats,
 };
 pub use brain::{NeuromorphicBrain, BrainStats};

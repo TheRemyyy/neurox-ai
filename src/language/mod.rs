@@ -1,14 +1,11 @@
 //! Language and Temporal Processing Systems
 //!
-//! Sequential processing, language comprehension and production.
-//! Includes modern dual-stream architecture for biological accuracy.
+//! Dual-stream language architecture for biological accuracy.
+//! - Ventral stream: Sound-to-meaning comprehension (STG→MTG→ATL)
+//! - Dorsal stream: Sound-to-articulation production (STG→Spt→IFG)
 
-pub mod temporal_processing;
 pub mod dual_stream;
 
-pub use temporal_processing::{
-    LanguageStats, LanguageSystem, MotorSequencer, TemporalProcessor,
-};
 pub use dual_stream::{
     DualStreamLanguage, DualStreamStats, VentralStream, DorsalStream,
     MultiTimescaleProcessor, STG, MTG, ATL, Spt, IFG,
