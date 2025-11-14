@@ -21,7 +21,7 @@ enum Commands {
     /// Display GPU device information
     Info,
 
-    /// Interactive neural processor console
+    /// Interactive NeuromorphicBrain console (27+ biological systems)
     Chat {
         /// Max vocabulary size (10k = 400MB, 20k = 1.6GB)
         #[arg(long, default_value_t = 10000)]
@@ -30,17 +30,6 @@ enum Commands {
         /// Pattern dimension (512 = balanced, 1024 = high quality)
         #[arg(long, default_value_t = 512)]
         pattern_dim: usize,
-    },
-
-    /// Run biological NeuromorphicBrain demo (27 brain systems)
-    Brain {
-        /// Pattern dimension
-        #[arg(long, default_value_t = 512)]
-        pattern_dim: usize,
-
-        /// Number of timesteps to run
-        #[arg(long, default_value_t = 1000)]
-        timesteps: usize,
     },
 }
 
@@ -88,12 +77,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }) => {
             run_chat_interface(vocab, pattern_dim)?;
         }
-        Some(Commands::Brain {
-            pattern_dim,
-            timesteps,
-        }) => {
-            run_brain_demo(pattern_dim, timesteps)?;
-        }
         None => {
             display_welcome();
         }
@@ -130,120 +113,46 @@ fn display_system_info() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Run biological NeuromorphicBrain demonstration
-fn run_brain_demo(pattern_dim: usize, timesteps: usize) -> Result<(), Box<dyn std::error::Error>> {
-    use neurox_ai::brain::NeuromorphicBrain;
-
-    println!("╔════════════════════════════════════════════════════════════╗");
-    println!("║  NeuromorphicBrain Demo - 27 Biological Systems            ║");
-    println!("╚════════════════════════════════════════════════════════════╝");
-    println!();
-
-    log::info!("Initializing NeuromorphicBrain...");
-
-    // Create brain with full biological architecture
-    let n_layers = 5;  // 5-layer hierarchical system
-    let base_neurons = 1000;  // 1000 base neurons per layer
-    let vocab_size = 10000;
-    let mut brain = NeuromorphicBrain::new(n_layers, base_neurons, vocab_size, pattern_dim);
-    log::info!("✓ Brain initialized: {} layers, {} neurons, {} pattern_dim",
-               n_layers, base_neurons, pattern_dim);
-
-    // Display initial stats
-    let stats = brain.stats();
-    println!("\n📊 Initial Brain Statistics:");
-    println!("  Working Memory: {} stored patterns", stats.working_memory.stored_patterns);
-    println!("  Hippocampus: initialized");
-    println!("  Cerebellum: initialized");
-    println!("  Amygdala: initialized");
-    println!("  Superior Colliculus: {} neurons", stats.superior_colliculus.total_neurons);
-    println!("  Thalamus: {} neurons", stats.thalamus.total_neurons);
-    println!();
-
-    // Run simulation
-    println!("🧠 Running brain simulation for {} timesteps...", timesteps);
-    println!();
-
-    let dt = 0.1; // 0.1 ms timestep
-    let mut last_print = 0;
-
-    for step in 0..timesteps {
-        // Update brain
-        brain.update(dt);
-
-        // Print progress every 100 steps
-        if step - last_print >= 100 || step == timesteps - 1 {
-            let progress = (step as f32 / timesteps as f32 * 100.0) as usize;
-            print!("\r  Progress: {}% [{}/{}] ", progress, step + 1, timesteps);
-            use std::io::{self, Write};
-            io::stdout().flush()?;
-            last_print = step;
-        }
-    }
-
-    println!("\n");
-
-    // Display final stats
-    let final_stats = brain.stats();
-    println!("📊 Final Brain Statistics:");
-    println!("  Time elapsed: {:.2} ms", final_stats.time);
-    println!("  Working Memory: {} stored patterns", final_stats.working_memory.stored_patterns);
-    println!("  Dopamine level: {:.3}", final_stats.basal_ganglia.dopamine_level);
-    println!("  Oscillations: theta {:.1} Hz, gamma {:.1} Hz",
-             final_stats.oscillations.theta_freq,
-             final_stats.oscillations.gamma_freq);
-    println!("  Superior Colliculus: {} saccades, active: {}",
-             final_stats.superior_colliculus.total_saccades,
-             final_stats.superior_colliculus.saccade_active);
-    println!("  Thalamus: burst ratio {:.3}, spindle: {}",
-             final_stats.thalamus.burst_ratio,
-             final_stats.thalamus.spindle_active);
-    println!("  All 27+ biological systems active and integrated");
-    println!();
-
-    println!("✓ Brain simulation complete!");
-    println!();
-
-    Ok(())
-}
-
-/// Run interactive neural processor console
+/// Run interactive NeuromorphicBrain console with all 27+ biological systems
 fn run_chat_interface(
     vocab: usize,
     pattern_dim: usize,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    use neurox_ai::NeuralProcessor;
-    use cudarc::driver::CudaDevice;
+    use neurox_ai::brain::NeuromorphicBrain;
     use rustyline::error::ReadlineError;
     use rustyline::DefaultEditor;
 
     println!("╔════════════════════════════════════════════════════════════╗");
-    println!("║     NeuroxAI Neural Processor - Interactive Console       ║");
+    println!("║     NeuromorphicBrain - Interactive Console (27+ Systems) ║");
     println!("╚════════════════════════════════════════════════════════════╝");
     println!();
-    log::info!("Initializing neural processor...");
+    log::info!("Initializing biological brain systems...");
 
-    // Initialize CUDA device
-    let device = CudaDevice::new(0)?;
-    log::info!("✓ CUDA device initialized: {}", device.name()?);
-
-    // Create neural processor
-    let mut processor = NeuralProcessor::new(device, vocab, pattern_dim)?;
-    log::info!("✓ Neural processor ready");
+    // Create biological brain with full architecture
+    let n_layers = 5;
+    let base_neurons = 1000;
+    let mut brain = NeuromorphicBrain::new(n_layers, base_neurons, vocab, pattern_dim);
+    log::info!("✓ Brain initialized: {} layers, {} base neurons, {} vocab",
+               n_layers, base_neurons, vocab);
     println!();
 
-    // Display stats
-    let stats = processor.stats()?;
-    println!("{}", stats);
+    // Display initial stats
+    let stats = brain.stats();
+    println!("🧠 Brain Systems Online:");
+    println!("  • Working Memory: {} patterns", stats.working_memory.stored_patterns);
+    println!("  • Dopamine: {:.3}", stats.basal_ganglia.dopamine_level);
+    println!("  • Oscillations: θ={:.1}Hz γ={:.1}Hz",
+             stats.oscillations.theta_freq, stats.oscillations.gamma_freq);
+    println!("  • Superior Colliculus: {} neurons", stats.superior_colliculus.total_neurons);
+    println!("  • Thalamus: {} neurons", stats.thalamus.total_neurons);
+    println!("  • All 27+ biological systems active");
     println!();
 
     println!("╔════════════════════════════════════════════════════════════╗");
-    println!("║  Neural processor online. Ready for interaction.          ║");
+    println!("║  Biological brain online. Ready for interaction.          ║");
     println!("║  Commands:                                                 ║");
-    println!("║    /stats   - System statistics                            ║");
-    println!("║    /train   - Toggle learning mode                         ║");
-    println!("║    /vocab   - Display vocabulary                           ║");
-    println!("║    /gen <text> - Generate from prompt                      ║");
+    println!("║    /stats   - Brain system statistics                      ║");
+    println!("║    /systems - List all 27+ active systems                  ║");
     println!("║    quit     - Shutdown (or Ctrl+C)                         ║");
     println!("╚════════════════════════════════════════════════════════════╝");
     println!();
@@ -251,14 +160,9 @@ fn run_chat_interface(
     // Create readline editor with history
     let mut rl = DefaultEditor::new()?;
 
-    let mut training_mode = false;
-
     loop {
-        // Set prompt based on mode
-        let prompt = if training_mode { "learn> " } else { "> " };
-
         // Read user input with rustyline (handles Ctrl+C gracefully)
-        let readline = rl.readline(prompt);
+        let readline = rl.readline("🧠> ");
 
         let input = match readline {
             Ok(line) => {
@@ -267,12 +171,12 @@ fn run_chat_interface(
             }
             Err(ReadlineError::Interrupted) => {
                 // Ctrl+C pressed
-                println!("→ Neural processor shutdown initiated (Ctrl+C)");
+                println!("→ Brain shutdown initiated (Ctrl+C)");
                 break;
             }
             Err(ReadlineError::Eof) => {
                 // Ctrl+D pressed
-                println!("→ Neural processor shutdown initiated (EOF)");
+                println!("→ Brain shutdown initiated (EOF)");
                 break;
             }
             Err(err) => {
@@ -289,75 +193,58 @@ fn run_chat_interface(
         }
 
         if input == "quit" || input == "exit" {
-            println!("→ Neural processor shutdown initiated");
+            println!("→ Brain shutdown initiated");
             break;
         }
 
         if input == "/stats" {
-            let stats = processor.stats()?;
-            println!("{}", stats);
-            continue;
-        }
-
-        if input == "/train" {
-            training_mode = !training_mode;
-            if training_mode {
-                println!("→ Learning mode enabled");
-            } else {
-                println!("→ Learning mode disabled");
-            }
-            continue;
-        }
-
-        if input == "/vocab" {
-            let vocab = processor.vocabulary();
-            println!("Learned vocabulary ({} words):", vocab.len());
-            if vocab.is_empty() {
-                println!("  (no words learned yet - start training!)");
-            } else {
-                let mut sorted_vocab = vocab;
-                sorted_vocab.sort();
-                for (i, word) in sorted_vocab.iter().enumerate() {
-                    if i % 10 == 0 && i > 0 {
-                        println!();
-                    }
-                    print!("{:12}", word);
-                }
-                println!();
-            }
-            continue;
-        }
-
-        if input.starts_with("/gen ") {
-            let prompt = input.strip_prefix("/gen ").unwrap();
-            match processor.generate_text(prompt, 20) {
-                Ok(generated) => {
-                    println!("← {}", generated);
-                }
-                Err(e) => {
-                    println!("✗ Error: {}", e);
-                }
-            }
+            let stats = brain.stats();
+            println!("\n📊 Brain Statistics:");
+            println!("  Time: {:.2} ms", stats.time);
+            println!("  Working Memory: {} patterns, {:.1}% capacity",
+                     stats.working_memory.stored_patterns,
+                     stats.working_memory.utilization * 100.0);
+            println!("  Dopamine: {:.3}", stats.basal_ganglia.dopamine_level);
+            println!("  ACh: {:.3}, NE: {:.3}",
+                     stats.neuromodulation.ach_level,
+                     stats.neuromodulation.ne_level);
+            println!("  Oscillations: θ={:.1}Hz γ={:.1}Hz",
+                     stats.oscillations.theta_freq,
+                     stats.oscillations.gamma_freq);
+            println!("  Superior Colliculus: {} saccades",
+                     stats.superior_colliculus.total_saccades);
+            println!("  Thalamus: burst ratio {:.3}",
+                     stats.thalamus.burst_ratio);
             println!();
             continue;
         }
 
-        // Process input
-        if training_mode {
-            match processor.train_on_text(input) {
-                Ok(_) => println!("✓ Learned"),
-                Err(e) => println!("✗ Error: {}", e),
-            }
-        } else {
-            match processor.process_text(input) {
-                Ok(response) => {
-                    println!("← {}", response);
-                }
-                Err(e) => {
-                    println!("✗ Error: {}", e);
-                }
-            }
+        if input == "/systems" {
+            println!("\n🧠 Active Brain Systems (27+):");
+            println!("  1. Working Memory          15. Oscillations");
+            println!("  2. Hippocampus             16. Interneurons");
+            println!("  3. Basal Ganglia           17. Homeostasis");
+            println!("  4. Language (Dual-Stream)  18. Predictive Coding");
+            println!("  5. Attention System        19. Cerebellum");
+            println!("  6. Neuromodulation         20. Amygdala");
+            println!("  7. Superior Colliculus     21. Spatial Navigation");
+            println!("  8. Thalamus                22. Semantic System");
+            println!("  9. R-STDP                  23. V1 Orientation");
+            println!(" 10. ETDP                    24. Cochlea");
+            println!(" 11. Memristive Network      25. MT/MST Motion");
+            println!(" 12. CAdEx Neurons           26. Barrel Cortex");
+            println!(" 13. Izhikevich Neurons      27. Sleep Consolidation");
+            println!(" 14. Structural Plasticity   + Heterosynaptic...");
+            println!();
+            continue;
         }
+
+        // Process text through full biological brain
+        let response = brain.process_text(input);
+        println!("🧠← {}", response);
+
+        // Update brain continuously
+        brain.update(0.1);
 
         println!();
     }
