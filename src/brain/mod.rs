@@ -161,7 +161,7 @@ impl NeuromorphicBrain {
         let hippocampus = Hippocampus::new(pattern_dim, 10, 0.05, 10000);
         let spatial = SpatialSystem::new(200, 500.0);  // 200 place cells, 500cm environment
         let cerebellum = Cerebellum::new();  // Dual-hemisphere motor learning
-        let amygdala = Amygdala::new();  // Fear conditioning and extinction
+        let amygdala = Amygdala::new(10);  // Fear conditioning and extinction (10 inputs)
 
         // Interneurons and modulation
         let interneurons = InterneuronCircuit::new(pattern_dim);  // PV:SST:VIP = 40:30:15
@@ -173,8 +173,8 @@ impl NeuromorphicBrain {
         let semantics = SemanticSystem::new(vocab_size, 300, 500);  // 500 concept cells
 
         // Sensory processing systems
-        let v1_orientation = V1OrientationSystem::new(128, 128);  // 128×128 visual field
-        let cochlea = NeuromorphicCochlea::new(64);  // 64 frequency channels
+        let v1_orientation = V1OrientationSystem::new(128, 128, 4);  // 128×128 visual field, 4 orientations
+        let cochlea = NeuromorphicCochlea::new(64, 16000.0, 200.0, 10000.0);  // 64 channels, 16kHz sample rate, 200Hz-10kHz
         let motion_processing = MotionProcessingSystem::new(128, 128);  // MT-MST optic flow
         let barrel_cortex = BarrelCortex::new();  // 5×5 whisker array
 
@@ -366,7 +366,13 @@ impl NeuromorphicBrain {
 
         // 3. Store experiences in sleep consolidation system
         for (pattern, priority) in &replayed {
-            self.sleep.store_experience(pattern.clone(), *priority, vec![0]);
+            // Compute scalar priority from priority vector (use average)
+            let priority_scalar = if !priority.is_empty() {
+                priority.iter().sum::<f32>() / priority.len() as f32
+            } else {
+                0.5
+            };
+            self.sleep.store_experience(pattern.clone(), priority_scalar.abs(), vec![0]);
         }
 
         // 4. Run sleep consolidation (sharp-wave ripples + slow oscillations)
@@ -436,9 +442,11 @@ impl NeuromorphicBrain {
         self.neuromodulation.update(dt, attention, pred_error, 0.3, false);
 
         // 5. Update cerebellum (motor learning via STDP)
-        let motor_input = vec![0.1; 10];  // Placeholder - would come from actual motor commands
-        let error_signal = pred_error * 0.1;  // Prediction error as motor error
-        self.cerebellum.update(&motor_input, error_signal, dt);
+        let motor_input_left = vec![false; 246];  // 246 mossy fibers (bool spikes)
+        let motor_input_right = vec![false; 246];
+        let error_left = vec![pred_error * 0.1; 8];  // 8 climbing fibers (error signals)
+        let error_right = vec![pred_error * 0.1; 8];
+        let (_left_out, _right_out) = self.cerebellum.update(dt, &motor_input_left, &motor_input_right, &error_left, &error_right);
 
         // 6. Update amygdala (emotional processing)
         let context = 0;  // Placeholder context
@@ -476,6 +484,8 @@ impl NeuromorphicBrain {
 
     /// Get comprehensive brain statistics with ALL new systems
     pub fn stats(&self) -> BrainStats {
+        let (cerebellum_left, _cerebellum_right) = self.cerebellum.stats();
+
         BrainStats {
             working_memory: self.working_memory.stats(),
             hippocampus: self.hippocampus.stats(),
@@ -487,7 +497,7 @@ impl NeuromorphicBrain {
             interneurons: self.interneurons.stats(),
             homeostasis: self.homeostasis.stats(),
             predictive: self.predictive.stats(),
-            cerebellum: self.cerebellum.stats(),
+            cerebellum: cerebellum_left,  // Use left hemisphere stats
             amygdala: self.amygdala.stats(),
             structural_plasticity: self.structural_plasticity.stats(),
             heterosynaptic: self.heterosynaptic.stats(),

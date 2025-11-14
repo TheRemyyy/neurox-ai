@@ -457,8 +457,8 @@ impl PVInterneuron {
     pub fn new(id: usize) -> Self {
         let mut neuron = LIFNeuron::new(id as u32);
         // Fast-spiking parameters
-        neuron.tau_mem = 5.0; // Fast dynamics (5ms)
-        neuron.v_thresh = -50.0; // Lower threshold
+        neuron.state.tau_m = 5.0; // Fast dynamics (5ms)
+        neuron.state.threshold = -50.0; // Lower threshold
 
         Self {
             id,
@@ -489,7 +489,7 @@ impl SSTInterneuron {
     pub fn new(id: usize) -> Self {
         let mut neuron = LIFNeuron::new(id as u32);
         // Adapting parameters
-        neuron.tau_mem = 20.0; // Slower dynamics (20ms)
+        neuron.state.tau_m = 20.0; // Slower dynamics (20ms)
 
         Self {
             id,

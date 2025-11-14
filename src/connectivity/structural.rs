@@ -265,8 +265,9 @@ impl StructuralPlasticity {
         self.synapse_map.remove(&key);
 
         // Swap with last and pop (O(1) removal)
-        if idx < self.active_synapses.len() - 1 {
-            self.active_synapses.swap(idx, self.active_synapses.len() - 1);
+        let last_idx = self.active_synapses.len() - 1;
+        if idx < last_idx {
+            self.active_synapses.swap(idx, last_idx);
 
             // Update map for swapped synapse
             let swapped = &self.active_synapses[idx];

@@ -396,14 +396,14 @@ pub enum SleepStage {
 }
 
 /// Replay event during sleep
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReplayEvent {
     pub experience_id: usize,
     pub timestamp: f32,
     pub direction: ReplayDirection,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ReplayDirection {
     Forward,
     Reverse,
