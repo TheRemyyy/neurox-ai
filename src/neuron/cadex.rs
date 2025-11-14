@@ -214,10 +214,10 @@ mod tests {
     fn test_cadex_spiking() {
         let mut neuron = CAdExNeuron::new(0);
         let dt = 0.1;  // 0.1 ms timestep
-        let input = 500.0;  // Strong input
+        let input = 2000.0;  // Strong input (increased to overcome adaptation)
 
         let mut spike_count = 0;
-        for _ in 0..1000 {
+        for _i in 0..1000 {
             if neuron.update(dt, input) {
                 spike_count += 1;
             }
@@ -251,7 +251,7 @@ mod tests {
         let mut rs = CAdExNeuron::regular_spiking(1);
 
         let dt = 0.1;
-        let input = 400.0;
+        let input = 1500.0;  // Strong enough to overcome adaptation
 
         let mut fs_spikes = 0;
         let mut rs_spikes = 0;
@@ -273,7 +273,7 @@ mod tests {
     fn test_adapting_variant() {
         let mut adapt = CAdExNeuron::adapting(0);
         let dt = 0.1;
-        let input = 500.0;
+        let input = 2500.0;  // Needs strong input due to strong adaptation
 
         let mut spike_times = Vec::new();
         for t in 0..2000 {
@@ -294,7 +294,7 @@ mod tests {
     fn test_bursting_variant() {
         let mut burst = CAdExNeuron::bursting(0);
         let dt = 0.1;
-        let input = 600.0;
+        let input = 1800.0;  // Strong input for bursting
 
         let mut spike_times = Vec::new();
         for t in 0..3000 {

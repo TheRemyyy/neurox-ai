@@ -1,12 +1,13 @@
 //! Learning rules and synaptic plasticity
 //!
 //! Implements STDP, homeostatic plasticity, STP, quantization, metaplasticity,
-//! calcium-based plasticity, burst-dependent STDP, and heterosynaptic plasticity.
+//! calcium-based plasticity, burst-dependent STDP, heterosynaptic plasticity, and ETDP.
 
 pub mod stdp;
 pub mod quantization;
 pub mod metaplasticity;
 pub mod heterosynaptic;
+pub mod etdp;
 
 pub use stdp::{
     TripletSTDP, HomeostaticPlasticity, CalciumBasedPlasticity, BurstDependentSTDP,
@@ -17,6 +18,7 @@ pub use metaplasticity::{
     HomeostaticSystem, HomeostaticStats,
 };
 pub use heterosynaptic::{HeterosynapticPlasticity, HeterosynapticStats};
+pub use etdp::{ETDP, ETDPStats};
 
 use serde::{Deserialize, Serialize};
 
