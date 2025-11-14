@@ -11,6 +11,7 @@ pub mod cuda;
 pub mod connectivity;
 pub mod simulation;
 pub mod learning;
+pub mod synapse;
 pub mod utils;
 pub mod datasets;
 pub mod training;
