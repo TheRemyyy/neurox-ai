@@ -30,7 +30,7 @@ pub struct EmbeddingLayer {
 
     /// Word to index mapping
     #[serde(skip)]
-    word_to_idx: Arc<DashMap<String, usize>>,
+    pub(crate) word_to_idx: Arc<DashMap<String, usize>>,
 
     /// Index to word mapping
     idx_to_word: Vec<String>,
