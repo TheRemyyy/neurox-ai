@@ -241,11 +241,17 @@ impl Amygdala {
             .filter(|n| n.extinction_strength > 0.5)
             .count();
 
-        let avg_thalamic_weight = self.lateral_amygdala.thalamic_weights
-            .iter()
-            .flat_map(|w| w.iter())
-            .sum::<f32>() / (self.lateral_amygdala.thalamic_weights.len()
-                * self.lateral_amygdala.thalamic_weights[0].len()) as f32;
+        let avg_thalamic_weight = if !self.lateral_amygdala.thalamic_weights.is_empty()
+            && !self.lateral_amygdala.thalamic_weights[0].is_empty() {
+            let total_weights = self.lateral_amygdala.thalamic_weights.len()
+                * self.lateral_amygdala.thalamic_weights[0].len();
+            self.lateral_amygdala.thalamic_weights
+                .iter()
+                .flat_map(|w| w.iter())
+                .sum::<f32>() / total_weights as f32
+        } else {
+            0.0
+        };
 
         AmygdalaStats {
             la_active_neurons: la_active,

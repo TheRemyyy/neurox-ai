@@ -321,10 +321,69 @@ impl Thalamus {
             }
         }
 
-        // Update Pulvinar (higher-order)
+        // Update VPM (somatosensory face)
+        let vpl_len = self.vpl_neurons.len();
+        for (i, neuron) in self.vpm_neurons.iter_mut().enumerate() {
+            neuron.set_attention(somato_gain);
+            // VPM gets input from second half of somatosensory array (face/whiskers)
+            let input = somatosensory.get(vpl_len + i).copied().unwrap_or(0.0);
+            let feedback = cortical_feedback.get(i).copied().unwrap_or(0.0);
+
+            if neuron.update(input, feedback, dt) {
+                if neuron.burst_mode {
+                    self.total_bursts += 1;
+                } else {
+                    self.total_tonic_spikes += 1;
+                }
+            }
+        }
+
+        // Update Pulvinar (higher-order visual attention)
         for neuron in &mut self.pulvinar_neurons {
             neuron.set_attention(visual_gain * 1.5); // Enhanced for attention
             neuron.update(0.0, 0.0, dt);
+        }
+
+        // Update MD (mediodorsal - cognition and working memory)
+        for (i, neuron) in self.md_neurons.iter_mut().enumerate() {
+            // MD receives from prefrontal/cognitive areas (use cortical feedback)
+            let input = cortical_feedback.get(i).copied().unwrap_or(0.0);
+            neuron.set_attention(self.attention_strength);  // Cognitive attention
+            if neuron.update(input, 0.0, dt) {
+                if neuron.burst_mode {
+                    self.total_bursts += 1;
+                } else {
+                    self.total_tonic_spikes += 1;
+                }
+            }
+        }
+
+        // Update TRN (thalamic reticular nucleus - inhibitory gating)
+        for (i, neuron) in self.trn_neurons.iter_mut().enumerate() {
+            // TRN receives collaterals from relay nuclei
+            let mut relay_input = 0.0;
+
+            // Sample from all relay nuclei
+            if i < self.lgn_neurons.len() {
+                relay_input += self.lgn_neurons[i].activity;
+            }
+            if i < self.mgn_neurons.len() {
+                relay_input += self.mgn_neurons[i].activity;
+            }
+            if i < self.vpl_neurons.len() {
+                relay_input += self.vpl_neurons[i].activity;
+            }
+
+            neuron.set_attention(1.0 / self.attention_strength);  // Inverse attention (suppresses unattended)
+            if neuron.update(relay_input * 0.5, 0.0, dt) {
+                // TRN provides feedback inhibition to relay nuclei
+                // (In full implementation, would inhibit specific relay neurons)
+                if neuron.burst_mode {
+                    self.total_bursts += 1;
+                } else {
+                    self.total_tonic_spikes += 1;
+                }
+            }
         }
 
         // Update spindle oscillation (7-14 Hz, for sleep)

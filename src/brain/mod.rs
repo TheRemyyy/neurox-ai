@@ -57,6 +57,10 @@ const HETEROSYNAPTIC_SYNAPSES: usize = 10000;
 const HETEROSYNAPTIC_ASTROCYTES: usize = 100;
 /// Thalamus input vector size (neurons per nucleus × sampled inputs)
 const THALAMUS_INPUT_SIZE: usize = 100;
+/// Number of neurons generating heterosynaptic input (CAdEx + Izhikevich)
+const HETEROSYNAPTIC_NEURONS: usize = 200;  // 100 CAdEx + 100 Izhikevich
+/// Synapses per neuron for heterosynaptic mapping
+const SYNAPSES_PER_NEURON: usize = HETEROSYNAPTIC_SYNAPSES / HETEROSYNAPTIC_NEURONS;  // = 50
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NeuromorphicBrain {
@@ -619,9 +623,9 @@ impl NeuromorphicBrain {
                 let post_neurons: Vec<usize> = ((i+1)..(i+11).min(200)).collect();
                 self.rstdp.on_pre_spike(i, &post_neurons, dt);
 
-                // For heterosynaptic: each neuron maps to multiple synapses (50 synapses per neuron)
-                let synapse_start = i * 50;
-                let synapse_end = (synapse_start + 50).min(HETEROSYNAPTIC_SYNAPSES);
+                // For heterosynaptic: each neuron maps to multiple synapses
+                let synapse_start = i * SYNAPSES_PER_NEURON;
+                let synapse_end = (synapse_start + SYNAPSES_PER_NEURON).min(HETEROSYNAPTIC_SYNAPSES);
                 for syn_id in synapse_start..synapse_end {
                     hetero_pre_spikes[syn_id] = true;
                     hetero_activity[syn_id] = activity;
@@ -642,9 +646,9 @@ impl NeuromorphicBrain {
                 let post_neurons: Vec<usize> = ((neuron_id+1)..(neuron_id+11).min(200)).collect();
                 self.rstdp.on_pre_spike(neuron_id, &post_neurons, dt);
 
-                // For heterosynaptic: continue mapping (neurons 100-199 → synapses 5000-9999)
-                let synapse_start = 5000 + i * 50;
-                let synapse_end = (synapse_start + 50).min(HETEROSYNAPTIC_SYNAPSES);
+                // For heterosynaptic: continue mapping (neurons 100-199 → second half of synapses)
+                let synapse_start = HETEROSYNAPTIC_SYNAPSES / 2 + i * SYNAPSES_PER_NEURON;
+                let synapse_end = (synapse_start + SYNAPSES_PER_NEURON).min(HETEROSYNAPTIC_SYNAPSES);
                 for syn_id in synapse_start..synapse_end {
                     hetero_pre_spikes[syn_id] = true;
                     hetero_activity[syn_id] = activity;
