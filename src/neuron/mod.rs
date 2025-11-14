@@ -7,8 +7,10 @@ pub mod hierarchical;
 pub mod interneurons;
 pub mod dendritic;
 pub mod izhikevich;
+pub mod cadex;
 
-pub use lif::{LIFNeuron, CAdExNeuron};
+pub use lif::LIFNeuron;
+pub use cadex::CAdExNeuron;
 pub use hierarchical::{NeuronLevel, RegionGroup, MeanFieldRegion, HierarchicalBrain, StreamingBuffer};
 pub use interneurons::{
     PVInterneuron, SSTInterneuron, VIPInterneuron, InterneuronCircuit, InterneuronStats,
