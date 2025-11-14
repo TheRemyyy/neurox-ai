@@ -26,6 +26,13 @@ use crate::neuron::{LIFNeuron, Neuron};
 use crate::oscillations::OscillatoryCircuit;
 use serde::{Deserialize, Serialize};
 
+// === PRECISION UPDATE CONSTANTS ===
+/// Minimum error variance to prevent division by zero when computing precision
+const MIN_ERROR_VARIANCE: f32 = 0.1;
+
+/// Maximum precision cap to prevent unbounded growth with very low errors
+const MAX_PRECISION: f32 = 10.0;
+
 /// Cortical layer with laminar structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LaminarLayer {
@@ -156,7 +163,7 @@ impl LaminarLayer {
 
                 // Update precision (inverse of error variance)
                 let error_var = local_error * local_error;
-                self.precision[i * 2] = (1.0 / (error_var + 0.1)).min(10.0);
+                self.precision[i * 2] = (1.0 / (error_var + MIN_ERROR_VARIANCE)).min(MAX_PRECISION);
                 if i * 2 + 1 < self.n_neurons {
                     self.precision[i * 2 + 1] = self.precision[i * 2];
                 }

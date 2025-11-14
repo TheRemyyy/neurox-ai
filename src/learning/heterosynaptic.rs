@@ -143,7 +143,7 @@ impl HeterosynapticPlasticity {
         }
 
         // Pre-compute neighbor lists for O(K) diffusion instead of O(N²)
-        let diffusion_radius = 100.0;  // 100 μm
+        let diffusion_radius: f32 = 100.0;  // 100 μm
         let mut neighbor_lists = vec![Vec::new(); n_synapses];
 
         for i in 0..n_synapses {
@@ -260,25 +260,19 @@ impl HeterosynapticPlasticity {
                 self.total_no_events += 1;
             }
 
-            // NO diffusion from nearby synapses
+            // NO diffusion from nearby synapses (O(K) using pre-computed neighbors)
             let (x1, y1, z1) = self.synapse_positions[i];
             let mut diffusion_input = 0.0;
 
-            for j in 0..n_synapses {
-                if i == j {
-                    continue;
-                }
-
+            for &j in &self.neighbor_lists[i] {
                 let (x2, y2, z2) = self.synapse_positions[j];
                 let distance = Self::euclidean_distance_3d((x1, y1, z1), (x2, y2, z2));
 
-                if distance < self.no_diffusion_radius {
-                    // Gaussian diffusion kernel
-                    let diffusion_kernel = (-distance * distance
-                        / (2.0 * self.no_diffusion_radius * self.no_diffusion_radius))
-                        .exp();
-                    diffusion_input += self.no_concentration[j] * diffusion_kernel * dt;
-                }
+                // Gaussian diffusion kernel (no radius check needed - neighbors pre-filtered)
+                let diffusion_kernel = (-distance * distance
+                    / (2.0 * self.no_diffusion_radius * self.no_diffusion_radius))
+                    .exp();
+                diffusion_input += self.no_concentration[j] * diffusion_kernel * dt;
             }
 
             new_no[i] += diffusion_input * 0.1; // Diffusion rate

@@ -825,14 +825,29 @@ impl NeuromorphicBrain {
         let auditory_thalamic = self.extract_cochlea_for_thalamus(&cochlea_spikes);
         let somatosensory_thalamic = self.extract_barrel_for_thalamus(&barrel_output);
 
-        // Generate cortical feedback from working memory and predictive errors
+        // Generate cortical feedback from higher cortical areas (IT/PFC levels)
+        // Higher cortical areas provide contextual modulation to thalamic relay
         let mut cortical_feedback = Vec::new();
+
+        // Get predictions from IT (level 3) and PFC (level 4) for top-down modulation
+        if let Some(it_prediction) = self.predictive.get_prediction(3) {
+            // IT provides object-level context
+            cortical_feedback.extend_from_slice(&it_prediction);
+        }
+        if let Some(pfc_prediction) = self.predictive.get_prediction(4) {
+            // PFC provides category/context information
+            cortical_feedback.extend_from_slice(&pfc_prediction);
+        }
+
+        // Also include working memory patterns for sustained attention
         if !wm_patterns.is_empty() {
-            for pattern in wm_patterns.iter().take(10) {
-                cortical_feedback.extend_from_slice(&pattern[..pattern.len().min(10)]);
+            for pattern in wm_patterns.iter().take(5) {
+                cortical_feedback.extend_from_slice(&pattern[..pattern.len().min(20)]);
             }
         }
-        cortical_feedback.resize(THALAMUS_INPUT_SIZE, pred_error * 0.1);  // Fill with prediction errors
+
+        // Resize to match thalamus input, fill with prediction error signal
+        cortical_feedback.resize(THALAMUS_INPUT_SIZE, pred_error * 0.1);
 
         self.thalamus.update(&visual_thalamic, &auditory_thalamic, &somatosensory_thalamic, &cortical_feedback, dt);
 
