@@ -119,9 +119,10 @@ fn run_chat_interface(
     vocab: usize,
     pattern_dim: usize,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    use std::io::{self, Write};
     use neurox_ai::NeuralProcessor;
     use cudarc::driver::CudaDevice;
+    use rustyline::error::ReadlineError;
+    use rustyline::DefaultEditor;
 
     println!("╔════════════════════════════════════════════════════════════╗");
     println!("║     NeuroxAI Neural Processor - Interactive Console       ║");
@@ -154,43 +155,39 @@ fn run_chat_interface(
     println!("╚════════════════════════════════════════════════════════════╝");
     println!();
 
-    // Setup Ctrl+C handler
-    let running = Arc::new(AtomicBool::new(true));
-    let r = running.clone();
-    ctrlc::set_handler(move || {
-        r.store(false, Ordering::SeqCst);
-    })?;
+    // Create readline editor with history
+    let mut rl = DefaultEditor::new()?;
 
     let mut training_mode = false;
 
     loop {
-        // Check if interrupted
-        if !running.load(Ordering::SeqCst) {
-            println!("\n→ Neural processor shutdown initiated (Ctrl+C)");
-            break;
-        }
+        // Set prompt based on mode
+        let prompt = if training_mode { "learn> " } else { "> " };
 
-        // Print prompt
-        if training_mode {
-            print!("learn> ");
-        } else {
-            print!("> ");
-        }
-        io::stdout().flush()?;
+        // Read user input with rustyline (handles Ctrl+C gracefully)
+        let readline = rl.readline(prompt);
 
-        // Read user input
-        let mut input = String::new();
-        match io::stdin().read_line(&mut input) {
-            Ok(_) => {},
-            Err(_) => {
-                // Likely Ctrl+C during read
-                if !running.load(Ordering::SeqCst) {
-                    println!("\n→ Neural processor shutdown initiated (Ctrl+C)");
-                    break;
-                }
-                continue;
+        let input = match readline {
+            Ok(line) => {
+                rl.add_history_entry(&line)?;
+                line
             }
-        }
+            Err(ReadlineError::Interrupted) => {
+                // Ctrl+C pressed
+                println!("→ Neural processor shutdown initiated (Ctrl+C)");
+                break;
+            }
+            Err(ReadlineError::Eof) => {
+                // Ctrl+D pressed
+                println!("→ Neural processor shutdown initiated (EOF)");
+                break;
+            }
+            Err(err) => {
+                eprintln!("Error reading input: {}", err);
+                break;
+            }
+        };
+
         let input = input.trim();
 
         // Handle commands
