@@ -49,6 +49,15 @@ use dashmap::DashMap;
 /// Complete neuromorphic brain with maximum biological accuracy
 ///
 /// Integrates ALL biological systems for near-human-level cognitive architecture
+
+// === ARCHITECTURE CONSTANTS ===
+/// Number of synapses in heterosynaptic plasticity system
+const HETEROSYNAPTIC_SYNAPSES: usize = 10000;
+/// Number of astrocytes in heterosynaptic system
+const HETEROSYNAPTIC_ASTROCYTES: usize = 100;
+/// Thalamus input vector size (neurons per nucleus × sampled inputs)
+const THALAMUS_INPUT_SIZE: usize = 100;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NeuromorphicBrain {
     // === CORE CORTICAL SYSTEMS ===
@@ -209,7 +218,7 @@ impl NeuromorphicBrain {
 
         // Homeostasis and plasticity
         let homeostasis = HomeostaticSystem::new(5.0, -55.0);  // Target 5Hz, threshold -55mV
-        let heterosynaptic = HeterosynapticPlasticity::new(10000, 100, 1000.0);  // 10k synapses, 100 astrocytes
+        let heterosynaptic = HeterosynapticPlasticity::new(HETEROSYNAPTIC_SYNAPSES, HETEROSYNAPTIC_ASTROCYTES, 1000.0);
         let structural_plasticity = StructuralPlasticity::new(base_neurons, 0.1, 50);  // 10% initial, 50 max/neuron
         let etdp = crate::learning::ETDP::new(0.001);  // Voltage-dependent event-driven plasticity
         let rstdp = crate::learning::RSTDPSystem::new(0.01);  // Reward-modulated STDP with meta-learning
@@ -330,7 +339,8 @@ impl NeuromorphicBrain {
         }
 
         // 8. Process through enhanced predictive hierarchy
-        let input_pattern = self.pad_or_truncate(&semantics, 512);  // Level 0 needs 512
+        let level0_size = self.predictive.levels[0].layer4.len();
+        let input_pattern = self.pad_or_truncate(&semantics, level0_size);
         let errors = self.predictive.process(&input_pattern, dt);
 
         // 9. Apply interneuron sparse coding
@@ -455,7 +465,8 @@ impl NeuromorphicBrain {
             self.oscillations.gamma_slow.modulate_by_theta(self.oscillations.theta.get_phase());
 
             // Process through predictive hierarchy
-            let input = self.pad_or_truncate(pattern, 512);
+            let level0_size = self.predictive.levels[0].layer4.len();
+            let input = self.pad_or_truncate(pattern, level0_size);
             let _errors = self.predictive.process(&input, dt);
 
             // Store in working memory with low attention (consolidation)
@@ -560,24 +571,6 @@ impl NeuromorphicBrain {
 
         self.structural_plasticity.update(&pre_activity, &post_activity, (self.time / 1000.0) as u32);
 
-        // 9. Update heterosynaptic plasticity with REAL spike data
-        // This must happen AFTER R-STDP section where spike_events are collected
-        // For now, use structural plasticity activity as proxy
-        // Heterosynaptic system was initialized with 10k synapses - must match!
-        let synaptic_activity = self.pad_or_truncate(&pre_activity, 10000);
-
-        // Convert activity to sparse spike representation
-        let mut pre_spikes = vec![false; synaptic_activity.len()];
-        let mut post_spikes = vec![false; synaptic_activity.len()];
-        for (i, &activity) in synaptic_activity.iter().enumerate() {
-            pre_spikes[i] = activity > 0.5;  // Threshold for spike
-            post_spikes[i] = activity > 0.3;  // Different threshold for post-synaptic
-        }
-        let hetero_changes = self.heterosynaptic.update(&synaptic_activity, &pre_spikes, &post_spikes, dt);
-
-        // USE heterosynaptic weight changes (would be applied to actual synapses)
-        let avg_hetero_change: f32 = hetero_changes.iter().sum::<f32>() / hetero_changes.len() as f32;
-
         // 9a. Update ETDP with ACTUAL voltage/spike detection
         // Collect voltage changes from CAdEx and Izhikevich neurons
         for (i, neuron) in self.cadex_neurons.iter().enumerate() {
@@ -604,27 +597,58 @@ impl NeuromorphicBrain {
 
         // 9b. Update R-STDP with ACTUAL spike events
         // Collect spikes from CAdEx and Izhikevich neurons
+        // ALSO collect for heterosynaptic plasticity (need 10k synapses)
         let mut spike_events: Vec<(usize, bool)> = Vec::new();  // (neuron_id, spiked)
+
+        // Initialize spike buffers for heterosynaptic (matches const HETEROSYNAPTIC_SYNAPSES)
+        let mut hetero_pre_spikes = vec![false; HETEROSYNAPTIC_SYNAPSES];
+        let mut hetero_post_spikes = vec![false; HETEROSYNAPTIC_SYNAPSES];
+        let mut hetero_activity = vec![0.0; HETEROSYNAPTIC_SYNAPSES];
 
         for (i, neuron) in self.cadex_neurons.iter_mut().enumerate() {
             let input_current = 50.0;
             let spiked = neuron.update(dt, input_current);
+
+            // Collect voltage-based activity for heterosynaptic
+            let voltage = neuron.voltage();
+            let activity = ((voltage + 70.0) / 50.0).clamp(0.0, 1.0);  // Normalize to 0-1
+
             if spiked {
                 spike_events.push((i, true));
                 // For R-STDP: assume simple connectivity (each neuron connects to next 10)
                 let post_neurons: Vec<usize> = ((i+1)..(i+11).min(200)).collect();
                 self.rstdp.on_pre_spike(i, &post_neurons, dt);
+
+                // For heterosynaptic: each neuron maps to multiple synapses (50 synapses per neuron)
+                let synapse_start = i * 50;
+                let synapse_end = (synapse_start + 50).min(HETEROSYNAPTIC_SYNAPSES);
+                for syn_id in synapse_start..synapse_end {
+                    hetero_pre_spikes[syn_id] = true;
+                    hetero_activity[syn_id] = activity;
+                }
             }
         }
 
         for (i, neuron) in self.izhikevich_neurons.iter_mut().enumerate() {
             let input_current = 10.0;
             let spiked = neuron.update(dt, input_current);
+
+            let voltage = neuron.voltage();
+            let activity = ((voltage + 70.0) / 50.0).clamp(0.0, 1.0);
+
             if spiked {
                 let neuron_id = 100 + i;  // Offset
                 spike_events.push((neuron_id, true));
                 let post_neurons: Vec<usize> = ((neuron_id+1)..(neuron_id+11).min(200)).collect();
                 self.rstdp.on_pre_spike(neuron_id, &post_neurons, dt);
+
+                // For heterosynaptic: continue mapping (neurons 100-199 → synapses 5000-9999)
+                let synapse_start = 5000 + i * 50;
+                let synapse_end = (synapse_start + 50).min(HETEROSYNAPTIC_SYNAPSES);
+                for syn_id in synapse_start..synapse_end {
+                    hetero_pre_spikes[syn_id] = true;
+                    hetero_activity[syn_id] = activity;
+                }
             }
         }
 
@@ -633,6 +657,17 @@ impl NeuromorphicBrain {
         self.rstdp.apply_reward(reward_signal, dt);
 
         // Now weight changes are computed and ready to be applied
+
+        // 9c. Update heterosynaptic plasticity with REAL spike data
+        // Post-synaptic spikes: assume downstream connectivity (shifted pattern)
+        for i in 0..HETEROSYNAPTIC_SYNAPSES {
+            if i > 0 && hetero_pre_spikes[i - 1] {
+                hetero_post_spikes[i] = true;  // Simple forward connectivity
+            }
+        }
+
+        let hetero_changes = self.heterosynaptic.update(&hetero_activity, &hetero_pre_spikes, &hetero_post_spikes, dt);
+        let avg_hetero_change: f32 = hetero_changes.iter().sum::<f32>() / hetero_changes.len() as f32;
 
         // 9c. Update memristive network (EM field coupling)
         // Generate 3D positions in a cortical column layout (simplified)
@@ -688,20 +723,22 @@ impl NeuromorphicBrain {
 
         // 12a. V1 Orientation Processing (visual input)
         // Generate synthetic visual input from working memory patterns (simulated retinal input)
-        let mut visual_input = vec![vec![0.0; 128]; 128];
+        let v1_width = self.v1_orientation.width;
+        let v1_height = self.v1_orientation.height;
+        let mut visual_input = vec![vec![0.0; v1_width]; v1_height];
         let wm_patterns = self.working_memory.get_all_patterns();
         if !wm_patterns.is_empty() {
             // Convert working memory to 2D visual pattern
-            for (i, pattern) in wm_patterns.iter().take(128).enumerate() {
-                for (j, &val) in pattern.iter().take(128).enumerate() {
+            for (i, pattern) in wm_patterns.iter().take(v1_height).enumerate() {
+                for (j, &val) in pattern.iter().take(v1_width).enumerate() {
                     visual_input[i][j] = val;
                 }
             }
         } else {
             // Fallback: use oscillatory pattern
             let phase = (self.time * 0.01) % (2.0 * std::f32::consts::PI);
-            for i in 0..128 {
-                for j in 0..128 {
+            for i in 0..v1_height {
+                for j in 0..v1_width {
                     visual_input[i][j] = 0.5 + 0.3 * ((i as f32 / 10.0 + phase).sin());
                 }
             }
@@ -751,17 +788,33 @@ impl NeuromorphicBrain {
                 cortical_feedback.extend_from_slice(&pattern[..pattern.len().min(10)]);
             }
         }
-        cortical_feedback.resize(100, pred_error * 0.1);  // Fill with prediction errors
+        cortical_feedback.resize(THALAMUS_INPUT_SIZE, pred_error * 0.1);  // Fill with prediction errors
 
         self.thalamus.update(&visual_thalamic, &auditory_thalamic, &somatosensory_thalamic, &cortical_feedback, dt);
 
         // 12f. Update Superior Colliculus with motion/attention data
         self.superior_colliculus.update(dt);
         // Feed motion information to colliculus for saccade planning
-        if let Some(_salient_location) = self.find_salient_location(&motion_output) {
-            let _saccade_target = self.superior_colliculus.trigger_saccade_from_activity();
-            // Saccade target guides attention (integration point for future attention redirection)
-            // In full implementation: attention.set_spatial_focus(saccade_target)
+        if let Some(salient_location) = self.find_salient_location(&motion_output) {
+            // Trigger saccade toward salient location
+            if let Some(saccade_target) = self.superior_colliculus.trigger_saccade_from_activity() {
+                // Saccade target guides spatial attention and exploration
+                // Update spatial system to "move" toward saccade target (simulated exploration)
+                let (current_x, current_y) = self.spatial.position;
+                let (target_x, target_y) = saccade_target;
+
+                // Smooth movement toward target (10% of distance per timestep)
+                let new_x = current_x + (target_x - current_x) * 0.1;
+                let new_y = current_y + (target_y - current_y) * 0.1;
+                self.spatial.update(dt, (new_x, new_y));
+
+                // Modulate attention based on saccade activity
+                let saccade_magnitude = ((target_x - current_x).powi(2) + (target_y - current_y).powi(2)).sqrt();
+                // Attention boost during saccade planning (larger saccades = more attention)
+                let attention_boost = (saccade_magnitude * 0.5).min(1.0);
+                // This attention boost could be used to modulate sensory processing
+                let _ = attention_boost;  // Stored for future use
+            }
         }
 
         // 13. Update time
@@ -857,7 +910,7 @@ impl NeuromorphicBrain {
             }
         }
 
-        self.pad_or_truncate(&thalamic_input, 100)
+        self.pad_or_truncate(&thalamic_input, THALAMUS_INPUT_SIZE)
     }
 
     /// Extract thalamic input from Cochlea output (MGN processing)
@@ -867,7 +920,7 @@ impl NeuromorphicBrain {
             .map(|&spike| if spike { 1.0 } else { 0.0 })
             .collect();
 
-        self.pad_or_truncate(&continuous, 100)
+        self.pad_or_truncate(&continuous, THALAMUS_INPUT_SIZE)
     }
 
     /// Extract thalamic input from Barrel Cortex output (VPL/VPM processing)
@@ -878,7 +931,7 @@ impl NeuromorphicBrain {
             thalamic_input.extend_from_slice(row);
         }
 
-        self.pad_or_truncate(&thalamic_input, 100)
+        self.pad_or_truncate(&thalamic_input, THALAMUS_INPUT_SIZE)
     }
 
     /// Find salient location in motion output for attention

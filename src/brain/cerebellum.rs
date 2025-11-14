@@ -267,7 +267,7 @@ impl CerebellarHemisphere {
         }
 
         // Update granule cells (with mossy fiber input and Golgi inhibition)
-        let mut granule_spikes = vec![false; 4096];
+        let mut granule_spikes = vec![false; self.granule_cells.len()];
         for (i, gc) in self.granule_cells.iter_mut().enumerate() {
             // Excitatory input from mossy fibers
             let mut input_current = 0.0;
@@ -307,7 +307,7 @@ impl CerebellarHemisphere {
         }
 
         // Update molecular layer interneurons
-        let mut mli_activity = vec![false; 25];
+        let mut mli_activity = vec![false; self.molecular_interneurons.len()];
         for mli in &mut self.molecular_interneurons {
             // Receive from parallel fibers (granule cells)
             let mut input = granule_spikes.iter().filter(|&&s| s).count() as f32 * 0.01;
@@ -317,7 +317,7 @@ impl CerebellarHemisphere {
         }
 
         // Update Purkinje cells and apply STDP
-        let mut purkinje_output = vec![0.0; 8];
+        let mut purkinje_output = vec![0.0; self.purkinje_cells.len()];
         let mut pk_ids_for_stdp = Vec::new();
 
         for pk in &mut self.purkinje_cells {
@@ -406,10 +406,19 @@ impl CerebellarHemisphere {
             .filter(|pk| self.timestep - pk.last_spike < 10)
             .count();
 
-        let avg_pf_weight: f32 = self.purkinje_cells
+        // Calculate actual weight count (8 Purkinje cells × weights per cell)
+        let total_weights: usize = self.purkinje_cells
             .iter()
-            .flat_map(|pk| pk.parallel_fiber_weights.iter())
-            .sum::<f32>() / (8 * 4096) as f32;
+            .map(|pk| pk.parallel_fiber_weights.len())
+            .sum();
+        let avg_pf_weight: f32 = if total_weights > 0 {
+            self.purkinje_cells
+                .iter()
+                .flat_map(|pk| pk.parallel_fiber_weights.iter())
+                .sum::<f32>() / total_weights as f32
+        } else {
+            0.0
+        };
 
         CerebellarStats {
             hemisphere_id: self.hemisphere_id,
