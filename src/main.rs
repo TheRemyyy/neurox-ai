@@ -6,6 +6,7 @@
 use clap::{Parser, Subcommand};
 use neurox_ai::{CudaContext, VERSION};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 #[derive(Parser)]
 #[command(name = "neurox-ai")]
@@ -34,9 +35,20 @@ enum Commands {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize logging
+    // Initialize logging with custom time format (HH:MM)
     env_logger::Builder::from_default_env()
         .filter_level(log::LevelFilter::Info)
+        .format_timestamp(Some(env_logger::fmt::TimestampPrecision::Seconds))
+        .format(|buf, record| {
+            use std::io::Write;
+            let timestamp = chrono::Local::now().format("%H:%M");
+            writeln!(
+                buf,
+                "[{}] {}",
+                timestamp,
+                record.args()
+            )
+        })
         .init();
 
     let cli = Cli::parse();
@@ -123,13 +135,26 @@ fn run_chat_interface(
     println!("║    /train   - Toggle learning mode                         ║");
     println!("║    /vocab   - Display vocabulary                           ║");
     println!("║    /gen <text> - Generate from prompt                      ║");
-    println!("║    quit     - Shutdown                                     ║");
+    println!("║    quit     - Shutdown (or Ctrl+C)                         ║");
     println!("╚════════════════════════════════════════════════════════════╝");
     println!();
+
+    // Setup Ctrl+C handler
+    let running = Arc::new(AtomicBool::new(true));
+    let r = running.clone();
+    ctrlc::set_handler(move || {
+        r.store(false, Ordering::SeqCst);
+    })?;
 
     let mut training_mode = false;
 
     loop {
+        // Check if interrupted
+        if !running.load(Ordering::SeqCst) {
+            println!("\n→ Neural processor shutdown initiated (Ctrl+C)");
+            break;
+        }
+
         // Print prompt
         if training_mode {
             print!("learn> ");
@@ -140,7 +165,17 @@ fn run_chat_interface(
 
         // Read user input
         let mut input = String::new();
-        io::stdin().read_line(&mut input)?;
+        match io::stdin().read_line(&mut input) {
+            Ok(_) => {},
+            Err(_) => {
+                // Likely Ctrl+C during read
+                if !running.load(Ordering::SeqCst) {
+                    println!("\n→ Neural processor shutdown initiated (Ctrl+C)");
+                    break;
+                }
+                continue;
+            }
+        }
         let input = input.trim();
 
         // Handle commands
