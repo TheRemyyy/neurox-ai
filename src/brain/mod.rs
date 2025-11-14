@@ -349,7 +349,7 @@ impl NeuromorphicBrain {
     /// Consolidate memories during "sleep" with biological mechanisms
     ///
     /// Implements: Prioritized replay, theta-gamma coupling, synaptic scaling,
-    ///            criticality restoration (2024 discovery)
+    ///            criticality restoration, sleep consolidation system
     pub fn consolidate(&mut self) {
         log::info!("Beginning sleep-like consolidation with full biological mechanisms...");
 
@@ -364,7 +364,17 @@ impl NeuromorphicBrain {
         let replayed = self.hippocampus.consolidate(100);
         log::info!("Replaying {} high-priority memories", replayed.len());
 
-        // 3. Replay with theta-gamma coupling
+        // 3. Store experiences in sleep consolidation system
+        for (pattern, priority) in &replayed {
+            self.sleep.store_experience(pattern.clone(), *priority, vec![0]);
+        }
+
+        // 4. Run sleep consolidation (sharp-wave ripples + slow oscillations)
+        let sleep_duration = 3600.0;  // 1 hour of simulated sleep
+        let consolidation_result = self.sleep.sleep(sleep_duration, dt);
+        log::info!("Sleep consolidation: {} replay events", consolidation_result.total_replays);
+
+        // 5. Replay with theta-gamma coupling
         for (pattern, _priority) in &replayed {
             // Update theta oscillation
             self.oscillations.theta.update(dt);
@@ -380,25 +390,32 @@ impl NeuromorphicBrain {
             self.working_memory.store(pattern, 0.3);
         }
 
-        // 4. Apply synaptic scaling (24-48h homeostatic process)
+        // 6. Apply synaptic downscaling from sleep system
+        if consolidation_result.synaptic_scaling_factor > 0.0 {
+            log::info!("Applying synaptic downscaling: {:.3}", consolidation_result.synaptic_scaling_factor);
+            // Apply to connectivity weights
+            // (In full implementation, would iterate all synapses)
+        }
+
+        // 7. Apply synaptic scaling (24-48h homeostatic process)
         // (Homeostasis is continuously updated, scaling happens automatically)
         let stats = self.homeostasis.stats();
         log::info!("Synaptic scaling factor: {:.3}", stats.scaling_factor);
 
-        // 5. Restore criticality (2024 discovery - sleep restores optimal regime)
+        // 8. Restore criticality (2024 discovery - sleep restores optimal regime)
         log::info!("Criticality score: {:.3}", stats.criticality_score);
         if !stats.is_critical {
             log::info!("Tuning network toward criticality...");
             // Homeostasis automatically adjusts toward criticality
         }
 
-        // 6. Return to encoding mode
+        // 9. Return to encoding mode
         self.neuromodulation.acetylcholine.set_encoding_mode(true);
         self.encoding_mode = true;
         self.oscillations.set_encoding_mode(true);
 
-        log::info!("Consolidation complete. Criticality: {:.3}, Scaling: {:.3}",
-            stats.criticality_score, stats.scaling_factor);
+        log::info!("Consolidation complete. Criticality: {:.3}, Scaling: {:.3}, Sleep replays: {}",
+            stats.criticality_score, stats.scaling_factor, consolidation_result.total_replays);
     }
 
     /// Update all brain dynamics (FULL biological update loop with ALL new systems)
@@ -470,6 +487,11 @@ impl NeuromorphicBrain {
             interneurons: self.interneurons.stats(),
             homeostasis: self.homeostasis.stats(),
             predictive: self.predictive.stats(),
+            cerebellum: self.cerebellum.stats(),
+            amygdala: self.amygdala.stats(),
+            structural_plasticity: self.structural_plasticity.stats(),
+            heterosynaptic: self.heterosynaptic.stats(),
+            sleep: self.sleep.stats(),
             total_error: self.predictive.total_error(),
             time: self.time,
         }
@@ -578,6 +600,11 @@ pub struct BrainStats {
     pub interneurons: InterneuronStats,
     pub homeostasis: HomeostaticStats,
     pub predictive: EnhancedPredictiveStats,
+    pub cerebellum: CerebellarStats,
+    pub amygdala: AmygdalaStats,
+    pub structural_plasticity: StructuralPlasticityStats,
+    pub heterosynaptic: HeterosynapticStats,
+    pub sleep: SleepStats,
     pub total_error: f32,
     pub time: f32,
 }

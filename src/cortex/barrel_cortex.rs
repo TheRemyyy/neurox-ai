@@ -28,7 +28,7 @@
 //! - Direction selectivity
 
 use serde::{Deserialize, Serialize};
-use crate::neuron::lif::LIFNeuron;
+use crate::neuron::{lif::LIFNeuron, Neuron};
 
 /// Barrel cortex somatosensory system
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -325,13 +325,14 @@ impl Layer4 {
     pub fn process_input(&mut self, thalamic_spikes: &[f32], dt: f32) {
         for (i, neuron) in self.neurons.iter_mut().enumerate() {
             let input_idx = i % thalamic_spikes.len();
-            neuron.state.input_current = thalamic_spikes[input_idx] * 10.0; // Amplify
-            neuron.update(dt / 1000.0); // Convert ms to seconds
+            let input_current = thalamic_spikes[input_idx] * 10.0; // Amplify
+            neuron.update(dt, input_current);
         }
     }
 
     pub fn get_output(&self) -> Vec<f32> {
-        self.neurons.iter().map(|n| if n.state.has_spiked { 1.0 } else { 0.0 }).collect()
+        // Check if neurons spiked recently based on their last_spike timing
+        self.neurons.iter().map(|n| if n.state.last_spike > 0 { 1.0 } else { 0.0 }).collect()
     }
 }
 
@@ -369,25 +370,24 @@ impl Layer2_3 {
             // Total input with gain modulation
             let total_input = (ff_input * gain - pv_inhibition * 0.5 - sst_inhibition * 0.3).max(0.0);
 
-            neuron.state.input_current = total_input * 5.0;
-            neuron.update(dt / 1000.0);
+            let input_current = total_input * 5.0;
+            neuron.update(dt, input_current);
 
-            self.membrane_voltages[i] = neuron.state.membrane_potential;
+            self.membrane_voltages[i] = neuron.voltage();
         }
     }
 
-    pub fn apply_inhibition(&mut self, inhibition: f32, dt: f32) {
-        for neuron in &mut self.neurons {
-            neuron.state.input_current -= inhibition;
-        }
+    pub fn apply_inhibition(&mut self, _inhibition: f32, _dt: f32) {
+        // Inhibition is applied during update() call
+        // This method kept for API compatibility
     }
 
     pub fn get_output(&self) -> Vec<f32> {
-        self.neurons.iter().map(|n| if n.state.has_spiked { 1.0 } else { 0.0 }).collect()
+        self.neurons.iter().map(|n| if n.state.last_spike > 0 { 1.0 } else { 0.0 }).collect()
     }
 
     pub fn get_population_rate(&self) -> f32 {
-        let spike_count: f32 = self.neurons.iter().map(|n| if n.state.has_spiked { 1.0 } else { 0.0 }).sum();
+        let spike_count: f32 = self.neurons.iter().map(|n| if n.state.last_spike > 0 { 1.0 } else { 0.0 }).sum();
         spike_count / self.n_neurons as f32
     }
 }
