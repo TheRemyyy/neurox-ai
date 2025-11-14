@@ -22,7 +22,8 @@
       "Bash(Select-Object -First 30)",
       "Bash(cargo test:*)",
       "Bash(Select-String -Pattern \"(error|warning:.*unused)\")",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(Select-String -Pattern \"error\\[E\" -Context 2,0)"
     ],
     "deny": [],
     "ask": []
