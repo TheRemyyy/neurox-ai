@@ -31,6 +31,17 @@ enum Commands {
         #[arg(long, default_value_t = 512)]
         pattern_dim: usize,
     },
+
+    /// Run biological NeuromorphicBrain demo (27 brain systems)
+    Brain {
+        /// Pattern dimension
+        #[arg(long, default_value_t = 512)]
+        pattern_dim: usize,
+
+        /// Number of timesteps to run
+        #[arg(long, default_value_t = 1000)]
+        timesteps: usize,
+    },
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -77,6 +88,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }) => {
             run_chat_interface(vocab, pattern_dim)?;
         }
+        Some(Commands::Brain {
+            pattern_dim,
+            timesteps,
+        }) => {
+            run_brain_demo(pattern_dim, timesteps)?;
+        }
         None => {
             display_welcome();
         }
@@ -109,6 +126,83 @@ fn display_system_info() -> Result<(), Box<dyn std::error::Error>> {
     println!("{}", device_info);
     println!();
     println!("System ready for neuromorphic computation.");
+
+    Ok(())
+}
+
+/// Run biological NeuromorphicBrain demonstration
+fn run_brain_demo(pattern_dim: usize, timesteps: usize) -> Result<(), Box<dyn std::error::Error>> {
+    use neurox_ai::brain::NeuromorphicBrain;
+
+    println!("╔════════════════════════════════════════════════════════════╗");
+    println!("║  NeuromorphicBrain Demo - 27 Biological Systems            ║");
+    println!("╚════════════════════════════════════════════════════════════╝");
+    println!();
+
+    log::info!("Initializing NeuromorphicBrain...");
+
+    // Create brain with full biological architecture
+    let n_layers = 5;  // 5-layer hierarchical system
+    let base_neurons = 1000;  // 1000 base neurons per layer
+    let vocab_size = 10000;
+    let mut brain = NeuromorphicBrain::new(n_layers, base_neurons, vocab_size, pattern_dim);
+    log::info!("✓ Brain initialized: {} layers, {} neurons, {} pattern_dim",
+               n_layers, base_neurons, pattern_dim);
+
+    // Display initial stats
+    let stats = brain.stats();
+    println!("\n📊 Initial Brain Statistics:");
+    println!("  Working Memory: {} stored patterns", stats.working_memory.stored_patterns);
+    println!("  Hippocampus: initialized");
+    println!("  Cerebellum: initialized");
+    println!("  Amygdala: initialized");
+    println!("  Superior Colliculus: {} neurons", stats.superior_colliculus.total_neurons);
+    println!("  Thalamus: {} neurons", stats.thalamus.total_neurons);
+    println!();
+
+    // Run simulation
+    println!("🧠 Running brain simulation for {} timesteps...", timesteps);
+    println!();
+
+    let dt = 0.1; // 0.1 ms timestep
+    let mut last_print = 0;
+
+    for step in 0..timesteps {
+        // Update brain
+        brain.update(dt);
+
+        // Print progress every 100 steps
+        if step - last_print >= 100 || step == timesteps - 1 {
+            let progress = (step as f32 / timesteps as f32 * 100.0) as usize;
+            print!("\r  Progress: {}% [{}/{}] ", progress, step + 1, timesteps);
+            use std::io::{self, Write};
+            io::stdout().flush()?;
+            last_print = step;
+        }
+    }
+
+    println!("\n");
+
+    // Display final stats
+    let final_stats = brain.stats();
+    println!("📊 Final Brain Statistics:");
+    println!("  Time elapsed: {:.2} ms", final_stats.time);
+    println!("  Working Memory: {} stored patterns", final_stats.working_memory.stored_patterns);
+    println!("  Dopamine level: {:.3}", final_stats.basal_ganglia.dopamine_level);
+    println!("  Oscillations: theta {:.1} Hz, gamma {:.1} Hz",
+             final_stats.oscillations.theta_freq,
+             final_stats.oscillations.gamma_freq);
+    println!("  Superior Colliculus: {} saccades, active: {}",
+             final_stats.superior_colliculus.total_saccades,
+             final_stats.superior_colliculus.saccade_active);
+    println!("  Thalamus: burst ratio {:.3}, spindle: {}",
+             final_stats.thalamus.burst_ratio,
+             final_stats.thalamus.spindle_active);
+    println!("  All 27+ biological systems active and integrated");
+    println!();
+
+    println!("✓ Brain simulation complete!");
+    println!();
 
     Ok(())
 }

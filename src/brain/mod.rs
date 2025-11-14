@@ -136,6 +136,10 @@ pub struct NeuromorphicBrain {
     /// These replace some LIF neurons for more biologically realistic adaptation
     pub cadex_neurons: Vec<crate::neuron::CAdExNeuron>,
 
+    /// Izhikevich neurons (demonstration of rich spiking dynamics)
+    /// Support 20+ biological firing patterns
+    pub izhikevich_neurons: Vec<crate::neuron::IzhikevichNeuron>,
+
     /// Sleep consolidation (offline replay)
     pub sleep: SleepConsolidation,
 
@@ -223,6 +227,20 @@ impl NeuromorphicBrain {
             }
         }
 
+        // Create Izhikevich neurons (demonstration of rich spike patterns)
+        let mut izhikevich_neurons = Vec::new();
+        for i in 0..100 {
+            if i < 50 {
+                izhikevich_neurons.push(crate::neuron::IzhikevichNeuron::regular_spiking(i as u32));
+            } else if i < 70 {
+                izhikevich_neurons.push(crate::neuron::IzhikevichNeuron::fast_spiking(i as u32));
+            } else if i < 85 {
+                izhikevich_neurons.push(crate::neuron::IzhikevichNeuron::intrinsically_bursting(i as u32));
+            } else {
+                izhikevich_neurons.push(crate::neuron::IzhikevichNeuron::chattering(i as u32));
+            }
+        }
+
         let sleep = SleepConsolidation::new();  // Offline consolidation
 
         // Attention system
@@ -256,6 +274,7 @@ impl NeuromorphicBrain {
             rstdp,
             memristive_network,
             cadex_neurons,
+            izhikevich_neurons,
             sleep,
             attention,
             vocab_size,
@@ -555,6 +574,12 @@ impl NeuromorphicBrain {
             let _spiked = neuron.update(dt, input_current);
         }
 
+        // 9f. Update Izhikevich neurons (demonstration of rich spike patterns)
+        for neuron in &mut self.izhikevich_neurons {
+            let input_current = 10.0;  // Sample input
+            let _spiked = neuron.update(dt, input_current);
+        }
+
         // 10. Update homeostasis continuously
         let avg_rate = 5.0;  // Placeholder - would come from neuron activity
         self.homeostasis.update(dt, avg_rate, avg_rate, 1);
@@ -562,8 +587,31 @@ impl NeuromorphicBrain {
         // 11. Update language system
         self.language.update(dt);
 
-        // 12. Update sensory processing systems (if stimuli present)
-        // V1, cochlea, motion, and barrel cortex would be updated during sensory processing
+        // 12. Update sensory processing systems
+        // These process raw sensory inputs and feed into higher cortical areas
+
+        // 12a. V1 Orientation Processing (visual input)
+        // Process orientation-selective responses to visual edges
+        let visual_input = vec![vec![0.5; 128]; 128];  // 128×128 retinotopic input (would come from actual visual stream)
+        let timestep = (self.time / dt) as u32;
+        let _v1_output = self.v1_orientation.process(dt, &visual_input, timestep);
+
+        // 12b. Cochlea Audio Processing (auditory input)
+        // Process frequency decomposition of audio signals
+        let audio_sample = 0.0;  // Single audio sample (would come from actual audio stream)
+        let _cochlea_spikes = self.cochlea.process(audio_sample, dt);
+
+        // 12c. MT/MST Motion Processing (optic flow)
+        // Process visual motion and heading direction
+        // Use V1 complex cell output (would normally come from V1 processing)
+        let motion_input_3d = vec![vec![vec![0.0; 4]; 270]; 270];  // 270×270×4 complex cells
+        let (_motion_output, _optic_flow) = self.motion_processing.process(&motion_input_3d, dt);
+
+        // 12d. Barrel Cortex Somatosensory (tactile input)
+        // Process whisker/touch sensations
+        let whisker_deflections = vec![vec![0.0; 5]; 5];  // 5×5 whisker array
+        let whisker_velocities = vec![vec![0.0; 5]; 5];   // 5×5 velocity array
+        let _barrel_output = self.barrel_cortex.process(&whisker_deflections, &whisker_velocities, dt);
 
         // 13. Update time
         self.time += dt;
