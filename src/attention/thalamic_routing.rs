@@ -12,7 +12,6 @@
 
 use crate::connectivity::SparseConnectivity;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// Dynamic connectivity with gain modulation
 ///
