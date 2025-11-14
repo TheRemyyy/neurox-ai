@@ -235,7 +235,7 @@ pub struct VentralStream {
 impl VentralStream {
     pub fn new(vocab_size: usize, embedding_dim: usize) -> Self {
         Self {
-            stg: STG::new(20, 40),  // 20 token buffer, 40-dim phonemes
+            stg: STG::new(20, embedding_dim),  // 20 token buffer, use full embedding dim
             mtg: MTG::new(embedding_dim),
             atl: ATL::new(500, embedding_dim),
             embeddings: EmbeddingLayer::new(vocab_size, embedding_dim),

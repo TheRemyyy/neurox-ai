@@ -555,7 +555,8 @@ mod tests {
 
         // Verify consolidation effects
         let stats = brain.stats();
-        assert!(!stats.neuromodulation.ach_encoding_mode);  // Should be in consolidation mode initially
+        assert!(stats.neuromodulation.ach_encoding_mode);  // Should return to encoding mode after consolidation
+        assert!(stats.homeostasis.criticality_score > 0.0);  // Criticality should be restored
     }
 
     #[test]
