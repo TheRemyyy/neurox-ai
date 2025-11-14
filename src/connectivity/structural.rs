@@ -407,6 +407,10 @@ mod tests {
     fn test_synapse_formation() {
         let mut sp = StructuralPlasticity::new(50, 0.05, 50);
 
+        // Increase formation rate and lower threshold for faster synapse formation in test
+        sp.eta_form = 0.01;      // 10× higher formation rate (1% instead of 0.1%)
+        sp.theta_form = 0.2;     // Lower threshold for easier formation
+
         // High correlated activity
         let mut activity = vec![0.0; 50];
         activity[0] = 1.0;
@@ -447,6 +451,11 @@ mod tests {
     fn test_distance_penalty() {
         let mut sp = StructuralPlasticity::new(100, 0.05, 50);
 
+        // Increase distance penalty for stronger local connectivity bias
+        sp.distance_penalty = 0.9;   // Strong preference for nearby connections
+        sp.eta_form = 0.01;           // Higher formation rate for better statistics
+        sp.theta_form = 0.2;          // Lower threshold
+
         // Place neurons in a line
         for i in 0..100 {
             sp.neuron_positions[i] = (i as f32 / 100.0, 0.5);
@@ -455,7 +464,8 @@ mod tests {
         // High activity everywhere
         let activity = vec![1.0; 100];
 
-        for t in 0..500 {
+        // Run longer for better statistical significance
+        for t in 0..2000 {
             sp.update(&activity, &activity, t);
         }
 

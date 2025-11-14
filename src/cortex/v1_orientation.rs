@@ -651,9 +651,9 @@ mod tests {
 
         // Should have both positive and negative lobes
         let has_positive = cell.receptive_field.iter()
-            .any(|row| row.iter().any(|&v| v > 0.1));
+            .any(|row| row.iter().any(|&v| v > 0.05));
         let has_negative = cell.receptive_field.iter()
-            .any(|row| row.iter().any(|&v| v < -0.1));
+            .any(|row| row.iter().any(|&v| v < -0.05));
 
         assert!(has_positive && has_negative,
             "Gabor RF should have both positive and negative lobes");

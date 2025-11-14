@@ -300,8 +300,10 @@ impl OscillatoryCircuit {
     /// Compute coherence between two oscillators
     pub fn coherence(&self, phase1: f32, phase2: f32) -> f32 {
         // Phase locking value (0-1)
+        // Map cos(phase_diff) from [-1, 1] to [0, 1]
+        // 0 = completely out of phase, 1 = perfectly in phase
         let phase_diff = (phase1 - phase2) * 2.0 * PI;
-        phase_diff.cos().abs()
+        (phase_diff.cos() + 1.0) / 2.0
     }
 
     /// Set behavioral state (affects gamma type)

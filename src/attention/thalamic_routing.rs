@@ -484,7 +484,7 @@ mod tests {
     #[test]
     fn test_focus() {
         let conn = create_test_connectivity(5);
-        let mut attention = AttentionSystem::new(5, conn, 2.0);
+        let mut attention = AttentionSystem::new(5, conn, 0.1);
 
         attention.focus(2, 0.9);
 

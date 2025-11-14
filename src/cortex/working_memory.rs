@@ -422,7 +422,7 @@ mod tests {
         assert!(neuron.activity() > 0.0);
 
         // But eventually decay
-        for _ in 0..100 {
+        for _ in 0..500 {
             neuron.update(100.0, 0.0);
         }
         assert!(neuron.activity() < 0.1);

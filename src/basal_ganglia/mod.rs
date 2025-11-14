@@ -509,8 +509,8 @@ mod tests {
         neuron.update_eligibility(1.0, true);
         assert!(neuron.eligibility_trace > 0.0);
 
-        // Should decay over time
-        for _ in 0..100 {
+        // Should decay over time (tau=1500ms, so need ~2000ms for decay below 0.5)
+        for _ in 0..200 {
             neuron.update_eligibility(10.0, false);
         }
         assert!(neuron.eligibility_trace < 0.5);

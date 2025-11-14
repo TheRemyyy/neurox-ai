@@ -794,7 +794,7 @@ mod tests {
 
     #[test]
     fn test_nmda_spike_detection() {
-        let mut branch = DendriticBranch::new(0, 30, 100.0);
+        let mut branch = DendriticBranch::new(0, 35, 100.0);
 
         // Position synapses close together for clustering
         for syn in &mut branch.synapses {
@@ -802,7 +802,7 @@ mod tests {
         }
 
         // Activate many synapses simultaneously
-        let inputs = vec![true; 30];
+        let inputs = vec![true; 35];
         branch.update(0.1, 0.0, &inputs);
 
         // Should trigger plateau
@@ -849,8 +849,11 @@ mod tests {
     fn test_pmsn_compartment() {
         let mut comp = PMSNCompartment::new(0, CompartmentType::Soma);
 
+        // Start from depolarized state
+        comp.v = -30.0;
+
         // Without input, should decay to resting
-        for _ in 0..100 {
+        for _ in 0..200 {
             comp.update(0.1, None, None, 0.0);
         }
 

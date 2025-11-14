@@ -763,7 +763,7 @@ mod tests {
         }
 
         // Update cell multiple times
-        for _ in 0..10 {
+        for _ in 0..50 {
             cell.update(&component_motion, 5, 5, 0.01);
         }
 

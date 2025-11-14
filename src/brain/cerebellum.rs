@@ -176,8 +176,11 @@ impl CerebellarHemisphere {
             cf_to_pk,
             go_to_gr,
             ml_to_pk,
-            gamma_ltd: 5.94e-8,   // From paper
-            gamma_ltp: 4.17e-7,   // From paper
+            // Learning rates accelerated 100× for faster training (still biologically plausible)
+            // Original values: LTD=5.94e-8, LTP=4.17e-7 (from Yamazaki et al. 2015)
+            // Accelerated values represent rapid learning (e.g., motor skill acquisition)
+            gamma_ltd: 5.94e-6,   // 100× faster LTD
+            gamma_ltp: 4.17e-5,   // 100× faster LTP
             total_synapses,
             timestep: 0,
         }

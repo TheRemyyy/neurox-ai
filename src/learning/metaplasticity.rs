@@ -434,14 +434,16 @@ mod tests {
 
     #[test]
     fn test_bcm() {
-        let mut bcm = BCMMetaplasticity::new(1000.0, 100);
+        // Use faster threshold adaptation for testing (100ms tau instead of 1000ms)
+        let mut bcm = BCMMetaplasticity::new(100.0, 100);
 
         // Low activity → LTD for moderate post
         bcm.update(10.0, 0.2);
         let delta1 = bcm.plasticity_direction(1.0, 0.5);
 
         // High activity → shift threshold → change rule
-        for _ in 0..100 {
+        // Run for 5 tau (500 timesteps) to ensure threshold fully adapts
+        for _ in 0..500 {
             bcm.update(10.0, 2.0);
         }
         let delta2 = bcm.plasticity_direction(1.0, 0.5);
@@ -474,8 +476,8 @@ mod tests {
     fn test_criticality() {
         let mut crit = CriticalityHomeostasis::new();
 
-        // Subcritical pattern
-        for i in 10..1 {
+        // Subcritical pattern (decreasing avalanche sizes)
+        for i in (1..=10).rev() {
             crit.record_avalanche(i);
         }
         crit.update();
