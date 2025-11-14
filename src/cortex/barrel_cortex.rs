@@ -662,7 +662,7 @@ mod tests {
         let input = vec![1.0; 10];
 
         // PV should be fast-spiking
-        assert!(pv.neuron.tau_mem < 10.0, "PV should have fast dynamics");
+        assert!(pv.neuron.state.tau_m < 10.0, "PV should have fast dynamics");
 
         // SST should have adaptation
         for _ in 0..10 {
