@@ -31,9 +31,6 @@ pub mod oscillations;
 pub mod spatial;
 pub mod semantics;
 
-// GPU-accelerated neural processor (100% GPU, zero CPU bottlenecks)
-pub mod neural_processor;
-
 // Re-export key types
 pub use neuron::{LIFNeuron, NeuronState};
 pub use cuda::CudaContext;
@@ -73,9 +70,6 @@ pub use learning::{
     HomeostaticSystem, HomeostaticStats, BCMMetaplasticity,
     CriticalityHomeostasis,
 };
-
-// Re-export neural processor
-pub use neural_processor::{NeuralProcessor, ProcessorStats};
 
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
