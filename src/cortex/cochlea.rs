@@ -421,7 +421,7 @@ mod tests {
 
         // Test with different amplitudes
         for amplitude in [0.01, 0.1, 0.5, 1.0] {
-            let mut max_response = 0.0;
+            let mut max_response: f32 = 0.0;
 
             for t in 0..1000 {
                 let time = t as f32 / sample_rate;
