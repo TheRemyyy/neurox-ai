@@ -1452,6 +1452,7 @@ mod tests {
         // ASCII graf helper
         fn print_bar(label: &str, value: f32, max_val: f32, width: usize) {
             let filled = ((value / max_val) * width as f32) as usize;
+            let filled = filled.min(width);  // Clamp to prevent overflow
             let bar: String = "█".repeat(filled) + &"░".repeat(width - filled);
             println!("  {} {:.3} {}", label, value, bar);
         }
