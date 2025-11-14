@@ -315,7 +315,7 @@ impl DorsalStream {
 
 impl Default for DorsalStream {
     fn default() -> Self {
-        Self::new()
+        Self::new(300)  // Default embedding dimension
     }
 }
 
@@ -506,9 +506,10 @@ mod tests {
 
     #[test]
     fn test_dorsal_stream() {
-        let mut dorsal = DorsalStream::new();
+        let embedding_dim = 300;
+        let mut dorsal = DorsalStream::new(embedding_dim);
 
-        let semantic_input = vec![0.5; 40];
+        let semantic_input = vec![0.5; embedding_dim];
         let output = dorsal.produce(&semantic_input);
 
         // May produce empty if no learned mappings
