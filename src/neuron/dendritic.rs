@@ -657,28 +657,23 @@ impl PMSNeuron {
             return false;
         }
 
-        // Collect all compartment voltages for coupling
-        let mut voltages = Vec::new();
-        voltages.push(self.soma.v);
-        voltages.extend(self.proximal.iter().map(|c| c.v));
-        voltages.extend(self.distal.iter().map(|c| c.v));
-        voltages.extend(self.apical.iter().map(|c| c.v));
+        // Collect all compartment voltages BEFORE mutation
+        let soma_v = self.soma.v;
+        let proximal_v: Vec<f32> = self.proximal.iter().map(|c| c.v).collect();
+        let distal_v: Vec<f32> = self.distal.iter().map(|c| c.v).collect();
+        let apical_v: Vec<f32> = self.apical.iter().map(|c| c.v).collect();
 
         // Update soma
         let soma_spike = {
-            let v_next = self.proximal.first().map(|c| c.v);
+            let v_next = proximal_v.first().copied();
             self.soma.input_current = inputs.soma_current;
             self.soma.update(dt, v_next, None, 0.0)
         };
 
         // Update proximal compartments
         for (i, comp) in self.proximal.iter_mut().enumerate() {
-            let v_prev = if i == 0 { Some(self.soma.v) } else { Some(self.proximal[i - 1].v) };
-            let v_next = if i < self.proximal.len() - 1 {
-                Some(self.proximal[i + 1].v)
-            } else {
-                self.distal.first().map(|c| c.v)
-            };
+            let v_prev = if i == 0 { Some(soma_v) } else { proximal_v.get(i - 1).copied() };
+            let v_next = proximal_v.get(i + 1).copied().or_else(|| distal_v.first().copied());
 
             comp.input_current = inputs.proximal_currents.get(i).copied().unwrap_or(0.0);
             comp.update(dt, v_next, v_prev, 0.0);
@@ -687,15 +682,11 @@ impl PMSNeuron {
         // Update distal compartments (with NMDA)
         for (i, comp) in self.distal.iter_mut().enumerate() {
             let v_prev = if i == 0 {
-                self.proximal.last().map(|c| c.v)
+                proximal_v.last().copied()
             } else {
-                Some(self.distal[i - 1].v)
+                distal_v.get(i - 1).copied()
             };
-            let v_next = if i < self.distal.len() - 1 {
-                Some(self.distal[i + 1].v)
-            } else {
-                self.apical.first().map(|c| c.v)
-            };
+            let v_next = distal_v.get(i + 1).copied().or_else(|| apical_v.first().copied());
 
             comp.input_current = inputs.distal_currents.get(i).copied().unwrap_or(0.0);
             let nmda = inputs.nmda_currents.get(i).copied().unwrap_or(0.0);
@@ -705,15 +696,11 @@ impl PMSNeuron {
         // Update apical compartments (top-down modulation)
         for (i, comp) in self.apical.iter_mut().enumerate() {
             let v_prev = if i == 0 {
-                self.distal.last().map(|c| c.v)
+                distal_v.last().copied()
             } else {
-                Some(self.apical[i - 1].v)
+                apical_v.get(i - 1).copied()
             };
-            let v_next = if i < self.apical.len() - 1 {
-                Some(self.apical[i + 1].v)
-            } else {
-                None
-            };
+            let v_next = apical_v.get(i + 1).copied();
 
             comp.input_current = inputs.apical_currents.get(i).copied().unwrap_or(0.0);
             comp.update(dt, v_next, v_prev, 0.0);
