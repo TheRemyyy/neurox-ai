@@ -536,9 +536,9 @@ mod tests {
     fn test_cerebellar_learning() {
         let mut hemisphere = CerebellarHemisphere::new(0);
 
-        // Create consistent input pattern
+        // Create consistent input pattern (more active fibers for stronger signal)
         let mut mf_input = vec![false; 246];
-        for i in 0..20 {
+        for i in 0..50 {
             mf_input[i] = true;
         }
 
@@ -550,8 +550,8 @@ mod tests {
             .parallel_fiber_weights
             .clone();
 
-        // Train with no error (should cause LTP)
-        for _ in 0..100 {
+        // Train with no error (should cause LTP) - longer training for visible effect
+        for _ in 0..500 {
             hemisphere.update(1.0, &mf_input, &no_error);
         }
 

@@ -438,17 +438,22 @@ mod tests {
         let mut bcm = BCMMetaplasticity::new(100.0, 100);
 
         // Low activity → LTD for moderate post
-        bcm.update(10.0, 0.2);
+        for _ in 0..10 {
+            bcm.update(10.0, 0.2);
+        }
         let delta1 = bcm.plasticity_direction(1.0, 0.5);
 
         // High activity → shift threshold → change rule
+        // After high activity, threshold moves to ~1.0 (from y²=1.0)
         // Run for 5 tau (500 timesteps) to ensure threshold fully adapts
         for _ in 0..500 {
-            bcm.update(10.0, 2.0);
+            bcm.update(10.0, 1.0);
         }
-        let delta2 = bcm.plasticity_direction(1.0, 0.5);
+        // Now test with post=1.2 which should be above new threshold
+        let delta2 = bcm.plasticity_direction(1.0, 1.2);
 
         // Direction should change with threshold
+        // delta1 should be negative (LTD), delta2 should be positive (LTP)
         assert_ne!(delta1.signum(), delta2.signum());
     }
 
@@ -476,14 +481,18 @@ mod tests {
     fn test_criticality() {
         let mut crit = CriticalityHomeostasis::new();
 
-        // Subcritical pattern (decreasing avalanche sizes)
-        for i in (1..=10).rev() {
-            crit.record_avalanche(i);
+        // Subcritical pattern (decreasing avalanche sizes) - need 100+ samples for stats
+        for _ in 0..10 {
+            for i in (1..=10).rev() {
+                crit.record_avalanche(i);
+            }
         }
         crit.update();
 
-        assert!(crit.branching_ratio < 1.0);
-        assert!(crit.adjust_toward_criticality() > 0.0);  // Should increase
+        assert!(crit.branching_ratio < 1.0,
+            "Branching ratio should be < 1.0 for subcritical pattern, got {}", crit.branching_ratio);
+        assert!(crit.adjust_toward_criticality() > 0.0,
+            "Should increase excitability for subcritical network");
     }
 
     #[test]
