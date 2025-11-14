@@ -252,8 +252,8 @@ impl SleepConsolidation {
             experience.replay_count += 1;
             experience.consolidation_strength += 0.1;
 
-            // Compressed replay (time compression)
-            let compressed_pattern = self.compress_replay(&experience.neural_activity);
+            // Clone the pattern to avoid borrow issues
+            let pattern_clone = experience.neural_activity.clone();
 
             self.total_replays += 1;
 
@@ -261,6 +261,9 @@ impl SleepConsolidation {
             if experience.replay_count >= 5 {
                 self.memories_consolidated += 1;
             }
+
+            // Compressed replay (time compression)
+            let compressed_pattern = self.compress_replay(&pattern_clone);
 
             Some(compressed_pattern)
         } else {

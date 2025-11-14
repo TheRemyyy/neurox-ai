@@ -570,12 +570,11 @@ impl ThalamicNeuron {
         // Modulated by cortical feedback (L6)
         let total_input = sensory_input * (1.0 + self.cortical_feedback_strength * 0.3);
 
-        self.neuron.state.input_current = total_input;
-        self.neuron.update(dt / 1000.0);
+        let spiked = self.neuron.update(dt, total_input);
 
         // Update spike train
         self.spike_train.rotate_right(1);
-        self.spike_train[0] = if self.neuron.state.has_spiked { 1.0 } else { 0.0 };
+        self.spike_train[0] = if spiked { 1.0 } else { 0.0 };
     }
 
     pub fn apply_cortical_feedback(&mut self, feedback: f32, dt: f32) {
