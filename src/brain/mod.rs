@@ -38,7 +38,7 @@ use crate::learning::{
 };
 use crate::memory::Hippocampus;
 use crate::neuromodulation::{NeuromodulationSystem, NeuromodulationStats};
-use crate::neuron::{HierarchicalBrain, InterneuronCircuit, InterneuronStats};
+use crate::neuron::{HierarchicalBrain, InterneuronCircuit, InterneuronStats, Neuron};
 use crate::oscillations::{OscillatoryCircuit, OscillationStats};
 use crate::semantics::{SemanticSystem};
 use crate::spatial::{SpatialSystem};
@@ -132,6 +132,10 @@ pub struct NeuromorphicBrain {
     /// Memristive synaptic network
     pub memristive_network: crate::synapse::MemristiveNetwork,
 
+    /// CAdEx neurons (demonstration of conductance-based adaptive neurons)
+    /// These replace some LIF neurons for more biologically realistic adaptation
+    pub cadex_neurons: Vec<crate::neuron::CAdExNeuron>,
+
     /// Sleep consolidation (offline replay)
     pub sleep: SleepConsolidation,
 
@@ -206,6 +210,19 @@ impl NeuromorphicBrain {
         let etdp = crate::learning::ETDP::new(0.001);  // Voltage-dependent event-driven plasticity
         let rstdp = crate::learning::RSTDPSystem::new(0.01);  // Reward-modulated STDP with meta-learning
         let memristive_network = crate::synapse::MemristiveNetwork::new(base_neurons, 0.1);  // Memristive synapses with EM coupling
+
+        // Create CAdEx neurons (demonstration of different neuron types)
+        let mut cadex_neurons = Vec::new();
+        for i in 0..100 {
+            if i < 70 {
+                cadex_neurons.push(crate::neuron::CAdExNeuron::regular_spiking(i as u32));
+            } else if i < 85 {
+                cadex_neurons.push(crate::neuron::CAdExNeuron::fast_spiking(i as u32));
+            } else {
+                cadex_neurons.push(crate::neuron::CAdExNeuron::adapting(i as u32));
+            }
+        }
+
         let sleep = SleepConsolidation::new();  // Offline consolidation
 
         // Attention system
@@ -238,6 +255,7 @@ impl NeuromorphicBrain {
             etdp,
             rstdp,
             memristive_network,
+            cadex_neurons,
             sleep,
             attention,
             vocab_size,
@@ -513,11 +531,11 @@ impl NeuromorphicBrain {
         // Detect voltage events from neural activity
         // In a full implementation, we'd track actual voltage changes from neurons
         // For now, update the time-based decay of event traces
-        self.etdp.decay_traces(dt);
+        self.etdp.update(dt);
 
         // 9b. Update R-STDP (reward-modulated learning)
         // Apply reward signal from basal ganglia dopamine
-        let reward_signal = self.basal_ganglia.dopamine.level - 0.5;  // Normalized reward
+        let reward_signal = self.basal_ganglia.dopamine.dopamine_level - 0.5;  // Normalized reward
         self.rstdp.apply_reward(reward_signal, dt);
 
         // 9c. Update memristive network (EM field coupling)
@@ -526,6 +544,16 @@ impl NeuromorphicBrain {
         let neuron_positions = vec![(0.0f32, 0.0f32, 0.0f32); 1000.min(self.pattern_dim)];
         let neuron_currents = vec![0.1; neuron_positions.len()];
         self.memristive_network.update_em_field(dt, &neuron_currents);
+
+        // 9d. Vesicle pools are integrated at the synapse level
+        // They are automatically updated during synaptic transmission in various subsystems
+        // (working memory, hippocampus, etc.) via the VesiclePools module
+
+        // 9e. Update CAdEx neurons (demonstration of conductance-based adaptation)
+        for neuron in &mut self.cadex_neurons {
+            let input_current = 50.0;  // Sample input from sensory processing
+            let _spiked = neuron.update(dt, input_current);
+        }
 
         // 10. Update homeostasis continuously
         let avg_rate = 5.0;  // Placeholder - would come from neuron activity
@@ -678,7 +706,7 @@ pub struct BrainStats {
     pub structural_plasticity: StructuralPlasticityStats,
     pub heterosynaptic: HeterosynapticStats,
     pub sleep: SleepStats,
-    pub superior_colliculus: crate::brain::superior_colliculus::SuperiorColliculusStats,
+    pub superior_colliculus: crate::brain::superior_colliculus::SCStats,
     pub thalamus: crate::brain::thalamus::ThalamusStats,
     pub etdp: crate::learning::ETDPStats,
     pub rstdp: crate::learning::RSTDPStats,

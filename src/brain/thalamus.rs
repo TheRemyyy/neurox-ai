@@ -431,6 +431,13 @@ mod tests {
         // Focus on visual modality
         thalamus.set_attention(0, 2.0);
 
+        // Update to apply attention gains
+        let visual = vec![0.0; 10];
+        let auditory = vec![0.0; 10];
+        let somatosensory = vec![0.0; 10];
+        let feedback = vec![0.0; 10];
+        thalamus.update(&visual, &auditory, &somatosensory, &feedback, 0.1);
+
         // Visual neurons should have high gain
         assert!(thalamus.lgn_neurons[0].attention_gain > 1.5);
     }
