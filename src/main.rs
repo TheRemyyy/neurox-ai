@@ -6,7 +6,6 @@
 use clap::{Parser, Subcommand};
 use neurox_ai::{CudaContext, VERSION};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 
 #[derive(Parser)]
 #[command(name = "neurox-ai")]
