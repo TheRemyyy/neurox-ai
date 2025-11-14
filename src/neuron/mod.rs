@@ -6,15 +6,18 @@ pub mod lif;
 pub mod hierarchical;
 pub mod interneurons;
 pub mod dendritic;
+pub mod izhikevich;
 
-pub use lif::LIFNeuron;
+pub use lif::{LIFNeuron, CAdExNeuron};
 pub use hierarchical::{NeuronLevel, RegionGroup, MeanFieldRegion, HierarchicalBrain, StreamingBuffer};
 pub use interneurons::{
     PVInterneuron, SSTInterneuron, VIPInterneuron, InterneuronCircuit, InterneuronStats,
 };
 pub use dendritic::{
     DendriticBranch, DendriticNeuron, DendriticLayer, DendriticNeuronStats, DendriticLayerStats,
+    PMSNCompartment, CompartmentType, PMSNeuron, CompartmentInputs,
 };
+pub use izhikevich::{IzhikevichNeuron, MemristiveIzhikevichNeuron};
 
 use serde::{Deserialize, Serialize};
 

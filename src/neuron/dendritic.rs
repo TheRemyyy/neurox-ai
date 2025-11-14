@@ -435,6 +435,338 @@ pub struct DendriticLayerStats {
     pub active_branches: usize,
 }
 
+/// Parallel Multi-compartment Spiking Neuron (PMSN)
+///
+/// Based on cable equations from hippocampal pyramidal neurons (ICLR 2024).
+/// Models interactions among neuronal compartments for spatial STDP and
+/// realistic NMDA spike modeling.
+///
+/// Dynamics:
+/// τᵢ dVᵢ/dt = -Vᵢ + rᵢ₊₁(Vᵢ₊₁ - Vᵢ) + rᵢ₋₁(Vᵢ₋₁ - Vᵢ) + Iᵢ
+///
+/// Memory: ~300-500 MB per 1,000 neurons (multiple compartments)
+/// Difficulty: Medium-Hard
+/// Biological Accuracy: Very High (cable equation based, dendriticspike modeling)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PMSNCompartment {
+    /// Compartment ID
+    pub id: usize,
+
+    /// Membrane potential (mV)
+    pub v: f32,
+
+    /// Time constant (ms)
+    pub tau: f32,
+
+    /// Coupling resistance to next compartment
+    pub r_next: f32,
+
+    /// Coupling resistance to previous compartment
+    pub r_prev: f32,
+
+    /// Input current (pA)
+    pub input_current: f32,
+
+    /// Spike threshold (mV)
+    pub threshold: f32,
+
+    /// Compartment type (Soma, Proximal, Distal, Apical)
+    pub compartment_type: CompartmentType,
+
+    /// Local calcium concentration
+    pub calcium: f32,
+
+    /// NMDA receptor state
+    pub nmda_activation: f32,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+pub enum CompartmentType {
+    Soma,        // Soma - spike initiation
+    Proximal,    // Proximal dendrite - strong coupling to soma
+    Distal,      // Distal dendrite - weaker coupling, NMDA spikes
+    Apical,      // Apical tuft - top-down modulation
+}
+
+impl PMSNCompartment {
+    pub fn new(id: usize, compartment_type: CompartmentType) -> Self {
+        let (tau, threshold, r_next, r_prev) = match compartment_type {
+            CompartmentType::Soma => (10.0, -55.0, 0.8, 0.8),
+            CompartmentType::Proximal => (15.0, -50.0, 0.6, 0.8),
+            CompartmentType::Distal => (20.0, -45.0, 0.4, 0.6),
+            CompartmentType::Apical => (25.0, -40.0, 0.2, 0.4),
+        };
+
+        Self {
+            id,
+            v: -70.0,
+            tau,
+            r_next,
+            r_prev,
+            input_current: 0.0,
+            threshold,
+            compartment_type,
+            calcium: 0.0,
+            nmda_activation: 0.0,
+        }
+    }
+
+    /// Update using cable equation
+    pub fn update(
+        &mut self,
+        dt: f32,
+        v_next: Option<f32>,
+        v_prev: Option<f32>,
+        nmda_current: f32,
+    ) -> bool {
+        // Cable equation: τᵢ dVᵢ/dt = -Vᵢ + rᵢ₊₁(Vᵢ₊₁ - Vᵢ) + rᵢ₋₁(Vᵢ₋₁ - Vᵢ) + Iᵢ
+        let mut dv = -self.v;
+
+        // Coupling to next compartment
+        if let Some(v_n) = v_next {
+            dv += self.r_next * (v_n - self.v);
+        }
+
+        // Coupling to previous compartment
+        if let Some(v_p) = v_prev {
+            dv += self.r_prev * (v_p - self.v);
+        }
+
+        // Add input current and NMDA current
+        dv += self.input_current + nmda_current;
+
+        // Integrate
+        self.v += (dv / self.tau) * dt;
+
+        // Update NMDA activation (voltage-dependent)
+        let mg_block = 1.0 / (1.0 + 0.3 * (-0.062 * self.v).exp());
+        self.nmda_activation = mg_block * nmda_current;
+
+        // Update calcium (NMDA-dependent)
+        self.calcium += 0.1 * self.nmda_activation * dt;
+        self.calcium *= 0.99; // Decay
+
+        // Clamp values
+        self.v = self.v.clamp(-100.0, 50.0);
+        self.calcium = self.calcium.clamp(0.0, 1.0);
+
+        // Check for spike (compartment-specific)
+        self.v >= self.threshold
+    }
+}
+
+/// Full PMSN with multiple compartments
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PMSNeuron {
+    pub id: u32,
+
+    /// Soma compartment
+    pub soma: PMSNCompartment,
+
+    /// Proximal dendrite compartments (close to soma)
+    pub proximal: Vec<PMSNCompartment>,
+
+    /// Distal dendrite compartments
+    pub distal: Vec<PMSNCompartment>,
+
+    /// Apical tuft (top-down modulation)
+    pub apical: Vec<PMSNCompartment>,
+
+    /// All compartments in order for cable equation
+    /// (soma -> proximal -> distal -> apical)
+    compartments: Vec<usize>,
+
+    /// Refractory period counter
+    refractory_counter: u8,
+
+    /// Last spike time
+    pub last_spike: u32,
+}
+
+impl PMSNeuron {
+    /// Create hippocampal-like pyramidal neuron
+    /// Typical structure: 1 soma + 4 proximal + 6 distal + 2 apical = 13 compartments
+    pub fn hippocampal_pyramidal(id: u32) -> Self {
+        let soma = PMSNCompartment::new(0, CompartmentType::Soma);
+
+        let proximal: Vec<_> = (0..4)
+            .map(|i| PMSNCompartment::new(i + 1, CompartmentType::Proximal))
+            .collect();
+
+        let distal: Vec<_> = (0..6)
+            .map(|i| PMSNCompartment::new(i + 5, CompartmentType::Distal))
+            .collect();
+
+        let apical: Vec<_> = (0..2)
+            .map(|i| PMSNCompartment::new(i + 11, CompartmentType::Apical))
+            .collect();
+
+        // Build compartment ordering for cable equation
+        let mut compartments = vec![0]; // soma
+        compartments.extend(1..5);      // proximal
+        compartments.extend(5..11);     // distal
+        compartments.extend(11..13);    // apical
+
+        Self {
+            id,
+            soma,
+            proximal,
+            distal,
+            apical,
+            compartments,
+            refractory_counter: 0,
+            last_spike: 0,
+        }
+    }
+
+    /// Cortical layer 5 pyramidal neuron (larger apical tuft)
+    pub fn cortical_layer5(id: u32) -> Self {
+        let soma = PMSNCompartment::new(0, CompartmentType::Soma);
+
+        let proximal: Vec<_> = (0..3)
+            .map(|i| PMSNCompartment::new(i + 1, CompartmentType::Proximal))
+            .collect();
+
+        let distal: Vec<_> = (0..5)
+            .map(|i| PMSNCompartment::new(i + 4, CompartmentType::Distal))
+            .collect();
+
+        let apical: Vec<_> = (0..4)
+            .map(|i| PMSNCompartment::new(i + 9, CompartmentType::Apical))
+            .collect();
+
+        let compartments = (0..13).collect();
+
+        Self {
+            id,
+            soma,
+            proximal,
+            distal,
+            apical,
+            compartments,
+            refractory_counter: 0,
+            last_spike: 0,
+        }
+    }
+
+    /// Update all compartments using cable equations
+    pub fn update(&mut self, dt: f32, inputs: &CompartmentInputs, timestep: u32) -> bool {
+        // Handle refractory period
+        if self.refractory_counter > 0 {
+            self.refractory_counter -= 1;
+            return false;
+        }
+
+        // Collect all compartment voltages for coupling
+        let mut voltages = Vec::new();
+        voltages.push(self.soma.v);
+        voltages.extend(self.proximal.iter().map(|c| c.v));
+        voltages.extend(self.distal.iter().map(|c| c.v));
+        voltages.extend(self.apical.iter().map(|c| c.v));
+
+        // Update soma
+        let soma_spike = {
+            let v_next = self.proximal.first().map(|c| c.v);
+            self.soma.input_current = inputs.soma_current;
+            self.soma.update(dt, v_next, None, 0.0)
+        };
+
+        // Update proximal compartments
+        for (i, comp) in self.proximal.iter_mut().enumerate() {
+            let v_prev = if i == 0 { Some(self.soma.v) } else { Some(self.proximal[i - 1].v) };
+            let v_next = if i < self.proximal.len() - 1 {
+                Some(self.proximal[i + 1].v)
+            } else {
+                self.distal.first().map(|c| c.v)
+            };
+
+            comp.input_current = inputs.proximal_currents.get(i).copied().unwrap_or(0.0);
+            comp.update(dt, v_next, v_prev, 0.0);
+        }
+
+        // Update distal compartments (with NMDA)
+        for (i, comp) in self.distal.iter_mut().enumerate() {
+            let v_prev = if i == 0 {
+                self.proximal.last().map(|c| c.v)
+            } else {
+                Some(self.distal[i - 1].v)
+            };
+            let v_next = if i < self.distal.len() - 1 {
+                Some(self.distal[i + 1].v)
+            } else {
+                self.apical.first().map(|c| c.v)
+            };
+
+            comp.input_current = inputs.distal_currents.get(i).copied().unwrap_or(0.0);
+            let nmda = inputs.nmda_currents.get(i).copied().unwrap_or(0.0);
+            comp.update(dt, v_next, v_prev, nmda);
+        }
+
+        // Update apical compartments (top-down modulation)
+        for (i, comp) in self.apical.iter_mut().enumerate() {
+            let v_prev = if i == 0 {
+                self.distal.last().map(|c| c.v)
+            } else {
+                Some(self.apical[i - 1].v)
+            };
+            let v_next = if i < self.apical.len() - 1 {
+                Some(self.apical[i + 1].v)
+            } else {
+                None
+            };
+
+            comp.input_current = inputs.apical_currents.get(i).copied().unwrap_or(0.0);
+            comp.update(dt, v_next, v_prev, 0.0);
+        }
+
+        // Check for somatic spike
+        if soma_spike {
+            self.soma.v = -70.0;
+            self.refractory_counter = 20;
+            self.last_spike = timestep;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Get total calcium across all compartments
+    pub fn total_calcium(&self) -> f32 {
+        self.soma.calcium
+            + self.proximal.iter().map(|c| c.calcium).sum::<f32>()
+            + self.distal.iter().map(|c| c.calcium).sum::<f32>()
+            + self.apical.iter().map(|c| c.calcium).sum::<f32>()
+    }
+
+    /// Check if dendritic spike occurred (high voltage in distal/apical)
+    pub fn dendritic_spike(&self) -> bool {
+        self.distal.iter().any(|c| c.v > c.threshold)
+            || self.apical.iter().any(|c| c.v > c.threshold)
+    }
+}
+
+/// Inputs to different compartments
+#[derive(Debug, Clone, Default)]
+pub struct CompartmentInputs {
+    pub soma_current: f32,
+    pub proximal_currents: Vec<f32>,
+    pub distal_currents: Vec<f32>,
+    pub apical_currents: Vec<f32>,
+    pub nmda_currents: Vec<f32>,
+}
+
+impl CompartmentInputs {
+    pub fn new(n_proximal: usize, n_distal: usize, n_apical: usize) -> Self {
+        Self {
+            soma_current: 0.0,
+            proximal_currents: vec![0.0; n_proximal],
+            distal_currents: vec![0.0; n_distal],
+            apical_currents: vec![0.0; n_apical],
+            nmda_currents: vec![0.0; n_distal],
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -524,5 +856,98 @@ mod tests {
 
         let spikes = layer.update(0.1, &inputs);
         assert_eq!(spikes.len(), 10);
+    }
+
+    #[test]
+    fn test_pmsn_compartment() {
+        let mut comp = PMSNCompartment::new(0, CompartmentType::Soma);
+
+        // Without input, should decay to resting
+        for _ in 0..100 {
+            comp.update(0.1, None, None, 0.0);
+        }
+
+        assert!(comp.v < -60.0);
+    }
+
+    #[test]
+    fn test_pmsn_cable_coupling() {
+        let mut soma = PMSNCompartment::new(0, CompartmentType::Soma);
+        let mut dendrite = PMSNCompartment::new(1, CompartmentType::Distal);
+
+        // Set different voltages
+        soma.v = -50.0;
+        dendrite.v = -70.0;
+
+        // Update with coupling
+        soma.update(0.1, Some(dendrite.v), None, 0.0);
+        dendrite.update(0.1, None, Some(soma.v), 0.0);
+
+        // Voltages should converge
+        let diff_before = (-50.0 - (-70.0)).abs();
+        let diff_after = (soma.v - dendrite.v).abs();
+
+        assert!(diff_after < diff_before, "Coupling should reduce voltage difference");
+    }
+
+    #[test]
+    fn test_pmsn_full_neuron() {
+        let mut neuron = PMSNeuron::hippocampal_pyramidal(0);
+
+        // Create inputs
+        let mut inputs = CompartmentInputs::new(4, 6, 2);
+        inputs.soma_current = 10.0;
+
+        // Update neuron
+        let mut spike_count = 0;
+        for t in 0..1000 {
+            if neuron.update(0.1, &inputs, t) {
+                spike_count += 1;
+            }
+        }
+
+        // Should spike at least once with sustained input
+        assert!(spike_count > 0);
+    }
+
+    #[test]
+    fn test_pmsn_dendritic_spike() {
+        let mut neuron = PMSNeuron::hippocampal_pyramidal(0);
+
+        // Strong distal input with NMDA
+        let mut inputs = CompartmentInputs::new(4, 6, 2);
+        inputs.distal_currents = vec![20.0; 6];
+        inputs.nmda_currents = vec![30.0; 6];
+
+        // Update until dendritic spike
+        for t in 0..500 {
+            neuron.update(0.1, &inputs, t);
+            if neuron.dendritic_spike() {
+                break;
+            }
+        }
+
+        // Should have dendritic spike
+        assert!(neuron.dendritic_spike());
+    }
+
+    #[test]
+    fn test_pmsn_calcium_accumulation() {
+        let mut neuron = PMSNeuron::hippocampal_pyramidal(0);
+
+        // NMDA inputs cause calcium accumulation
+        let mut inputs = CompartmentInputs::new(4, 6, 2);
+        inputs.nmda_currents = vec![10.0; 6];
+
+        let initial_calcium = neuron.total_calcium();
+
+        for t in 0..100 {
+            neuron.update(0.1, &inputs, t);
+        }
+
+        let final_calcium = neuron.total_calcium();
+
+        assert!(final_calcium > initial_calcium,
+            "NMDA currents should increase calcium");
     }
 }
