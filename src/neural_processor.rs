@@ -59,13 +59,13 @@ impl NeuralProcessor {
         pattern_dim: usize,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         log::info!("Initializing neural processor...");
-        log::info!("  Max vocabulary: {} (dynamic growth)", max_vocab_size);
-        log::info!("  Pattern dimension: {}", pattern_dim);
+        log::info!("Max vocabulary: {} (dynamic growth)", max_vocab_size);
+        log::info!("Pattern dimension: {}", pattern_dim);
 
         // Optimize long-term memory based on pattern dim
         let ltm_entries = (5000).min(50000 / (pattern_dim / 128));
         let ltm_mb = (ltm_entries * pattern_dim * 4) / (1024 * 1024);
-        log::info!("  Long-term memory: {} entries ({} MB)", ltm_entries, ltm_mb);
+        log::info!("Long-term memory: {} entries ({} MB)", ltm_entries, ltm_mb);
 
         let token_patterns = device.alloc_zeros::<f32>(pattern_dim * 500)?;
         let tokens_gpu = device.alloc_zeros::<i32>(500)?;

@@ -166,9 +166,9 @@ impl SparseTransitionMatrix {
 
         let initial_mb = (initial_nnz * 12) / (1024 * 1024);
         let max_mb = (max_nnz * 12) / (1024 * 1024);
-        log::info!("  Sparse transition matrix: {} MB initial, {} MB max", initial_mb, max_mb);
-        log::info!("  Dynamic growth: starts at {}% capacity", (initial_nnz * 100) / max_nnz);
-        log::info!("  Memory savings vs dense: {}%",
+        log::info!("Sparse transition matrix: {} MB initial, {} MB max", initial_mb, max_mb);
+        log::info!("Dynamic growth: starts at {}% capacity", (initial_nnz * 100) / max_nnz);
+        log::info!("Memory savings vs dense: {}%",
             100 - (max_mb * 100) / ((vocab_size * vocab_size * 4) / (1024 * 1024)));
 
         Ok(Self {

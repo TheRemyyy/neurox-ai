@@ -35,17 +35,32 @@ enum Commands {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize logging with custom time format (HH:MM)
+    // Initialize logging with beautiful formatting
     env_logger::Builder::from_default_env()
         .filter_level(log::LevelFilter::Info)
-        .format_timestamp(Some(env_logger::fmt::TimestampPrecision::Seconds))
         .format(|buf, record| {
             use std::io::Write;
+
             let timestamp = chrono::Local::now().format("%H:%M");
+
+            // ANSI color codes
+            let gray = "\x1b[90m";      // Dark gray
+            let reset = "\x1b[0m";      // Reset
+
+            let level_color = match record.level() {
+                log::Level::Error => "\x1b[91m",  // Bright red
+                log::Level::Warn  => "\x1b[93m",  // Bright yellow
+                log::Level::Info  => "\x1b[92m",  // Bright green
+                log::Level::Debug => "\x1b[94m",  // Bright blue
+                log::Level::Trace => "\x1b[95m",  // Bright magenta
+            };
+
             writeln!(
                 buf,
-                "[{}] {}",
-                timestamp,
+                "{}[{}]{} {}{:<5}{} {}{}{} - {}",
+                gray, timestamp, reset,
+                level_color, record.level(), reset,
+                gray, record.target(), reset,
                 record.args()
             )
         })
@@ -112,15 +127,15 @@ fn run_chat_interface(
     println!("║     NeuroxAI Neural Processor - Interactive Console       ║");
     println!("╚════════════════════════════════════════════════════════════╝");
     println!();
-    println!("Initializing neural processor...");
+    log::info!("Initializing neural processor...");
 
     // Initialize CUDA device
     let device = CudaDevice::new(0)?;
-    println!("✓ CUDA device initialized: {}", device.name()?);
+    log::info!("✓ CUDA device initialized: {}", device.name()?);
 
     // Create neural processor
     let mut processor = NeuralProcessor::new(device, vocab, pattern_dim)?;
-    println!("✓ Neural processor ready");
+    log::info!("✓ Neural processor ready");
     println!();
 
     // Display stats
