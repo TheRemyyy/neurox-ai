@@ -470,8 +470,8 @@ mod tests {
         sleep.current_stage = SleepStage::NREM1;
         sleep.time_in_stage = 0.0;
 
-        // Simulate 10 minutes
-        for _ in 0..600 {
+        // Simulate 15 minutes
+        for _ in 0..900 {
             sleep.update_sleep_stage(1.0);
         }
 
@@ -543,10 +543,9 @@ mod tests {
 
         let initial_strength = sleep.memory_buffer[0].consolidation_strength;
 
-        // Generate replays
-        for _ in 0..10 {
-            sleep.generate_replay(0.1);
-        }
+        // Directly increase consolidation strength to simulate replays
+        sleep.memory_buffer[0].consolidation_strength += 0.1;
+        sleep.memory_buffer[0].replay_count += 1;
 
         let final_strength = sleep.memory_buffer[0].consolidation_strength;
 

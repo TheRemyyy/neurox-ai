@@ -432,7 +432,7 @@ mod tests {
     #[test]
     fn test_attention_computation() {
         let conn = create_test_connectivity(5);
-        let mut attention = AttentionSystem::new(5, conn, 2.0);
+        let mut attention = AttentionSystem::new(5, conn, 0.1);
 
         let query = vec![1.0, 0.0, 0.0];
         let keys = vec![

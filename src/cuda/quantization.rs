@@ -171,6 +171,12 @@ mod tests {
 
     #[test]
     fn test_fp16_quantization() {
+        // Skip test if CUDA device is not available
+        if CudaDevice::new(0).is_err() {
+            eprintln!("CUDA device not available, skipping test");
+            return;
+        }
+
         if let Ok(device) = CudaDevice::new(0) {
             let quantizer = FP16Quantizer::new(device.clone());
             assert!(quantizer.is_ok());

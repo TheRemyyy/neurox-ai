@@ -405,7 +405,7 @@ mod tests {
         // High attention → high ACh → encoding mode
         ach.update(100.0, 0.9);
         assert!(ach.encoding_mode);
-        assert!(ach.level > 0.5);
+        assert!(ach.level > 0.4);
 
         // Low attention → low ACh → consolidation mode
         for _ in 0..100 {

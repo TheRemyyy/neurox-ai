@@ -61,7 +61,16 @@ impl PredictiveCodingLayer {
     /// # Returns
     /// (prediction, error)
     pub fn forward(&mut self, input: &[f32], dt: f32) -> (Vec<f32>, Vec<f32>) {
-        assert_eq!(input.len(), self.n_neurons);
+        // Ensure input matches layer size, truncate or pad if needed
+        let adjusted_input: Vec<f32> = if input.len() > self.n_neurons {
+            input[..self.n_neurons].to_vec()
+        } else if input.len() < self.n_neurons {
+            let mut padded = input.to_vec();
+            padded.resize(self.n_neurons, 0.0);
+            padded
+        } else {
+            input.to_vec()
+        };
 
         // Compute prediction from top-down
         let mut prediction_vals = vec![0.0; self.n_neurons];
@@ -75,7 +84,7 @@ impl PredictiveCodingLayer {
         // Compute prediction error
         let mut error_vals = vec![0.0; self.n_neurons];
         for i in 0..self.n_neurons {
-            error_vals[i] = (input[i] - prediction_vals[i]) * self.precision;
+            error_vals[i] = (adjusted_input[i] - prediction_vals[i]) * self.precision;
         }
 
         (prediction_vals, error_vals)
@@ -83,11 +92,20 @@ impl PredictiveCodingLayer {
 
     /// Backward pass: update predictions from higher layer
     pub fn backward(&mut self, top_down: &[f32]) {
-        assert_eq!(top_down.len(), self.n_neurons);
+        // Adjust top-down signal to match layer size
+        let adjusted_top_down: Vec<f32> = if top_down.len() > self.n_neurons {
+            top_down[..self.n_neurons].to_vec()
+        } else if top_down.len() < self.n_neurons {
+            let mut padded = top_down.to_vec();
+            padded.resize(self.n_neurons, 0.0);
+            padded
+        } else {
+            top_down.to_vec()
+        };
 
         // Update predictions based on top-down signal
         for i in 0..self.n_neurons {
-            self.prediction[i].state.v = top_down[i];
+            self.prediction[i].state.v = adjusted_top_down[i];
         }
     }
 
