@@ -405,11 +405,13 @@ mod tests {
             row_ptr[i + 1] = col_idx.len() as i32;
         }
 
+        let nnz = col_idx.len();
+
         SparseConnectivity {
             row_ptr,
             col_idx,
             weights,
-            nnz: col_idx.len(),
+            nnz,
             n_neurons: n,
         }
     }
