@@ -871,7 +871,7 @@ mod tests {
         dendrite.update(0.1, None, Some(soma.v), 0.0);
 
         // Voltages should converge
-        let diff_before = (-50.0 - (-70.0)).abs();
+        let diff_before: f32 = (-50.0 - (-70.0)).abs();
         let diff_after = (soma.v - dendrite.v).abs();
 
         assert!(diff_after < diff_before, "Coupling should reduce voltage difference");
