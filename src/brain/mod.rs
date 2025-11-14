@@ -16,9 +16,11 @@
 
 pub mod cerebellum;
 pub mod amygdala;
+pub mod superior_colliculus;
 
 pub use cerebellum::{Cerebellum, CerebellarHemisphere, CerebellarStats};
 pub use amygdala::{Amygdala, AmygdalaStats};
+pub use superior_colliculus::{SuperiorColliculus, SCStats, SCNeuron};
 
 use crate::attention::AttentionSystem;
 use crate::basal_ganglia::{BasalGanglia, BasalGangliaStats};
