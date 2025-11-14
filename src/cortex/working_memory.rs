@@ -164,10 +164,10 @@ pub struct WorkingMemory {
     context_buffer: CircularBuffer<Vec<f32>>,
 
     /// Storage capacity (default: 7)
-    capacity: usize,
+    pub capacity: usize,
 
     /// Pattern dimensionality
-    pattern_dim: usize,
+    pub pattern_dim: usize,
 
     /// Attention threshold for storage (0.0-1.0)
     attention_threshold: f32,
@@ -215,6 +215,7 @@ impl WorkingMemory {
     /// # Returns
     /// `true` if stored, `false` if rejected due to low attention
     pub fn store(&mut self, pattern: &[f32], attention: f32) -> bool {
+        eprintln!("WorkingMemory::store - pattern.len(): {}, self.pattern_dim: {}", pattern.len(), self.pattern_dim);
         assert_eq!(pattern.len(), self.pattern_dim, "Pattern dimension mismatch");
 
         // Reject if attention too low

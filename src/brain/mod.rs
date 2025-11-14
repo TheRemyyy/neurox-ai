@@ -189,6 +189,7 @@ impl NeuromorphicBrain {
         let effective_lr = self.neuromodulation.effective_learning_rate(base_lr);
 
         // 6. Store in working memory with attention gating
+        eprintln!("About to store semantics - len: {}, WM pattern_dim: {}", semantics.len(), self.working_memory.pattern_dim);
         let wm_stored = self.working_memory.store(&semantics, attention_level);
 
         // 7. Encode in hippocampus if attention was high enough
