@@ -408,12 +408,12 @@ impl Layer5 {
     pub fn update(&mut self, l23_input: &[f32], dt: f32) {
         for neuron in &mut self.neurons {
             let input: f32 = l23_input.iter().take(10).sum::<f32>() / 10.0;
-            neuron.state.input_current = input * 3.0;
-            neuron.update(dt / 1000.0);
+            let input_current = input * 3.0;
+            neuron.update(dt, input_current);
         }
     }
 
-    pub fn update_output(&mut self, dt: f32) {
+    pub fn update_output(&mut self, _dt: f32) {
         // L5 output dynamics (simplified)
     }
 }
@@ -434,13 +434,13 @@ impl Layer6 {
     pub fn update(&mut self, l23_input: &[f32], dt: f32) {
         for neuron in &mut self.neurons {
             let input: f32 = l23_input.iter().take(5).sum::<f32>() / 5.0;
-            neuron.state.input_current = input * 2.0;
-            neuron.update(dt / 1000.0);
+            let input_current = input * 2.0;
+            neuron.update(dt, input_current);
         }
     }
 
     pub fn get_population_rate(&self) -> f32 {
-        let spike_count: f32 = self.neurons.iter().map(|n| if n.state.has_spiked { 1.0 } else { 0.0 }).sum();
+        let spike_count: f32 = self.neurons.iter().map(|n| if n.state.last_spike > 0 { 1.0 } else { 0.0 }).sum();
         spike_count / self.n_neurons as f32
     }
 }
@@ -469,10 +469,10 @@ impl PVInterneuron {
 
     pub fn update(&mut self, input: &[f32], dt: f32) {
         let total_input: f32 = input.iter().sum::<f32>() / input.len() as f32;
-        self.neuron.state.input_current = total_input * 8.0; // High gain
-        self.neuron.update(dt / 1000.0);
+        let input_current = total_input * 8.0; // High gain
+        let spiked = self.neuron.update(dt, input_current);
 
-        self.output = if self.neuron.state.has_spiked { 1.0 } else { self.output * 0.9 };
+        self.output = if spiked { 1.0 } else { self.output * 0.9 };
     }
 }
 
@@ -501,10 +501,10 @@ impl SSTInterneuron {
 
     pub fn update(&mut self, input: &[f32], dt: f32) {
         let total_input: f32 = input.iter().sum::<f32>() / input.len() as f32;
-        self.neuron.state.input_current = (total_input * 5.0 - self.adaptation).max(0.0);
-        self.neuron.update(dt / 1000.0);
+        let input_current = (total_input * 5.0 - self.adaptation).max(0.0);
+        let spiked = self.neuron.update(dt, input_current);
 
-        if self.neuron.state.has_spiked {
+        if spiked {
             self.adaptation += 0.1; // Increase adaptation on spike
             self.output = 1.0;
         } else {
@@ -535,10 +535,10 @@ impl VIPInterneuron {
 
     pub fn update(&mut self, input: &[f32], dt: f32) {
         let total_input: f32 = input.iter().sum::<f32>() / input.len() as f32;
-        self.neuron.state.input_current = total_input * 6.0;
-        self.neuron.update(dt / 1000.0);
+        let input_current = total_input * 6.0;
+        let spiked = self.neuron.update(dt, input_current);
 
-        self.output = if self.neuron.state.has_spiked { 1.0 } else { self.output * 0.92 };
+        self.output = if spiked { 1.0 } else { self.output * 0.92 };
     }
 }
 
