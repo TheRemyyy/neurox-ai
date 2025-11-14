@@ -77,6 +77,12 @@ pub struct NeuromorphicBrain {
     /// Amygdala for emotional processing and fear learning
     pub amygdala: Amygdala,
 
+    /// Superior Colliculus for eye movement control and visuomotor transformation
+    pub superior_colliculus: SuperiorColliculus,
+
+    /// Thalamus for sensory relay and attention gating
+    pub thalamus: Thalamus,
+
     // === INTERNEURON & MODULATION ===
     /// Interneuron circuit (PV/SST/VIP) for sparse coding and oscillations
     pub interneurons: InterneuronCircuit,
@@ -116,6 +122,15 @@ pub struct NeuromorphicBrain {
 
     /// Structural plasticity (dynamic synapse formation/removal)
     pub structural_plasticity: StructuralPlasticity,
+
+    /// ETDP (Event-driven timing-dependent plasticity)
+    pub etdp: crate::learning::ETDP,
+
+    /// R-STDP (Reward-modulated STDP with meta-learning)
+    pub rstdp: crate::learning::RSTDPSystem,
+
+    /// Memristive synaptic network
+    pub memristive_network: crate::synapse::MemristiveNetwork,
 
     /// Sleep consolidation (offline replay)
     pub sleep: SleepConsolidation,
@@ -166,6 +181,8 @@ impl NeuromorphicBrain {
         let spatial = SpatialSystem::new(200, 500.0);  // 200 place cells, 500cm environment
         let cerebellum = Cerebellum::new();  // Dual-hemisphere motor learning
         let amygdala = Amygdala::new(10);  // Fear conditioning and extinction (10 inputs)
+        let superior_colliculus = SuperiorColliculus::new(32, 32);  // 32×32 topographic map for saccades
+        let thalamus = Thalamus::new(100);  // 100 neurons per nucleus for sensory relay
 
         // Interneurons and modulation
         let interneurons = InterneuronCircuit::new(pattern_dim);  // PV:SST:VIP = 40:30:15
@@ -186,6 +203,9 @@ impl NeuromorphicBrain {
         let homeostasis = HomeostaticSystem::new(5.0, -55.0);  // Target 5Hz, threshold -55mV
         let heterosynaptic = HeterosynapticPlasticity::new(10000, 100, 1000.0);  // 10k synapses, 100 astrocytes
         let structural_plasticity = StructuralPlasticity::new(base_neurons, 0.1, 50);  // 10% initial, 50 max/neuron
+        let etdp = crate::learning::ETDP::new(0.001);  // Voltage-dependent event-driven plasticity
+        let rstdp = crate::learning::RSTDPSystem::new(0.01);  // Reward-modulated STDP with meta-learning
+        let memristive_network = crate::synapse::MemristiveNetwork::new(base_neurons, 0.1);  // Memristive synapses with EM coupling
         let sleep = SleepConsolidation::new();  // Offline consolidation
 
         // Attention system
@@ -201,6 +221,8 @@ impl NeuromorphicBrain {
             spatial,
             cerebellum,
             amygdala,
+            superior_colliculus,
+            thalamus,
             interneurons,
             neuromodulation,
             oscillations,
@@ -213,6 +235,9 @@ impl NeuromorphicBrain {
             homeostasis,
             heterosynaptic,
             structural_plasticity,
+            etdp,
+            rstdp,
+            memristive_network,
             sleep,
             attention,
             vocab_size,
@@ -458,6 +483,18 @@ impl NeuromorphicBrain {
         let us_present = if pred_error > 0.5 { 1.0 } else { 0.0 };  // Unconditioned stimulus from error
         let fear_output = self.amygdala.update(dt, &cs_input, us_present, context);
 
+        // 6a. Update superior colliculus (eye movements)
+        self.superior_colliculus.update(dt);
+        // Can trigger saccades based on visual attention
+        let _saccade_target = self.superior_colliculus.trigger_saccade_from_activity();
+
+        // 6b. Update thalamus (sensory relay)
+        let visual_input = vec![0.0; 100];  // Would come from actual visual processing
+        let auditory_input = vec![0.0; 100];
+        let somatosensory_input = vec![0.0; 100];
+        let cortical_feedback = vec![0.0; 100];
+        self.thalamus.update(&visual_input, &auditory_input, &somatosensory_input, &cortical_feedback, dt);
+
         // 7. Update spatial system (path integration)
         // (Updated during process_text with actual movement)
 
@@ -471,6 +508,24 @@ impl NeuromorphicBrain {
         let pre_spikes = vec![false; synaptic_activity.len()];
         let post_spikes = vec![false; synaptic_activity.len()];
         let _hetero_changes = self.heterosynaptic.update(&synaptic_activity, &pre_spikes, &post_spikes, dt);
+
+        // 9a. Update ETDP (voltage-dependent plasticity)
+        // Detect voltage events from neural activity
+        // In a full implementation, we'd track actual voltage changes from neurons
+        // For now, update the time-based decay of event traces
+        self.etdp.decay_traces(dt);
+
+        // 9b. Update R-STDP (reward-modulated learning)
+        // Apply reward signal from basal ganglia dopamine
+        let reward_signal = self.basal_ganglia.dopamine.level - 0.5;  // Normalized reward
+        self.rstdp.apply_reward(reward_signal, dt);
+
+        // 9c. Update memristive network (EM field coupling)
+        // Collect neuron currents for EM field computation
+        // In full implementation, would get actual neuron voltages/currents
+        let neuron_positions = vec![(0.0f32, 0.0f32, 0.0f32); 1000.min(self.pattern_dim)];
+        let neuron_currents = vec![0.1; neuron_positions.len()];
+        self.memristive_network.update_em_field(dt, &neuron_currents);
 
         // 10. Update homeostasis continuously
         let avg_rate = 5.0;  // Placeholder - would come from neuron activity
@@ -506,6 +561,10 @@ impl NeuromorphicBrain {
             structural_plasticity: self.structural_plasticity.stats(),
             heterosynaptic: self.heterosynaptic.stats(),
             sleep: self.sleep.stats(),
+            superior_colliculus: self.superior_colliculus.stats(),
+            thalamus: self.thalamus.stats(),
+            etdp: self.etdp.stats(),
+            rstdp: self.rstdp.stats(),
             total_error: self.predictive.total_error(),
             time: self.time,
         }
@@ -619,6 +678,10 @@ pub struct BrainStats {
     pub structural_plasticity: StructuralPlasticityStats,
     pub heterosynaptic: HeterosynapticStats,
     pub sleep: SleepStats,
+    pub superior_colliculus: crate::brain::superior_colliculus::SuperiorColliculusStats,
+    pub thalamus: crate::brain::thalamus::ThalamusStats,
+    pub etdp: crate::learning::ETDPStats,
+    pub rstdp: crate::learning::RSTDPStats,
     pub total_error: f32,
     pub time: f32,
 }
