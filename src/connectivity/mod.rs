@@ -294,3 +294,355 @@ impl SparseConnectivity {
         100.0 * (1.0 - self.nnz as f64 / (self.n_neurons * self.n_neurons) as f64) as f32
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_procedural_connectivity_creation() {
+        let proc_conn = ProceduralConnectivity::new(42, 0.1, 1.0, 0.2);
+
+        assert_eq!(proc_conn.seed, 42);
+        assert_eq!(proc_conn.connection_prob, 0.1);
+        assert_eq!(proc_conn.weight_mean, 1.0);
+        assert_eq!(proc_conn.weight_std, 0.2);
+        assert_eq!(proc_conn.exc_ratio, 0.8);
+    }
+
+    #[test]
+    fn test_procedural_connectivity_topology() {
+        let proc_conn = ProceduralConnectivity::new(42, 0.1, 1.0, 0.2)
+            .with_topology(ConnectivityType::SmallWorld { k: 10, beta: 0.1 });
+
+        match proc_conn.topology {
+            ConnectivityType::SmallWorld { k, beta } => {
+                assert_eq!(k, 10);
+                assert_eq!(beta, 0.1);
+            }
+            _ => panic!("Expected SmallWorld topology"),
+        }
+    }
+
+    #[test]
+    fn test_cortical_connectivity() {
+        let proc_conn = ProceduralConnectivity::cortical(42, 10, 0.1);
+
+        assert_eq!(proc_conn.connection_prob, 0.1);
+        assert_eq!(proc_conn.exc_ratio, 0.8);
+        match proc_conn.topology {
+            ConnectivityType::SmallWorld { .. } => {},
+            _ => panic!("Expected SmallWorld topology for cortical"),
+        }
+    }
+
+    #[test]
+    fn test_generate_random_connections() {
+        let proc_conn = ProceduralConnectivity::new(42, 0.2, 1.0, 0.1);
+
+        let connections = proc_conn.generate_connections(0, 0..100);
+
+        // Should have some connections (probabilistic)
+        assert!(connections.len() > 0);
+        assert!(connections.len() < 100); // Not all-to-all
+
+        // Check weights are reasonable
+        for (_target, weight) in &connections {
+            assert!(weight.abs() > 0.0);
+            assert!(weight.abs() < 5.0); // Should be within ~3 std devs
+        }
+    }
+
+    #[test]
+    fn test_generate_all_to_all_connections() {
+        let proc_conn = ProceduralConnectivity::new(42, 1.0, 1.0, 0.1)
+            .with_topology(ConnectivityType::AllToAll);
+
+        let connections = proc_conn.generate_connections(0, 0..10);
+
+        // Should connect to all except self
+        assert_eq!(connections.len(), 9);
+    }
+
+    #[test]
+    fn test_dales_principle() {
+        let proc_conn = ProceduralConnectivity::new(42, 0.5, 1.0, 0.1);
+
+        // First 80% should be excitatory (positive weights)
+        let exc_connections = proc_conn.generate_connections(10, 0..1000);
+        let exc_positive = exc_connections.iter().filter(|(_, w)| *w > 0.0).count();
+        assert!(exc_positive > exc_connections.len() / 2);
+
+        // Last 20% should be inhibitory (negative weights)
+        let inh_connections = proc_conn.generate_connections(900, 0..1000);
+        let inh_negative = inh_connections.iter().filter(|(_, w)| *w < 0.0).count();
+        assert!(inh_negative > inh_connections.len() / 2);
+    }
+
+    #[test]
+    fn test_estimate_synapses_random() {
+        let proc_conn = ProceduralConnectivity::new(42, 0.1, 1.0, 0.1);
+
+        let estimate = proc_conn.estimate_synapses(1000);
+
+        // Should be ~1000 * 1000 * 0.1 = 100,000
+        assert!(estimate > 50_000);
+        assert!(estimate < 150_000);
+    }
+
+    #[test]
+    fn test_estimate_synapses_all_to_all() {
+        let proc_conn = ProceduralConnectivity::new(42, 1.0, 1.0, 0.1)
+            .with_topology(ConnectivityType::AllToAll);
+
+        let estimate = proc_conn.estimate_synapses(100);
+
+        // Should be 100 * 99 = 9,900
+        assert_eq!(estimate, 9_900);
+    }
+
+    #[test]
+    fn test_estimate_synapses_small_world() {
+        let proc_conn = ProceduralConnectivity::new(42, 0.1, 1.0, 0.1)
+            .with_topology(ConnectivityType::SmallWorld { k: 10, beta: 0.1 });
+
+        let estimate = proc_conn.estimate_synapses(1000);
+
+        // Should be ~1000 * 10 = 10,000
+        assert_eq!(estimate, 10_000);
+    }
+
+    #[test]
+    fn test_sparse_connectivity_empty() {
+        let sparse = SparseConnectivity::empty(100);
+
+        assert_eq!(sparse.n_neurons, 100);
+        assert_eq!(sparse.nnz, 0);
+        assert_eq!(sparse.row_ptr.len(), 101); // n_neurons + 1
+        assert_eq!(sparse.col_idx.len(), 0);
+        assert_eq!(sparse.weights.len(), 0);
+    }
+
+    #[test]
+    fn test_sparse_connectivity_from_procedural() {
+        let proc_conn = ProceduralConnectivity::new(42, 0.1, 1.0, 0.1);
+        let sparse = SparseConnectivity::from_procedural(100, &proc_conn);
+
+        assert_eq!(sparse.n_neurons, 100);
+        assert!(sparse.nnz > 0);
+        assert_eq!(sparse.row_ptr.len(), 101);
+        assert_eq!(sparse.col_idx.len(), sparse.nnz);
+        assert_eq!(sparse.weights.len(), sparse.nnz);
+    }
+
+    #[test]
+    fn test_sparse_connectivity_get_row() {
+        let proc_conn = ProceduralConnectivity::new(42, 0.2, 1.0, 0.1);
+        let sparse = SparseConnectivity::from_procedural(50, &proc_conn);
+
+        let (targets, weights) = sparse.get_row(0);
+
+        // Should have connections
+        assert!(targets.len() > 0);
+        assert_eq!(targets.len(), weights.len());
+
+        // All targets should be valid neuron IDs
+        for &target in targets {
+            assert!(target >= 0 && target < 50);
+        }
+    }
+
+    #[test]
+    fn test_sparse_connectivity_avg_degree() {
+        let proc_conn = ProceduralConnectivity::new(42, 0.1, 1.0, 0.1);
+        let sparse = SparseConnectivity::from_procedural(100, &proc_conn);
+
+        let avg_degree = sparse.avg_degree();
+
+        // Should be around 10 connections per neuron (0.1 * 100)
+        assert!(avg_degree > 5.0);
+        assert!(avg_degree < 15.0);
+    }
+
+    #[test]
+    fn test_sparse_connectivity_memory_footprint() {
+        let proc_conn = ProceduralConnectivity::new(42, 0.1, 1.0, 0.1);
+        let sparse = SparseConnectivity::from_procedural(100, &proc_conn);
+
+        let footprint = sparse.memory_footprint();
+
+        // Should be reasonable (much less than dense matrix)
+        // Dense: 100 * 100 * 4 bytes = 40,000 bytes
+        // Sparse with 10% density: ~1000 * (4 + 4) + 101 * 4 = ~8,400 bytes
+        assert!(footprint < 20_000);
+    }
+
+    #[test]
+    fn test_sparse_connectivity_sparsity() {
+        let proc_conn = ProceduralConnectivity::new(42, 0.1, 1.0, 0.1);
+        let sparse = SparseConnectivity::from_procedural(100, &proc_conn);
+
+        let sparsity = sparse.sparsity();
+
+        // Should be around 90% sparse (10% density)
+        assert!(sparsity > 80.0);
+        assert!(sparsity < 100.0);
+    }
+
+    #[test]
+    fn test_distance_dependent_connectivity() {
+        let proc_conn = ProceduralConnectivity::new(42, 0.5, 1.0, 0.1)
+            .with_topology(ConnectivityType::DistanceDependent { sigma: 0.1 });
+
+        let connections = proc_conn.generate_connections(50, 0..100);
+
+        // Should favor nearby neurons
+        let nearby_count = connections.iter()
+            .filter(|(target, _)| (*target as i32 - 50).abs() < 10)
+            .count();
+
+        let far_count = connections.iter()
+            .filter(|(target, _)| (*target as i32 - 50).abs() > 40)
+            .count();
+
+        assert!(nearby_count > far_count);
+    }
+
+    #[test]
+    fn test_small_world_connectivity() {
+        let proc_conn = ProceduralConnectivity::new(42, 0.5, 1.0, 0.1)
+            .with_topology(ConnectivityType::SmallWorld { k: 4, beta: 0.1 });
+
+        let connections = proc_conn.generate_connections(0, 0..100);
+
+        // Should have ~k connections
+        assert!(connections.len() >= 3);
+        assert!(connections.len() <= 5);
+    }
+
+    #[test]
+    fn test_reproducibility() {
+        let proc_conn1 = ProceduralConnectivity::new(42, 0.1, 1.0, 0.1);
+        let proc_conn2 = ProceduralConnectivity::new(42, 0.1, 1.0, 0.1);
+
+        let conn1 = proc_conn1.generate_connections(0, 0..100);
+        let conn2 = proc_conn2.generate_connections(0, 0..100);
+
+        // Same seed should produce identical connectivity
+        assert_eq!(conn1.len(), conn2.len());
+        for (c1, c2) in conn1.iter().zip(conn2.iter()) {
+            assert_eq!(c1.0, c2.0); // Same targets
+            assert_eq!(c1.1, c2.1); // Same weights
+        }
+    }
+
+    #[test]
+    fn test_biological_realism_sparsity() {
+        // Cortical connectivity is typically 10-20% dense
+        let proc_conn = ProceduralConnectivity::cortical(42, 10, 0.1);
+        let sparse = SparseConnectivity::from_procedural(1000, &proc_conn);
+
+        let sparsity = sparse.sparsity();
+
+        // Should be highly sparse (>80%)
+        assert!(sparsity > 80.0, "Cortical connectivity should be sparse");
+    }
+
+    #[test]
+    fn test_biological_realism_exc_inh_ratio() {
+        let proc_conn = ProceduralConnectivity::new(42, 0.2, 1.0, 0.1);
+
+        // Count excitatory vs inhibitory
+        let mut total_exc = 0;
+        let mut total_inh = 0;
+
+        for i in 0..1000 {
+            let connections = proc_conn.generate_connections(i, 0..1000);
+            for (_, weight) in connections {
+                if weight > 0.0 {
+                    total_exc += 1;
+                } else {
+                    total_inh += 1;
+                }
+            }
+        }
+
+        let total = total_exc + total_inh;
+        let exc_ratio = total_exc as f32 / total as f32;
+
+        // Should be around 80% excitatory
+        assert!(exc_ratio > 0.7 && exc_ratio < 0.9,
+            "Excitatory ratio should be ~80%, got {}", exc_ratio);
+    }
+
+    #[test]
+    fn test_biological_realism_weight_distribution() {
+        let proc_conn = ProceduralConnectivity::new(42, 0.2, 1.0, 0.2);
+
+        let connections = proc_conn.generate_connections(50, 0..1000);
+
+        // Calculate mean and std of weights
+        let weights: Vec<f32> = connections.iter().map(|(_, w)| w.abs()).collect();
+        let mean = weights.iter().sum::<f32>() / weights.len() as f32;
+
+        // Mean should be close to specified mean
+        assert!((mean - 1.0).abs() < 0.3, "Mean weight should be ~1.0");
+
+        // All weights should be within reasonable range (3 std devs)
+        for &weight in &weights {
+            assert!(weight < 2.0, "Weight should be within biological range");
+        }
+    }
+
+    #[test]
+    fn test_edge_case_single_neuron() {
+        let proc_conn = ProceduralConnectivity::new(42, 0.5, 1.0, 0.1);
+
+        let connections = proc_conn.generate_connections(0, 0..1);
+
+        // Should have no self-connections
+        assert_eq!(connections.len(), 0);
+    }
+
+    #[test]
+    fn test_edge_case_zero_probability() {
+        let proc_conn = ProceduralConnectivity::new(42, 0.0, 1.0, 0.1);
+
+        let connections = proc_conn.generate_connections(0, 0..100);
+
+        // Should have no connections
+        assert_eq!(connections.len(), 0);
+    }
+
+    #[test]
+    fn test_performance_large_network() {
+        // Test that we can handle reasonably large networks
+        let proc_conn = ProceduralConnectivity::new(42, 0.01, 1.0, 0.1);
+
+        // This should complete quickly even for 10k neurons
+        let sparse = SparseConnectivity::from_procedural(1000, &proc_conn);
+
+        assert_eq!(sparse.n_neurons, 1000);
+        assert!(sparse.nnz > 0);
+    }
+
+    #[test]
+    fn test_integration_csr_structure() {
+        let proc_conn = ProceduralConnectivity::new(42, 0.2, 1.0, 0.1);
+        let sparse = SparseConnectivity::from_procedural(10, &proc_conn);
+
+        // Verify CSR structure integrity
+        assert_eq!(sparse.row_ptr[0], 0);
+        assert_eq!(sparse.row_ptr[sparse.n_neurons] as usize, sparse.nnz);
+
+        // Row pointers should be monotonically increasing
+        for i in 1..sparse.row_ptr.len() {
+            assert!(sparse.row_ptr[i] >= sparse.row_ptr[i - 1]);
+        }
+
+        // All column indices should be valid
+        for &col in &sparse.col_idx {
+            assert!(col >= 0 && col < sparse.n_neurons as i32);
+        }
+    }
+}

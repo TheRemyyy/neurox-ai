@@ -294,3 +294,296 @@ impl StreamingBuffer {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_region_group_creation() {
+        let region = RegionGroup::new(0, 1000);
+
+        assert_eq!(region.id, 0);
+        assert_eq!(region.n_neurons, 1000);
+        assert_eq!(region.avg_v, -70.0);
+        assert_eq!(region.avg_rate, 5.0);
+    }
+
+    #[test]
+    fn test_region_group_update() {
+        let mut region = RegionGroup::new(0, 3);
+
+        let neurons = vec![
+            LIFNeuron::new(0),
+            LIFNeuron::new(1),
+            LIFNeuron::new(2),
+        ];
+
+        region.update_from_neurons(&neurons);
+
+        // Average should be around -70.0 (resting potential)
+        assert!(region.avg_v < -60.0 && region.avg_v > -80.0);
+    }
+
+    #[test]
+    fn test_mean_field_region_creation() {
+        let region = MeanFieldRegion::new(5, 1000000);
+
+        assert_eq!(region.id, 5);
+        assert_eq!(region.population, 1000000);
+        assert_eq!(region.mean_rate, 5.0);
+        assert_eq!(region.variance, 1.0);
+    }
+
+    #[test]
+    fn test_hierarchical_brain_creation() {
+        let brain = HierarchicalBrain::new(3, 1000);
+
+        assert_eq!(brain.detailed_neurons.len(), 1000);
+        assert_eq!(brain.medium_regions.len(), 100); // 10% of detailed
+        assert_eq!(brain.abstract_regions.len(), 10);  // 1% of detailed
+        assert_eq!(brain.total_neurons, 3000); // 3 layers * 1000
+    }
+
+    #[test]
+    fn test_full_brain_architecture() {
+        let brain = HierarchicalBrain::for_full_brain();
+
+        assert_eq!(brain.detailed_neurons.len(), 8_600_000);
+        assert_eq!(brain.medium_regions.len(), 10_000);
+        assert_eq!(brain.abstract_regions.len(), 75_000);
+        assert_eq!(brain.total_neurons, 86_000_000_000);
+    }
+
+    #[test]
+    fn test_memory_footprint() {
+        let brain = HierarchicalBrain::new(3, 1000);
+        let footprint = brain.memory_footprint();
+
+        // Should be reasonable for 1000 detailed neurons
+        // 1000 * 20 + 100 * 1024 + 10 * 100 = 20000 + 102400 + 1000 = 123400
+        assert!(footprint > 100_000);
+        assert!(footprint < 200_000);
+    }
+
+    #[test]
+    fn test_aggregate_detailed_to_medium() {
+        let mut brain = HierarchicalBrain::new(3, 8600);
+
+        // First aggregate to see what the initial state is
+        brain.aggregate_detailed_to_medium();
+
+        // Set some specific values in detailed neurons AFTER first aggregation
+        for neuron in &mut brain.detailed_neurons {
+            neuron.state.v = -65.0;
+        }
+
+        // Now aggregate again
+        brain.aggregate_detailed_to_medium();
+
+        // Medium regions should reflect averaged detailed neurons
+        // Check that at least some regions have updated values
+        let updated_regions = brain.medium_regions.iter()
+            .filter(|r| r.avg_v > -68.0 && r.avg_v < -62.0)
+            .count();
+
+        assert!(updated_regions > 0,
+            "At least some regions should have updated values near -65.0");
+    }
+
+    #[test]
+    fn test_aggregate_medium_to_abstract() {
+        let mut brain = HierarchicalBrain::new(3, 1000);
+
+        // Set medium region activity
+        for region in &mut brain.medium_regions {
+            region.avg_rate = 10.0;
+            region.activity = 0.5;
+        }
+
+        brain.aggregate_medium_to_abstract();
+
+        // Abstract regions should reflect medium regions
+        for (i, region) in brain.abstract_regions.iter().enumerate() {
+            if i < brain.medium_regions.len() {
+                assert_eq!(region.mean_rate, 10.0);
+            }
+        }
+    }
+
+    #[test]
+    fn test_broadcast_abstract_to_medium() {
+        let mut brain = HierarchicalBrain::new(3, 1000);
+
+        // Set abstract region rates
+        for region in &mut brain.abstract_regions {
+            region.mean_rate = 25.0;
+        }
+
+        brain.broadcast_abstract_to_medium();
+
+        // Medium regions should be modulated
+        for (i, region) in brain.medium_regions.iter().enumerate() {
+            if i < brain.abstract_regions.len() {
+                assert!(region.activity > 0.0);
+            }
+        }
+    }
+
+    #[test]
+    fn test_hierarchical_update_cycle() {
+        let mut brain = HierarchicalBrain::new(3, 1000);
+
+        // Run full update cycle
+        brain.update_hierarchy();
+
+        // Should complete without panic
+        assert!(brain.detailed_neurons.len() > 0);
+    }
+
+    #[test]
+    fn test_streaming_buffer_creation() {
+        let buffer = StreamingBuffer::new(100, 1000);
+
+        assert_eq!(buffer.max_loaded, 100);
+        assert_eq!(buffer.access_counts.len(), 1000);
+        assert_eq!(buffer.loaded_regions.len(), 0);
+    }
+
+    #[test]
+    fn test_streaming_buffer_request() {
+        let mut buffer = StreamingBuffer::new(10, 100);
+
+        // First request should load
+        assert!(buffer.request_region(5));
+        assert!(buffer.loaded_regions.contains(&5));
+        assert_eq!(buffer.access_counts[5], 1);
+
+        // Second request to same region should be cached
+        assert!(buffer.request_region(5));
+        assert_eq!(buffer.access_counts[5], 2);
+    }
+
+    #[test]
+    fn test_streaming_buffer_eviction() {
+        let mut buffer = StreamingBuffer::new(3, 100);
+
+        // Load 3 regions
+        buffer.request_region(0);
+        buffer.request_region(1);
+        buffer.request_region(2);
+
+        assert_eq!(buffer.loaded_regions.len(), 3);
+
+        // Request 4th region should trigger eviction
+        buffer.request_region(3);
+
+        assert_eq!(buffer.loaded_regions.len(), 3);
+        assert!(buffer.loaded_regions.contains(&3));
+    }
+
+    #[test]
+    fn test_streaming_buffer_lru() {
+        let mut buffer = StreamingBuffer::new(2, 100);
+
+        // Access pattern: 0, 1, 0 (0 accessed twice, 1 once)
+        buffer.request_region(0);
+        buffer.request_region(1);
+        buffer.request_region(0);
+
+        // Request new region should evict region 1 (LRU)
+        buffer.request_region(2);
+
+        assert!(buffer.loaded_regions.contains(&0));
+        assert!(buffer.loaded_regions.contains(&2));
+    }
+
+    #[test]
+    fn test_streaming_buffer_decay() {
+        let mut buffer = StreamingBuffer::new(10, 100);
+
+        buffer.request_region(5);
+        buffer.request_region(5);
+        buffer.request_region(5);
+
+        assert_eq!(buffer.access_counts[5], 3);
+
+        buffer.decay_access_counts();
+
+        // Decay uses saturating_sub(count / 2), so 3 - (3/2) = 3 - 1 = 2
+        assert_eq!(buffer.access_counts[5], 2);
+    }
+
+    #[test]
+    fn test_neuron_level_enum() {
+        let detailed = NeuronLevel::Detailed(LIFNeuron::new(0));
+        let medium = NeuronLevel::Medium(RegionGroup::new(0, 1000));
+        let abstract_level = NeuronLevel::Abstract(MeanFieldRegion::new(0, 1000000));
+
+        // Should be able to create all three levels
+        match detailed {
+            NeuronLevel::Detailed(_) => {},
+            _ => panic!("Expected Detailed variant"),
+        }
+
+        match medium {
+            NeuronLevel::Medium(_) => {},
+            _ => panic!("Expected Medium variant"),
+        }
+
+        match abstract_level {
+            NeuronLevel::Abstract(_) => {},
+            _ => panic!("Expected Abstract variant"),
+        }
+    }
+
+    #[test]
+    fn test_biological_realism_membrane_potential() {
+        let brain = HierarchicalBrain::new(3, 100);
+
+        // All detailed neurons should start near biological resting potential
+        for neuron in &brain.detailed_neurons {
+            assert!(neuron.state.v >= -80.0 && neuron.state.v <= -60.0,
+                "Membrane potential should be in biological range");
+        }
+    }
+
+    #[test]
+    fn test_biological_realism_firing_rates() {
+        let brain = HierarchicalBrain::new(3, 100);
+
+        // Medium regions should have biologically plausible firing rates
+        for region in &brain.medium_regions {
+            assert!(region.avg_rate >= 0.0 && region.avg_rate <= 100.0,
+                "Firing rate should be in biological range (0-100 Hz)");
+        }
+
+        // Abstract regions should have biologically plausible firing rates
+        for region in &brain.abstract_regions {
+            assert!(region.mean_rate >= 0.0 && region.mean_rate <= 100.0,
+                "Mean rate should be in biological range (0-100 Hz)");
+        }
+    }
+
+    #[test]
+    fn test_integration_hierarchical_levels() {
+        let mut brain = HierarchicalBrain::new(3, 1000);
+
+        // Simulate activity in detailed neurons
+        for (i, neuron) in brain.detailed_neurons.iter_mut().enumerate() {
+            if i % 10 == 0 {
+                neuron.state.v = -55.0; // Depolarized
+            }
+        }
+
+        // Propagate through hierarchy
+        brain.aggregate_detailed_to_medium();
+        brain.aggregate_medium_to_abstract();
+        brain.broadcast_abstract_to_medium();
+
+        // Medium regions should show increased activity
+        let avg_medium_v: f32 = brain.medium_regions.iter().map(|r| r.avg_v).sum::<f32>()
+            / brain.medium_regions.len() as f32;
+        assert!(avg_medium_v > -70.0, "Medium regions should reflect detailed activity");
+    }
+}

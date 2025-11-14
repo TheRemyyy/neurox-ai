@@ -469,4 +469,333 @@ mod tests {
         // Should be modulated
         assert!(effective_lr != base_lr);
     }
+
+    #[test]
+    fn test_ach_learning_rate_modulation() {
+        let mut system = NeuromodulationSystem::new();
+
+        let base_lr = 0.01;
+
+        // High ACh -> higher learning rate
+        system.acetylcholine.level = 0.9;
+        let high_ach_lr = system.effective_learning_rate(base_lr);
+
+        // Low ACh -> lower learning rate
+        system.acetylcholine.level = 0.1;
+        let low_ach_lr = system.effective_learning_rate(base_lr);
+
+        assert!(high_ach_lr > low_ach_lr, "High ACh should increase learning rate");
+    }
+
+    #[test]
+    fn test_ne_arousal_learning_rate() {
+        let mut system = NeuromodulationSystem::new();
+
+        let base_lr = 0.01;
+
+        // Moderate NE -> optimal learning
+        system.norepinephrine.level = 0.5;
+        let optimal_lr = system.effective_learning_rate(base_lr);
+
+        // Very low or very high NE -> reduced learning (Yerkes-Dodson)
+        system.norepinephrine.level = 0.0;
+        let low_ne_lr = system.effective_learning_rate(base_lr);
+
+        system.norepinephrine.level = 1.0;
+        let high_ne_lr = system.effective_learning_rate(base_lr);
+
+        assert!(optimal_lr > low_ne_lr, "Moderate NE should be better than low");
+        assert!(optimal_lr > high_ne_lr, "Moderate NE should be better than high");
+    }
+
+    #[test]
+    fn test_neuromodulation_stats() {
+        let mut system = NeuromodulationSystem::new();
+
+        system.acetylcholine.level = 0.6;
+        system.norepinephrine.level = 0.4;
+        system.serotonin.level = 0.7;
+        system.dopamine_level = 0.5;
+
+        let stats = system.stats();
+
+        assert_eq!(stats.ach_level, 0.6);
+        assert_eq!(stats.ne_level, 0.4);
+        assert_eq!(stats.sht_level, 0.7);
+        assert_eq!(stats.dopamine_level, 0.5);
+    }
+
+    #[test]
+    fn test_integrated_update() {
+        let mut system = NeuromodulationSystem::new();
+
+        system.update(100.0, 0.8, 0.3, 0.2, true);
+
+        // All systems should have updated
+        assert!(system.acetylcholine.level > 0.0);
+        assert!(system.norepinephrine.level > 0.0);
+        assert!(system.serotonin.level > 0.0);
+    }
+
+    #[test]
+    fn test_biological_realism_ach_range() {
+        let system = AcetylcholineSystem::new();
+
+        assert!(system.level >= 0.0 && system.level <= 1.0,
+            "ACh level should be in 0-1 range");
+        assert!(system.baseline >= 0.0 && system.baseline <= 1.0,
+            "ACh baseline should be in 0-1 range");
+        assert!(system.tau > 0.0, "ACh tau should be positive");
+    }
+
+    #[test]
+    fn test_biological_realism_ne_range() {
+        let system = NorepinephrineSystem::new();
+
+        assert!(system.level >= 0.0 && system.level <= 1.0,
+            "NE level should be in 0-1 range");
+        assert!(system.baseline >= 0.0 && system.baseline <= 1.0,
+            "NE baseline should be in 0-1 range");
+        assert!(system.tau > 0.0, "NE tau should be positive");
+    }
+
+    #[test]
+    fn test_biological_realism_serotonin_range() {
+        let system = SerotoninSystem::new();
+
+        assert!(system.level >= 0.0 && system.level <= 1.0,
+            "Serotonin level should be in 0-1 range");
+        assert!(system.baseline >= 0.0 && system.baseline <= 1.0,
+            "Serotonin baseline should be in 0-1 range");
+        assert!(system.tau > 0.0, "Serotonin tau should be positive");
+        assert!(system.gamma_min >= 0.0 && system.gamma_min <= 1.0,
+            "Gamma min should be in discount factor range");
+        assert!(system.gamma_max >= 0.0 && system.gamma_max <= 1.0,
+            "Gamma max should be in discount factor range");
+        assert!(system.gamma_max > system.gamma_min,
+            "Gamma max should be greater than gamma min");
+    }
+
+    #[test]
+    fn test_ach_consolidation_strength() {
+        let mut ach = AcetylcholineSystem::new();
+
+        ach.level = 0.2; // Low ACh
+        let consolidation = ach.consolidation_strength();
+        let encoding = ach.encoding_strength();
+
+        assert!(consolidation > encoding, "Low ACh should favor consolidation");
+        assert_eq!(consolidation + encoding, 1.0, "Consolidation + encoding should sum to 1");
+    }
+
+    #[test]
+    fn test_ne_prediction_error_tracking() {
+        let mut ne = NorepinephrineSystem::new();
+
+        // Add several prediction errors
+        for i in 0..10 {
+            ne.update(100.0, (i as f32) * 0.1, 0.3);
+        }
+
+        // Should have tracked prediction errors
+        assert!(ne.prediction_errors.len() > 0);
+        assert!(ne.prediction_errors.len() <= 100); // Should cap at 100
+    }
+
+    #[test]
+    fn test_ne_novelty_computation() {
+        let mut ne = NorepinephrineSystem::new();
+
+        // Add constant predictions (low novelty)
+        for _ in 0..10 {
+            ne.update(100.0, 0.5, 0.3);
+        }
+        let low_novelty = ne.novelty();
+
+        // Add variable predictions (high novelty)
+        ne = NorepinephrineSystem::new();
+        for i in 0..10 {
+            ne.update(100.0, (i % 2) as f32, 0.3);
+        }
+        let high_novelty = ne.novelty();
+
+        assert!(high_novelty > low_novelty,
+            "Variable prediction errors should produce higher novelty");
+    }
+
+    #[test]
+    fn test_serotonin_mood_setting() {
+        let mut sht = SerotoninSystem::new();
+
+        sht.set_mood(0.8);
+        assert_eq!(sht.baseline, 0.8);
+
+        // Should clamp to valid range
+        sht.set_mood(1.5);
+        assert_eq!(sht.baseline, 1.0);
+
+        sht.set_mood(-0.5);
+        assert_eq!(sht.baseline, 0.0);
+    }
+
+    #[test]
+    fn test_serotonin_reward_modulation() {
+        let mut sht = SerotoninSystem::new();
+
+        sht.level = 0.2; // Low serotonin
+        let impulsive_reward = sht.modulate_reward(1.0);
+
+        sht.level = 0.8; // High serotonin
+        let patient_reward = sht.modulate_reward(1.0);
+
+        assert!(impulsive_reward > patient_reward,
+            "Low serotonin should increase immediate reward sensitivity");
+    }
+
+    #[test]
+    fn test_dopamine_serotonin_opponent_processing() {
+        let mut system = NeuromodulationSystem::new();
+
+        // High DA, low 5-HT -> approach
+        system.dopamine_level = 0.8;
+        system.serotonin.level = 0.2;
+        let approach_value = system.compute_value(1.0, 1.0);
+
+        // Low DA, high 5-HT -> avoidance
+        system.dopamine_level = 0.2;
+        system.serotonin.level = 0.8;
+        let avoidance_value = system.compute_value(1.0, 1.0);
+
+        assert!(approach_value > 0.0, "High DA/low 5-HT should favor approach");
+        assert!(avoidance_value < 0.0, "Low DA/high 5-HT should favor avoidance");
+    }
+
+    #[test]
+    fn test_exploration_exploitation_balance() {
+        let mut system = NeuromodulationSystem::new();
+
+        // Low NE -> exploitation
+        system.norepinephrine.level = 0.1;
+        let exploit_epsilon = system.exploration_epsilon();
+
+        // High NE -> exploration
+        system.norepinephrine.level = 0.9;
+        let explore_epsilon = system.exploration_epsilon();
+
+        assert!(explore_epsilon > exploit_epsilon,
+            "High NE should increase exploration");
+    }
+
+    #[test]
+    fn test_ach_attention_dynamics() {
+        let mut ach = AcetylcholineSystem::new();
+
+        let initial_level = ach.level;
+
+        // Low attention should not change ACh much
+        for _ in 0..10 {
+            ach.update(100.0, 0.3);
+        }
+        let low_attention_level = ach.level;
+
+        // High attention should increase ACh
+        ach.level = initial_level;
+        for _ in 0..10 {
+            ach.update(100.0, 0.9);
+        }
+        let high_attention_level = ach.level;
+
+        assert!(high_attention_level > low_attention_level,
+            "High attention should increase ACh");
+    }
+
+    #[test]
+    fn test_ne_uncertainty_response() {
+        let mut ne = NorepinephrineSystem::new();
+
+        let baseline = ne.level;
+
+        // High uncertainty should increase NE
+        for _ in 0..10 {
+            ne.update(100.0, 0.1, 0.9); // Low PE, high uncertainty
+        }
+
+        assert!(ne.level > baseline, "High uncertainty should increase NE");
+    }
+
+    #[test]
+    fn test_serotonin_positive_outcomes() {
+        let mut sht = SerotoninSystem::new();
+
+        let initial_level = sht.level;
+
+        // Positive outcomes should increase serotonin
+        for _ in 0..100 {
+            sht.update(100.0, true);
+        }
+
+        assert!(sht.level > initial_level,
+            "Positive outcomes should increase serotonin");
+    }
+
+    #[test]
+    fn test_temporal_dynamics_decay() {
+        let mut system = NeuromodulationSystem::new();
+
+        // Boost all systems
+        system.acetylcholine.level = 0.9;
+        system.norepinephrine.level = 0.9;
+        system.serotonin.level = 0.9;
+
+        // Let them decay toward baseline
+        for _ in 0..100 {
+            system.update(100.0, 0.0, 0.0, 0.0, false);
+        }
+
+        // All should decay toward baseline
+        assert!(system.acetylcholine.level < 0.9,
+            "ACh should decay toward baseline");
+        assert!(system.norepinephrine.level < 0.9,
+            "NE should decay toward baseline");
+        assert!(system.serotonin.level < 0.9,
+            "Serotonin should decay toward baseline");
+    }
+
+    #[test]
+    fn test_edge_case_zero_attention() {
+        let mut ach = AcetylcholineSystem::new();
+
+        ach.update(100.0, 0.0);
+
+        // Should not crash with zero attention
+        assert!(ach.level >= 0.0);
+    }
+
+    #[test]
+    fn test_edge_case_extreme_prediction_error() {
+        let mut ne = NorepinephrineSystem::new();
+
+        ne.update(100.0, 100.0, 0.5); // Extreme prediction error
+
+        // Should clamp to valid range
+        assert!(ne.level >= 0.0 && ne.level <= 1.0);
+    }
+
+    #[test]
+    fn test_performance_many_updates() {
+        let mut system = NeuromodulationSystem::new();
+
+        // Should handle many updates efficiently
+        for i in 0..1000 {
+            let attention = (i % 100) as f32 / 100.0;
+            let pe = ((i * 7) % 100) as f32 / 100.0;
+            system.update(1.0, attention, pe, 0.5, i % 2 == 0);
+        }
+
+        // Should still be in valid range
+        let stats = system.stats();
+        assert!(stats.ach_level >= 0.0 && stats.ach_level <= 1.0);
+        assert!(stats.ne_level >= 0.0 && stats.ne_level <= 1.0);
+        assert!(stats.sht_level >= 0.0 && stats.sht_level <= 1.0);
+    }
 }
