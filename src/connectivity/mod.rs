@@ -1,7 +1,12 @@
 //! Synaptic connectivity and sparse matrix management
 //!
-//! Implements procedural connectivity generation and CSR sparse storage
-//! optimized for neuromorphic computing with biological realism.
+//! Implements procedural connectivity generation, CSR sparse storage,
+//! and structural plasticity optimized for neuromorphic computing
+//! with biological realism.
+
+pub mod structural;
+
+pub use structural::{StructuralPlasticity, Synapse, StructuralPlasticityStats};
 
 use serde::{Deserialize, Serialize};
 use rand::{Rng, SeedableRng};

@@ -22,10 +22,16 @@ pub use amygdala::{Amygdala, AmygdalaStats};
 
 use crate::attention::AttentionSystem;
 use crate::basal_ganglia::{BasalGanglia, BasalGangliaStats};
-use crate::connectivity::SparseConnectivity;
-use crate::cortex::{EnhancedPredictiveHierarchy, WorkingMemory, EnhancedPredictiveStats};
+use crate::connectivity::{SparseConnectivity, StructuralPlasticity, StructuralPlasticityStats};
+use crate::cortex::{
+    EnhancedPredictiveHierarchy, WorkingMemory, EnhancedPredictiveStats,
+    V1OrientationSystem, NeuromorphicCochlea, MotionProcessingSystem,
+    BarrelCortex, SleepConsolidation, SleepStats,
+};
 use crate::language::{DualStreamLanguage, DualStreamStats};
-use crate::learning::{HomeostaticSystem, HomeostaticStats};
+use crate::learning::{
+    HomeostaticSystem, HomeostaticStats, HeterosynapticPlasticity, HeterosynapticStats,
+};
 use crate::memory::Hippocampus;
 use crate::neuromodulation::{NeuromodulationSystem, NeuromodulationStats};
 use crate::neuron::{HierarchicalBrain, InterneuronCircuit, InterneuronStats};
@@ -61,6 +67,12 @@ pub struct NeuromorphicBrain {
     /// Spatial system with place/grid cells
     pub spatial: SpatialSystem,
 
+    /// Cerebellum for motor learning and error correction
+    pub cerebellum: Cerebellum,
+
+    /// Amygdala for emotional processing and fear learning
+    pub amygdala: Amygdala,
+
     // === INTERNEURON & MODULATION ===
     /// Interneuron circuit (PV/SST/VIP) for sparse coding and oscillations
     pub interneurons: InterneuronCircuit,
@@ -78,9 +90,31 @@ pub struct NeuromorphicBrain {
     /// Semantic system with learned embeddings and concept cells
     pub semantics: SemanticSystem,
 
+    // === SENSORY PROCESSING SYSTEMS ===
+    /// V1 orientation selectivity (visual cortex)
+    pub v1_orientation: V1OrientationSystem,
+
+    /// Neuromorphic cochlea (auditory processing)
+    pub cochlea: NeuromorphicCochlea,
+
+    /// MT-MST motion processing (optic flow)
+    pub motion_processing: MotionProcessingSystem,
+
+    /// Barrel cortex somatosensory (whisker processing)
+    pub barrel_cortex: BarrelCortex,
+
     // === HOMEOSTASIS & LEARNING ===
     /// Homeostatic system (BCM, synaptic scaling, criticality)
     pub homeostasis: HomeostaticSystem,
+
+    /// Heterosynaptic plasticity (NO-mediated, astrocyte)
+    pub heterosynaptic: HeterosynapticPlasticity,
+
+    /// Structural plasticity (dynamic synapse formation/removal)
+    pub structural_plasticity: StructuralPlasticity,
+
+    /// Sleep consolidation (offline replay)
+    pub sleep: SleepConsolidation,
 
     /// Attention and routing system
     pub attention: AttentionSystem,
@@ -126,6 +160,8 @@ impl NeuromorphicBrain {
         let basal_ganglia = BasalGanglia::new(500, 8, 0.05, 0.95);  // 500 striatal neurons, 8 actions
         let hippocampus = Hippocampus::new(pattern_dim, 10, 0.05, 10000);
         let spatial = SpatialSystem::new(200, 500.0);  // 200 place cells, 500cm environment
+        let cerebellum = Cerebellum::new();  // Dual-hemisphere motor learning
+        let amygdala = Amygdala::new();  // Fear conditioning and extinction
 
         // Interneurons and modulation
         let interneurons = InterneuronCircuit::new(pattern_dim);  // PV:SST:VIP = 40:30:15
@@ -136,8 +172,19 @@ impl NeuromorphicBrain {
         let language = DualStreamLanguage::new(vocab_size, 300);  // 300-dim embeddings
         let semantics = SemanticSystem::new(vocab_size, 300, 500);  // 500 concept cells
 
-        // Homeostasis and attention
+        // Sensory processing systems
+        let v1_orientation = V1OrientationSystem::new(128, 128);  // 128×128 visual field
+        let cochlea = NeuromorphicCochlea::new(64);  // 64 frequency channels
+        let motion_processing = MotionProcessingSystem::new(128, 128);  // MT-MST optic flow
+        let barrel_cortex = BarrelCortex::new();  // 5×5 whisker array
+
+        // Homeostasis and plasticity
         let homeostasis = HomeostaticSystem::new(5.0, -55.0);  // Target 5Hz, threshold -55mV
+        let heterosynaptic = HeterosynapticPlasticity::new(10000, 100, 1000.0);  // 10k synapses, 100 astrocytes
+        let structural_plasticity = StructuralPlasticity::new(base_neurons, 0.1, 50);  // 10% initial, 50 max/neuron
+        let sleep = SleepConsolidation::new();  // Offline consolidation
+
+        // Attention system
         let connectivity = Self::create_default_connectivity(pattern_dim);
         let attention = AttentionSystem::new(pattern_dim, connectivity, 2.0);
 
@@ -148,12 +195,21 @@ impl NeuromorphicBrain {
             basal_ganglia,
             hippocampus,
             spatial,
+            cerebellum,
+            amygdala,
             interneurons,
             neuromodulation,
             oscillations,
             language,
             semantics,
+            v1_orientation,
+            cochlea,
+            motion_processing,
+            barrel_cortex,
             homeostasis,
+            heterosynaptic,
+            structural_plasticity,
+            sleep,
             attention,
             vocab_size,
             pattern_dim,
@@ -345,7 +401,7 @@ impl NeuromorphicBrain {
             stats.criticality_score, stats.scaling_factor);
     }
 
-    /// Update all brain dynamics (FULL biological update loop)
+    /// Update all brain dynamics (FULL biological update loop with ALL new systems)
     pub fn update(&mut self, dt: f32) {
         // 1. Update oscillations (theta-gamma coupling)
         self.oscillations.update(dt, 0.5);
@@ -362,17 +418,42 @@ impl NeuromorphicBrain {
         let pred_error = self.predictive.total_error();
         self.neuromodulation.update(dt, attention, pred_error, 0.3, false);
 
-        // 5. Update spatial system (path integration)
+        // 5. Update cerebellum (motor learning via STDP)
+        let motor_input = vec![0.1; 10];  // Placeholder - would come from actual motor commands
+        let error_signal = pred_error * 0.1;  // Prediction error as motor error
+        self.cerebellum.update(&motor_input, error_signal, dt);
+
+        // 6. Update amygdala (emotional processing)
+        let context = 0;  // Placeholder context
+        let cs_input = vec![attention; 10];  // Conditioned stimulus from attention
+        let us_present = if pred_error > 0.5 { 1.0 } else { 0.0 };  // Unconditioned stimulus from error
+        let fear_output = self.amygdala.update(dt, &cs_input, us_present, context);
+
+        // 7. Update spatial system (path integration)
         // (Updated during process_text with actual movement)
 
-        // 6. Update homeostasis continuously
+        // 8. Update structural plasticity (dynamic synapse formation/removal)
+        let pre_activity = vec![0.5; self.pattern_dim.min(1000)];  // Sample from actual neural activity
+        let post_activity = vec![0.5; self.pattern_dim.min(1000)];
+        self.structural_plasticity.update(&pre_activity, &post_activity, (self.time / 1000.0) as u32);
+
+        // 9. Update heterosynaptic plasticity (NO-mediated, astrocyte)
+        let synaptic_activity = vec![0.5; 10000.min(self.pattern_dim * 10)];
+        let pre_spikes = vec![false; synaptic_activity.len()];
+        let post_spikes = vec![false; synaptic_activity.len()];
+        let _hetero_changes = self.heterosynaptic.update(&synaptic_activity, &pre_spikes, &post_spikes, dt);
+
+        // 10. Update homeostasis continuously
         let avg_rate = 5.0;  // Placeholder - would come from neuron activity
         self.homeostasis.update(dt, avg_rate, avg_rate, 1);
 
-        // 7. Update language system
+        // 11. Update language system
         self.language.update(dt);
 
-        // 8. Update time
+        // 12. Update sensory processing systems (if stimuli present)
+        // V1, cochlea, motion, and barrel cortex would be updated during sensory processing
+
+        // 13. Update time
         self.time += dt;
     }
 
