@@ -27,8 +27,14 @@ pub struct QuantizationConfig {
 impl QuantizationConfig {
     /// Create INT8 quantization config
     pub fn int8(w_min: f32, w_max: f32) -> Self {
+        // Scale maps the range [w_min, w_max] to [-128, 127]
         let scale = (w_max - w_min) / 255.0;
-        let zero_point = ((-w_min / scale).round() as i8).clamp(-128, 127);
+        // Zero point: value in quantized space that corresponds to zero in real space
+        // q = round(x/scale + zero_point), so for x=0: zero_point = -round(0/scale) = 0? No...
+        // Actually: x = w_min + (q - q_min) * scale
+        // For x=0: 0 = w_min + (q - (-128)) * scale
+        // q = -w_min/scale - 128
+        let zero_point = ((-w_min / scale) - 128.0).round() as i8;
 
         Self {
             bits: 8,
@@ -66,7 +72,7 @@ impl QuantizationConfig {
 
     /// Quantize float weight to int8
     pub fn quantize(&self, weight: f32) -> i8 {
-        let q = (weight / self.scale).round() + self.zero_point as f32;
+        let q = (weight / self.scale + self.zero_point as f32).round();
         q.clamp(-128.0, 127.0) as i8
     }
 

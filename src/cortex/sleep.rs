@@ -189,6 +189,9 @@ impl SleepConsolidation {
         // NREM3: 20-40 min (deep sleep, most consolidation)
         // REM: 10-30 min (increases in later cycles)
 
+        // Accumulate time in current stage
+        self.time_in_stage += dt;
+
         let stage_durations = match self.current_stage {
             SleepStage::Awake => 0.0,
             SleepStage::NREM1 => 100.0,   // 100 seconds (~1.7 min) - shorter for testing

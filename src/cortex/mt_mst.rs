@@ -462,7 +462,7 @@ impl ExpansionCell {
             }
         }
 
-        // Update cell state
+        // Update cell state - accumulate radial evidence
         self.response += dt * (-self.response / self.tau + radial_evidence);
         self.heading_x = self.center_x;
         self.heading_y = self.center_y;
@@ -778,9 +778,13 @@ mod tests {
             }
         }
 
-        // Update cell many times with larger timestep
+        // Update cell by integrating over all MT positions with radial flow
         for _ in 0..100 {
-            cell.update(&component_motion, 5, 5, 0.1);
+            for x in 0..10 {
+                for y in 0..10 {
+                    cell.update(&component_motion, x, y, 0.1 / (10.0 * 10.0));  // Distribute dt over all positions
+                }
+            }
         }
 
         // Should detect expansion

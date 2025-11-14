@@ -245,8 +245,8 @@ impl CalciumBasedPlasticity {
             0.0
         };
 
-        // LTD: ρ₋(Ca²⁺) = k₋·H(Ca²⁺ - θ₋)·(Ca²⁺ - θ₋)
-        let rho_minus = if ca > self.theta_minus {
+        // LTD: ρ₋(Ca²⁺) = k₋·H(Ca²⁺ - θ₋)·(Ca²⁺ - θ₋), only when below LTP threshold
+        let rho_minus = if ca > self.theta_minus && ca <= self.theta_plus {
             self.k_minus * (ca - self.theta_minus)
         } else {
             0.0
