@@ -724,8 +724,7 @@ impl NeuromorphicBrain {
 
         // 12d. Barrel Cortex Somatosensory (tactile input)
         // Generate whisker deflections from spatial system (simulated tactile exploration)
-        let spatial_x = self.spatial.x;
-        let spatial_y = self.spatial.y;
+        let (spatial_x, spatial_y) = self.spatial.position;
         let mut whisker_deflections = vec![vec![0.0; 5]; 5];
         let mut whisker_velocities = vec![vec![0.0; 5]; 5];
         // Pattern based on spatial position (simulates object contact)
