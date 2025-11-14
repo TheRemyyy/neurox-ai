@@ -170,6 +170,7 @@ mod tests {
     use cudarc::driver::CudaDevice;
 
     #[test]
+    #[ignore = "Requires CUDA device"]
     fn test_fp16_quantization() {
         // Skip test if CUDA device is not available
         if CudaDevice::new(0).is_err() {
