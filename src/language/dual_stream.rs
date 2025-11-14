@@ -278,12 +278,12 @@ pub struct DorsalStream {
 }
 
 impl DorsalStream {
-    pub fn new() -> Self {
+    pub fn new(embedding_dim: usize) -> Self {
         Self {
-            stg: STG::new(10, 40),
+            stg: STG::new(10, embedding_dim),
             spt: Spt::new(100),
             ifg: IFG::new(10),
-            phonological_loop: WorkingMemory::new(7, 40, 0.3),
+            phonological_loop: WorkingMemory::new(7, embedding_dim, 0.3),
         }
     }
 
@@ -433,7 +433,7 @@ impl DualStreamLanguage {
         eprintln!("DualStreamLanguage::new - embedding_dim: {}", embedding_dim);
         Self {
             ventral: VentralStream::new(vocab_size, embedding_dim),
-            dorsal: DorsalStream::new(),
+            dorsal: DorsalStream::new(embedding_dim),
             multiscale: MultiTimescaleProcessor::new(),
             vocab_size,
             embedding_dim,
