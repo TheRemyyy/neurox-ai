@@ -78,6 +78,10 @@ pub struct HeterosynapticPlasticity {
     /// Synapse spatial positions (x, y, z) in μm
     pub synapse_positions: Vec<(f32, f32, f32)>,
 
+    /// Pre-computed neighbor lists for efficient diffusion (O(K) instead of O(N²))
+    /// neighbor_lists[i] contains indices of synapses within diffusion radius of synapse i
+    pub neighbor_lists: Vec<Vec<usize>>,
+
     /// Statistics
     pub total_no_events: usize,
     pub total_astrocyte_events: usize,
@@ -138,10 +142,27 @@ impl HeterosynapticPlasticity {
                 .push(syn_idx);
         }
 
+        // Pre-compute neighbor lists for O(K) diffusion instead of O(N²)
+        let diffusion_radius = 100.0;  // 100 μm
+        let mut neighbor_lists = vec![Vec::new(); n_synapses];
+
+        for i in 0..n_synapses {
+            let (x1, y1, z1) = synapse_positions[i];
+            for j in (i+1)..n_synapses {
+                let (x2, y2, z2) = synapse_positions[j];
+                let dist_sq = (x2-x1).powi(2) + (y2-y1).powi(2) + (z2-z1).powi(2);
+
+                if dist_sq < diffusion_radius.powi(2) {
+                    neighbor_lists[i].push(j);
+                    neighbor_lists[j].push(i);  // Symmetric
+                }
+            }
+        }
+
         Self {
             no_concentration: vec![0.0; n_synapses],
             no_decay_tau: 3.0,  // 3 seconds (Garthwaite 2008)
-            no_diffusion_radius: 100.0,  // 100 μm
+            no_diffusion_radius: diffusion_radius,
             no_production_rate: 0.5,  // μM per spike
             astrocyte_coverage,
             astrocyte_calcium: vec![0.1; n_astrocytes],  // Baseline Ca²⁺
@@ -155,6 +176,7 @@ impl HeterosynapticPlasticity {
             eta_no_ltp: 0.01,  // LTP rate
             eta_astro_ltd: 0.005,  // LTD rate (weaker than LTP)
             synapse_positions,
+            neighbor_lists,
             total_no_events: 0,
             total_astrocyte_events: 0,
             total_potentiation_events: 0,

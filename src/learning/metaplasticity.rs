@@ -326,6 +326,10 @@ pub struct HomeostaticSystem {
 
     /// Global time (ms)
     time: f32,
+
+    /// Update counters (for periodic updates)
+    criticality_update_counter: usize,
+    intrinsic_update_counter: usize,
 }
 
 impl HomeostaticSystem {
@@ -336,6 +340,8 @@ impl HomeostaticSystem {
             criticality: CriticalityHomeostasis::new(),
             intrinsic: IntrinsicPlasticity::new(target_rate, initial_threshold),
             time: 0.0,
+            criticality_update_counter: 0,
+            intrinsic_update_counter: 0,
         }
     }
 
@@ -357,13 +363,17 @@ impl HomeostaticSystem {
 
         // Update criticality (continuous)
         self.criticality.record_avalanche(avalanche_size);
-        if (self.time as usize) % 1000 == 0 {  // Every second
+        self.criticality_update_counter += 1;
+        if self.criticality_update_counter >= 1000 {  // Every second (assuming ~1ms timesteps)
             self.criticality.update();
+            self.criticality_update_counter = 0;
         }
 
         // Update intrinsic plasticity (intermediate, ~hours)
-        if (self.time as usize) % 100 == 0 {  // Every 100ms
+        self.intrinsic_update_counter += 1;
+        if self.intrinsic_update_counter >= 100 {  // Every 100ms
             self.intrinsic.update(firing_rate);
+            self.intrinsic_update_counter = 0;
         }
     }
 

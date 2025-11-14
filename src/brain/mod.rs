@@ -62,6 +62,11 @@ const HETEROSYNAPTIC_NEURONS: usize = 200;  // 100 CAdEx + 100 Izhikevich
 /// Synapses per neuron for heterosynaptic mapping
 const SYNAPSES_PER_NEURON: usize = HETEROSYNAPTIC_SYNAPSES / HETEROSYNAPTIC_NEURONS;  // = 50
 
+// Visual pattern generation constants (for fallback synthetic input)
+const VISUAL_PATTERN_BASELINE: f32 = 0.5;  // Baseline gray level
+const VISUAL_PATTERN_AMPLITUDE: f32 = 0.3; // Sine wave amplitude
+const VISUAL_PATTERN_FREQUENCY: f32 = 10.0; // Spatial frequency (pixels)
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NeuromorphicBrain {
     // === CORE CORTICAL SYSTEMS ===
@@ -523,19 +528,44 @@ impl NeuromorphicBrain {
         self.neuromodulation.update(dt, attention, pred_error, 0.3, false);
 
         // 5. Update cerebellum (motor learning via STDP)
-        // Generate motor inputs from basal ganglia action selections (simplified encoding)
+        // Generate motor inputs from spatial system + basal ganglia
         let mut motor_input_left = vec![false; 246];  // 246 mossy fibers (bool spikes)
         let mut motor_input_right = vec![false; 246];
-        // Use basal ganglia activity to drive motor patterns (simplified: convert value to sparse spikes)
+
+        // Encode spatial velocity and BG value into mossy fiber patterns
+        let (spatial_x, spatial_y) = self.spatial.position;
+        let (vel_x, vel_y) = self.spatial.velocity;
         let bg_value = self.basal_ganglia.dopamine.value_estimate;
+
         for i in 0..246 {
-            if (i as f32 / 246.0) < bg_value {
-                motor_input_left[i] = true;
-                motor_input_right[i] = i % 2 == 0;  // Alternate pattern
-            }
+            // Population coding: different fibers encode different movement directions
+            let fiber_angle = (i as f32 / 246.0) * 2.0 * std::f32::consts::PI;
+            let cos_angle = fiber_angle.cos();
+            let sin_angle = fiber_angle.sin();
+
+            // Tuning curve: fiber fires if velocity aligns with preferred direction
+            let dot_product = vel_x * cos_angle + vel_y * sin_angle;
+            let activation = (dot_product * bg_value).max(0.0);
+
+            // Poisson-like spiking based on activation
+            motor_input_left[i] = activation > (i as f32 / 246.0);
+            motor_input_right[i] = activation > ((i + 123) as f32 / 246.0); // Phase-shifted
         }
-        let error_left = vec![pred_error * 0.1; 8];  // 8 climbing fibers (error signals)
-        let error_right = vec![pred_error * 0.1; 8];
+
+        // Compute motor error: difference between predicted and actual movement
+        // Store previous cerebellar output for error computation
+        let prev_motor_left = motor_input_left.iter().filter(|&&s| s).count() as f32 / 246.0;
+        let prev_motor_right = motor_input_right.iter().filter(|&&s| s).count() as f32 / 246.0;
+
+        // Error signal: sensory prediction error + motor variability
+        let mut error_left = vec![0.0; 8];
+        let mut error_right = vec![0.0; 8];
+        for i in 0..8 {
+            // Each climbing fiber gets specific error component
+            error_left[i] = pred_error * 0.2 + (prev_motor_left - bg_value).abs() * 0.1;
+            error_right[i] = pred_error * 0.2 + (prev_motor_right - bg_value).abs() * 0.1;
+        }
+
         let (left_motor_out, right_motor_out) = self.cerebellum.update(dt, &motor_input_left, &motor_input_right, &error_left, &error_right);
 
         // USE cerebellum output - motor corrections influence basal ganglia
@@ -673,16 +703,26 @@ impl NeuromorphicBrain {
         let hetero_changes = self.heterosynaptic.update(&hetero_activity, &hetero_pre_spikes, &hetero_post_spikes, dt);
         let avg_hetero_change: f32 = hetero_changes.iter().sum::<f32>() / hetero_changes.len() as f32;
 
-        // 9c. Update memristive network (EM field coupling)
-        // Generate 3D positions in a cortical column layout (simplified)
+        // 9d. Update memristive network (EM field coupling)
+        // Generate 3D positions in a cortical column layout
         let n_neurons = 1000.min(self.pattern_dim);
         let mut neuron_positions = Vec::with_capacity(n_neurons);
+
+        // Dynamic grid size based on neuron count
+        let grid_size = (n_neurons as f32).sqrt().ceil() as usize;
+        let spacing = 0.05;  // 50μm spacing (biological cortical columns)
         let layers = 6;  // Cortical layers
+
         for i in 0..n_neurons {
             let layer = (i * layers) / n_neurons;
-            let x = ((i % 10) as f32 - 5.0) * 0.1;  // 10x10 grid
-            let y = ((i / 10) as f32 - 5.0) * 0.1;
-            let z = layer as f32 * 0.5;  // Layer depth
+            let grid_x = i % grid_size;
+            let grid_y = i / grid_size;
+
+            // Center the grid around origin
+            let x = (grid_x as f32 - grid_size as f32 / 2.0) * spacing;
+            let y = (grid_y as f32 - grid_size as f32 / 2.0) * spacing;
+            let z = layer as f32 * 0.3;  // 300μm layer spacing
+
             neuron_positions.push((x, y, z));
         }
 
@@ -743,7 +783,7 @@ impl NeuromorphicBrain {
             let phase = (self.time * 0.01) % (2.0 * std::f32::consts::PI);
             for i in 0..v1_height {
                 for j in 0..v1_width {
-                    visual_input[i][j] = 0.5 + 0.3 * ((i as f32 / 10.0 + phase).sin());
+                    visual_input[i][j] = VISUAL_PATTERN_BASELINE + VISUAL_PATTERN_AMPLITUDE * ((i as f32 / VISUAL_PATTERN_FREQUENCY + phase).sin());
                 }
             }
         }
@@ -816,8 +856,11 @@ impl NeuromorphicBrain {
                 let saccade_magnitude = ((target_x - current_x).powi(2) + (target_y - current_y).powi(2)).sqrt();
                 // Attention boost during saccade planning (larger saccades = more attention)
                 let attention_boost = (saccade_magnitude * 0.5).min(1.0);
-                // This attention boost could be used to modulate sensory processing
-                let _ = attention_boost;  // Stored for future use
+
+                // Apply attention boost to thalamic relay (enhance sensory processing at saccade target)
+                let visual_modality = 0;  // Visual attention
+                let boosted_attention = (self.thalamus.attention_strength + attention_boost).min(2.0);
+                self.thalamus.set_attention(visual_modality, boosted_attention);
             }
         }
 
