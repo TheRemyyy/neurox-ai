@@ -1,12 +1,15 @@
 //! Learning rules and synaptic plasticity
 //!
-//! Implements STDP, homeostatic plasticity, STP, quantization, and metaplasticity.
+//! Implements STDP, homeostatic plasticity, STP, quantization, metaplasticity,
+//! calcium-based plasticity, and burst-dependent STDP.
 
 pub mod stdp;
 pub mod quantization;
 pub mod metaplasticity;
 
-pub use stdp::{TripletSTDP, HomeostaticPlasticity};
+pub use stdp::{
+    TripletSTDP, HomeostaticPlasticity, CalciumBasedPlasticity, BurstDependentSTDP,
+};
 pub use quantization::{QuantizationConfig, QuantizedWeights, QATSimulator};
 pub use metaplasticity::{
     BCMMetaplasticity, SynapticScaling, CriticalityHomeostasis, IntrinsicPlasticity,

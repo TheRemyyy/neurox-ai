@@ -2,6 +2,8 @@
 //!
 //! Complete brain architecture with ALL biological systems integrated:
 //! - Basal ganglia for reinforcement learning
+//! - Cerebellum for motor learning and error correction
+//! - Amygdala for emotional processing and fear learning
 //! - Interneuron diversity (PV/SST/VIP) for sparse coding
 //! - Neuromodulation (ACh/NE/5-HT/DA) for context-appropriate learning
 //! - Dendritic computation for 2-5× capacity boost
@@ -11,6 +13,12 @@
 //! - Semantic embeddings with concept cells
 //! - Place/grid cells for spatial/semantic organization
 //! - Homeostatic mechanisms (BCM, synaptic scaling, criticality)
+
+pub mod cerebellum;
+pub mod amygdala;
+
+pub use cerebellum::{Cerebellum, CerebellarHemisphere, CerebellarStats};
+pub use amygdala::{Amygdala, AmygdalaStats};
 
 use crate::attention::AttentionSystem;
 use crate::basal_ganglia::{BasalGanglia, BasalGangliaStats};
