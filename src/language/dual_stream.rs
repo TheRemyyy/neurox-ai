@@ -254,6 +254,8 @@ impl VentralStream {
         // MTG extracts lexical-semantic features
         if let Some(recent) = self.stg.get_recent(1).first() {
             self.mtg.phonology_to_lexical(recent);
+            // Copy lexical to semantic (simplified model)
+            self.mtg.semantic_features = self.mtg.lexical_activations.clone();
         }
 
         // ATL integrates into amodal concepts
@@ -428,6 +430,7 @@ pub struct DualStreamLanguage {
 
 impl DualStreamLanguage {
     pub fn new(vocab_size: usize, embedding_dim: usize) -> Self {
+        eprintln!("DualStreamLanguage::new - embedding_dim: {}", embedding_dim);
         Self {
             ventral: VentralStream::new(vocab_size, embedding_dim),
             dorsal: DorsalStream::new(),
@@ -441,6 +444,7 @@ impl DualStreamLanguage {
     pub fn comprehend(&mut self, tokens: &[usize]) -> Vec<f32> {
         // Process through ventral stream
         let semantics = self.ventral.comprehend(tokens);
+        eprintln!("DualStreamLanguage::comprehend - semantics.len(): {}", semantics.len());
 
         // Multi-timescale processing
         for &token_idx in tokens {
