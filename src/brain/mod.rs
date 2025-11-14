@@ -520,17 +520,8 @@ impl NeuromorphicBrain {
         let us_present = if pred_error > 0.5 { 1.0 } else { 0.0 };  // Unconditioned stimulus from error
         let fear_output = self.amygdala.update(dt, &cs_input, us_present, context);
 
-        // 6a. Update superior colliculus (eye movements)
-        self.superior_colliculus.update(dt);
-        // Can trigger saccades based on visual attention
-        let _saccade_target = self.superior_colliculus.trigger_saccade_from_activity();
-
-        // 6b. Update thalamus (sensory relay)
-        let visual_input = vec![0.0; 100];  // Would come from actual visual processing
-        let auditory_input = vec![0.0; 100];
-        let somatosensory_input = vec![0.0; 100];
-        let cortical_feedback = vec![0.0; 100];
-        self.thalamus.update(&visual_input, &auditory_input, &somatosensory_input, &cortical_feedback, dt);
+        // 6a. Superior Colliculus and Thalamus will be updated AFTER sensory processing
+        // (moved to after V1/Cochlea/Motion/Barrel for proper data flow)
 
         // 7. Update spatial system (path integration)
         // (Updated during process_text with actual movement)
@@ -587,31 +578,50 @@ impl NeuromorphicBrain {
         // 11. Update language system
         self.language.update(dt);
 
-        // 12. Update sensory processing systems
-        // These process raw sensory inputs and feed into higher cortical areas
+        // 12. Update sensory processing systems with PROPER DATA FLOW
+        // Each sensory system feeds into the next appropriately
 
         // 12a. V1 Orientation Processing (visual input)
         // Process orientation-selective responses to visual edges
         let visual_input = vec![vec![0.5; 128]; 128];  // 128×128 retinotopic input (would come from actual visual stream)
         let timestep = (self.time / dt) as u32;
-        let _v1_output = self.v1_orientation.process(dt, &visual_input, timestep);
+        let v1_output = self.v1_orientation.process(dt, &visual_input, timestep);
+        // v1_output is Vec<Vec<Vec<f32>>> - 128x128x4 (x, y, orientation)
 
         // 12b. Cochlea Audio Processing (auditory input)
         // Process frequency decomposition of audio signals
         let audio_sample = 0.0;  // Single audio sample (would come from actual audio stream)
-        let _cochlea_spikes = self.cochlea.process(audio_sample, dt);
+        let cochlea_spikes = self.cochlea.process(audio_sample, dt);
+        // cochlea_spikes is Vec<bool> - spike train per frequency channel
 
         // 12c. MT/MST Motion Processing (optic flow)
-        // Process visual motion and heading direction
-        // Use V1 complex cell output (would normally come from V1 processing)
-        let motion_input_3d = vec![vec![vec![0.0; 4]; 270]; 270];  // 270×270×4 complex cells
-        let (_motion_output, _optic_flow) = self.motion_processing.process(&motion_input_3d, dt);
+        // USE V1 complex cell output (proper data flow!)
+        let (motion_output, optic_flow) = self.motion_processing.process(&v1_output, dt);
+        // motion_output contains direction/speed, optic_flow contains flow field
 
         // 12d. Barrel Cortex Somatosensory (tactile input)
         // Process whisker/touch sensations
         let whisker_deflections = vec![vec![0.0; 5]; 5];  // 5×5 whisker array
         let whisker_velocities = vec![vec![0.0; 5]; 5];   // 5×5 velocity array
-        let _barrel_output = self.barrel_cortex.process(&whisker_deflections, &whisker_velocities, dt);
+        let barrel_output = self.barrel_cortex.process(&whisker_deflections, &whisker_velocities, dt);
+        // barrel_output is Vec<Vec<f32>> - 5x5 cortical column outputs
+
+        // 12e. NOW update Thalamus with REAL sensory data (proper data flow!)
+        // Convert sensory outputs to thalamic input format
+        let visual_thalamic = self.extract_v1_for_thalamus(&v1_output);
+        let auditory_thalamic = self.extract_cochlea_for_thalamus(&cochlea_spikes);
+        let somatosensory_thalamic = self.extract_barrel_for_thalamus(&barrel_output);
+        let cortical_feedback = vec![0.1; 100];  // From higher cortical areas
+        self.thalamus.update(&visual_thalamic, &auditory_thalamic, &somatosensory_thalamic, &cortical_feedback, dt);
+
+        // 12f. Update Superior Colliculus with motion/attention data
+        self.superior_colliculus.update(dt);
+        // Feed motion information to colliculus for saccade planning
+        if let Some(_salient_location) = self.find_salient_location(&motion_output) {
+            let _saccade_target = self.superior_colliculus.trigger_saccade_from_activity();
+            // Saccade target guides attention (integration point for future attention redirection)
+            // In full implementation: attention.set_spatial_focus(saccade_target)
+        }
 
         // 13. Update time
         self.time += dt;
@@ -685,6 +695,63 @@ impl NeuromorphicBrain {
             result.truncate(target_len);
         }
         result
+    }
+
+    /// Extract thalamic input from V1 output (LGN processing)
+    fn extract_v1_for_thalamus(&self, v1_output: &[Vec<Vec<f32>>]) -> Vec<f32> {
+        // V1 output is 128x128x4 (x, y, orientation)
+        // Extract spatial average across orientations for LGN relay
+        let mut thalamic_input = Vec::new();
+
+        // Sample 100 locations from V1 (10x10 grid)
+        for i in 0..10 {
+            for j in 0..10 {
+                let x = (i * 128) / 10;
+                let y = (j * 128) / 10;
+                if x < v1_output.len() && y < v1_output[0].len() {
+                    // Average across orientations
+                    let avg: f32 = v1_output[x][y].iter().sum::<f32>() / v1_output[x][y].len() as f32;
+                    thalamic_input.push(avg);
+                }
+            }
+        }
+
+        self.pad_or_truncate(&thalamic_input, 100)
+    }
+
+    /// Extract thalamic input from Cochlea output (MGN processing)
+    fn extract_cochlea_for_thalamus(&self, cochlea_spikes: &[bool]) -> Vec<f32> {
+        // Convert spike train to continuous values for thalamic relay
+        let continuous: Vec<f32> = cochlea_spikes.iter()
+            .map(|&spike| if spike { 1.0 } else { 0.0 })
+            .collect();
+
+        self.pad_or_truncate(&continuous, 100)
+    }
+
+    /// Extract thalamic input from Barrel Cortex output (VPL/VPM processing)
+    fn extract_barrel_for_thalamus(&self, barrel_output: &[Vec<f32>]) -> Vec<f32> {
+        // Flatten 5x5 barrel array to vector
+        let mut thalamic_input = Vec::new();
+        for row in barrel_output {
+            thalamic_input.extend_from_slice(row);
+        }
+
+        self.pad_or_truncate(&thalamic_input, 100)
+    }
+
+    /// Find salient location in motion output for attention
+    fn find_salient_location(&self, motion_output: &crate::cortex::mt_mst::MotionOutput) -> Option<(f32, f32)> {
+        // Calculate motion energy from heading and expansion
+        let motion_energy = (motion_output.heading_x.powi(2) + motion_output.heading_y.powi(2)).sqrt()
+                          + motion_output.expansion_strength.abs();
+
+        // If there's significant motion, return heading direction as salient location
+        if motion_energy > 0.1 {
+            Some((motion_output.heading_x, motion_output.heading_y))
+        } else {
+            None
+        }
     }
 
     fn generate_response_text(&self, semantic: &[f32], max_words: usize) -> String {
