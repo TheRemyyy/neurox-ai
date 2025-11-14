@@ -508,8 +508,17 @@ impl NeuromorphicBrain {
         self.neuromodulation.update(dt, attention, pred_error, 0.3, false);
 
         // 5. Update cerebellum (motor learning via STDP)
-        let motor_input_left = vec![false; 246];  // 246 mossy fibers (bool spikes)
-        let motor_input_right = vec![false; 246];
+        // Generate motor inputs from basal ganglia action selections (simplified encoding)
+        let mut motor_input_left = vec![false; 246];  // 246 mossy fibers (bool spikes)
+        let mut motor_input_right = vec![false; 246];
+        // Use basal ganglia activity to drive motor patterns (simplified: convert value to sparse spikes)
+        let bg_value = self.basal_ganglia.dopamine.value_estimate;
+        for i in 0..246 {
+            if (i as f32 / 246.0) < bg_value {
+                motor_input_left[i] = true;
+                motor_input_right[i] = i % 2 == 0;  // Alternate pattern
+            }
+        }
         let error_left = vec![pred_error * 0.1; 8];  // 8 climbing fibers (error signals)
         let error_right = vec![pred_error * 0.1; 8];
         let (left_motor_out, right_motor_out) = self.cerebellum.update(dt, &motor_input_left, &motor_input_right, &error_left, &error_right);
@@ -552,12 +561,18 @@ impl NeuromorphicBrain {
         self.structural_plasticity.update(&pre_activity, &post_activity, (self.time / 1000.0) as u32);
 
         // 9. Update heterosynaptic plasticity with REAL spike data
-        // Use spike events from R-STDP collection
+        // This must happen AFTER R-STDP section where spike_events are collected
+        // For now, use structural plasticity activity as proxy
         let synaptic_activity = pre_activity[..10000.min(self.pattern_dim * 10).min(pre_activity.len())].to_vec();
         let synaptic_activity = self.pad_or_truncate(&synaptic_activity, 10000.min(self.pattern_dim * 10));
 
-        let pre_spikes = vec![false; synaptic_activity.len()];  // Would come from actual spike monitoring
-        let post_spikes = vec![false; synaptic_activity.len()];
+        // Convert activity to sparse spike representation
+        let mut pre_spikes = vec![false; synaptic_activity.len()];
+        let mut post_spikes = vec![false; synaptic_activity.len()];
+        for (i, &activity) in synaptic_activity.iter().enumerate() {
+            pre_spikes[i] = activity > 0.5;  // Threshold for spike
+            post_spikes[i] = activity > 0.3;  // Different threshold for post-synaptic
+        }
         let hetero_changes = self.heterosynaptic.update(&synaptic_activity, &pre_spikes, &post_spikes, dt);
 
         // USE heterosynaptic weight changes (would be applied to actual synapses)
@@ -620,10 +635,32 @@ impl NeuromorphicBrain {
         // Now weight changes are computed and ready to be applied
 
         // 9c. Update memristive network (EM field coupling)
-        // Collect neuron currents for EM field computation
-        // In full implementation, would get actual neuron voltages/currents
-        let neuron_positions = vec![(0.0f32, 0.0f32, 0.0f32); 1000.min(self.pattern_dim)];
-        let neuron_currents = vec![0.1; neuron_positions.len()];
+        // Generate 3D positions in a cortical column layout (simplified)
+        let n_neurons = 1000.min(self.pattern_dim);
+        let mut neuron_positions = Vec::with_capacity(n_neurons);
+        let layers = 6;  // Cortical layers
+        for i in 0..n_neurons {
+            let layer = (i * layers) / n_neurons;
+            let x = ((i % 10) as f32 - 5.0) * 0.1;  // 10x10 grid
+            let y = ((i / 10) as f32 - 5.0) * 0.1;
+            let z = layer as f32 * 0.5;  // Layer depth
+            neuron_positions.push((x, y, z));
+        }
+
+        // Use actual neuron voltages as currents (CAdEx and Izhikevich)
+        let mut neuron_currents = Vec::with_capacity(n_neurons);
+        for neuron in self.cadex_neurons.iter().take(n_neurons / 2) {
+            let voltage = neuron.voltage();
+            let current = (voltage + 70.0) / 100.0;  // Normalize to ~0-1 range
+            neuron_currents.push(current);
+        }
+        for neuron in self.izhikevich_neurons.iter().take(n_neurons - neuron_currents.len()) {
+            let voltage = neuron.voltage();
+            let current = (voltage + 70.0) / 100.0;
+            neuron_currents.push(current);
+        }
+        neuron_currents.resize(neuron_positions.len(), 0.1);  // Fill remainder
+
         self.memristive_network.update_em_field(dt, &neuron_currents);
 
         // 9d. Vesicle pools are integrated at the synapse level
@@ -632,7 +669,15 @@ impl NeuromorphicBrain {
         // Note: CAdEx and Izhikevich neurons are updated in R-STDP section above
 
         // 10. Update homeostasis continuously
-        let avg_rate = 5.0;  // Placeholder - would come from neuron activity
+        // Compute average firing rate from CAdEx and Izhikevich neurons
+        let total_spikes = self.cadex_neurons.iter().filter(|n| n.state.refractory_counter > 0).count()
+                         + self.izhikevich_neurons.iter().filter(|n| n.state.refractory_counter > 0).count();
+        let total_neurons = self.cadex_neurons.len() + self.izhikevich_neurons.len();
+        let avg_rate = if total_neurons > 0 {
+            (total_spikes as f32 / total_neurons as f32) * (1000.0 / dt)  // Convert to Hz
+        } else {
+            5.0  // Fallback default
+        };
         self.homeostasis.update(dt, avg_rate, avg_rate, 1);
 
         // 11. Update language system
@@ -642,15 +687,33 @@ impl NeuromorphicBrain {
         // Each sensory system feeds into the next appropriately
 
         // 12a. V1 Orientation Processing (visual input)
-        // Process orientation-selective responses to visual edges
-        let visual_input = vec![vec![0.5; 128]; 128];  // 128×128 retinotopic input (would come from actual visual stream)
+        // Generate synthetic visual input from working memory patterns (simulated retinal input)
+        let mut visual_input = vec![vec![0.0; 128]; 128];
+        let wm_patterns = self.working_memory.get_all_patterns();
+        if !wm_patterns.is_empty() {
+            // Convert working memory to 2D visual pattern
+            for (i, pattern) in wm_patterns.iter().take(128).enumerate() {
+                for (j, &val) in pattern.iter().take(128).enumerate() {
+                    visual_input[i][j] = val;
+                }
+            }
+        } else {
+            // Fallback: use oscillatory pattern
+            let phase = (self.time * 0.01) % (2.0 * std::f32::consts::PI);
+            for i in 0..128 {
+                for j in 0..128 {
+                    visual_input[i][j] = 0.5 + 0.3 * ((i as f32 / 10.0 + phase).sin());
+                }
+            }
+        }
         let timestep = (self.time / dt) as u32;
         let v1_output = self.v1_orientation.process(dt, &visual_input, timestep);
         // v1_output is Vec<Vec<Vec<f32>>> - 128x128x4 (x, y, orientation)
 
         // 12b. Cochlea Audio Processing (auditory input)
-        // Process frequency decomposition of audio signals
-        let audio_sample = 0.0;  // Single audio sample (would come from actual audio stream)
+        // Generate synthetic audio from theta oscillation (simulated auditory stream)
+        let theta_phase = self.oscillations.theta.get_phase();
+        let audio_sample = (theta_phase * 440.0).sin() * 0.5;  // 440 Hz tone modulated by theta
         let cochlea_spikes = self.cochlea.process(audio_sample, dt);
         // cochlea_spikes is Vec<bool> - spike train per frequency channel
 
@@ -660,9 +723,19 @@ impl NeuromorphicBrain {
         // motion_output contains direction/speed, optic_flow contains flow field
 
         // 12d. Barrel Cortex Somatosensory (tactile input)
-        // Process whisker/touch sensations
-        let whisker_deflections = vec![vec![0.0; 5]; 5];  // 5×5 whisker array
-        let whisker_velocities = vec![vec![0.0; 5]; 5];   // 5×5 velocity array
+        // Generate whisker deflections from spatial system (simulated tactile exploration)
+        let spatial_x = self.spatial.x;
+        let spatial_y = self.spatial.y;
+        let mut whisker_deflections = vec![vec![0.0; 5]; 5];
+        let mut whisker_velocities = vec![vec![0.0; 5]; 5];
+        // Pattern based on spatial position (simulates object contact)
+        for i in 0..5 {
+            for j in 0..5 {
+                let distance = ((i as f32 - spatial_x / 10.0).powi(2) + (j as f32 - spatial_y / 10.0).powi(2)).sqrt();
+                whisker_deflections[i][j] = if distance < 2.0 { 0.8 * (1.0 - distance / 2.0) } else { 0.0 };
+                whisker_velocities[i][j] = whisker_deflections[i][j] * 0.5;  // Velocity proportional to deflection
+            }
+        }
         let barrel_output = self.barrel_cortex.process(&whisker_deflections, &whisker_velocities, dt);
         // barrel_output is Vec<Vec<f32>> - 5x5 cortical column outputs
 
@@ -671,7 +744,16 @@ impl NeuromorphicBrain {
         let visual_thalamic = self.extract_v1_for_thalamus(&v1_output);
         let auditory_thalamic = self.extract_cochlea_for_thalamus(&cochlea_spikes);
         let somatosensory_thalamic = self.extract_barrel_for_thalamus(&barrel_output);
-        let cortical_feedback = vec![0.1; 100];  // From higher cortical areas
+
+        // Generate cortical feedback from working memory and predictive errors
+        let mut cortical_feedback = Vec::new();
+        if !wm_patterns.is_empty() {
+            for pattern in wm_patterns.iter().take(10) {
+                cortical_feedback.extend_from_slice(&pattern[..pattern.len().min(10)]);
+            }
+        }
+        cortical_feedback.resize(100, pred_error * 0.1);  // Fill with prediction errors
+
         self.thalamus.update(&visual_thalamic, &auditory_thalamic, &somatosensory_thalamic, &cortical_feedback, dt);
 
         // 12f. Update Superior Colliculus with motion/attention data
