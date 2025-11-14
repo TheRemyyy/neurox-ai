@@ -215,7 +215,6 @@ impl WorkingMemory {
     /// # Returns
     /// `true` if stored, `false` if rejected due to low attention
     pub fn store(&mut self, pattern: &[f32], attention: f32) -> bool {
-        eprintln!("WorkingMemory::store - pattern.len(): {}, self.pattern_dim: {}", pattern.len(), self.pattern_dim);
         assert_eq!(pattern.len(), self.pattern_dim, "Pattern dimension mismatch");
 
         // Reject if attention too low
