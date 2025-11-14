@@ -215,6 +215,7 @@ extern "C" __global__ void compute_optic_flow(
 "#;
 
 /// GPU-accelerated MT-MST Motion System
+#[derive(Debug)]
 pub struct GpuMotionSystem {
     device: Arc<CudaDevice>,
 
@@ -485,7 +486,7 @@ mod tests {
     fn test_gpu_motion_processing() {
         match CudaDevice::new(0) {
             Ok(device) => {
-                let device = Arc::new(device);
+                // CudaDevice::new already returns Arc<CudaDevice>
                 let mut motion = GpuMotionSystem::new(
                     device.clone(),
                     128,  // mt_width

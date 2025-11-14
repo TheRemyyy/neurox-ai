@@ -179,6 +179,7 @@ extern "C" __global__ void non_max_suppression(
 "#;
 
 /// GPU-accelerated V1 Orientation System
+#[derive(Debug)]
 pub struct GpuV1OrientationSystem {
     device: Arc<CudaDevice>,
 
@@ -344,7 +345,7 @@ mod tests {
         // Test only if CUDA available
         match CudaDevice::new(0) {
             Ok(device) => {
-                let device = Arc::new(device);
+                // CudaDevice::new already returns Arc<CudaDevice>
                 let mut v1 = GpuV1OrientationSystem::new(
                     device.clone(),
                     128,  // width
