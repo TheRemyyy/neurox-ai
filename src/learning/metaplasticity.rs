@@ -481,11 +481,10 @@ mod tests {
     fn test_criticality() {
         let mut crit = CriticalityHomeostasis::new();
 
-        // Subcritical pattern (decreasing avalanche sizes) - need 100+ samples for stats
-        for _ in 0..10 {
-            for i in (1..=10).rev() {
-                crit.record_avalanche(i);
-            }
+        // Subcritical pattern (continuously decreasing avalanche sizes)
+        // Start from 200 and decrease to avoid jumps between cycles
+        for i in (1..=200).rev() {
+            crit.record_avalanche(i);
         }
         crit.update();
 

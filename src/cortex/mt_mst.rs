@@ -743,34 +743,50 @@ mod tests {
     fn test_expansion_cell() {
         let mut cell = ExpansionCell::new(5, 5, 10, 10);
 
-        // Create radial flow pattern (expansion)
+        // Create radial flow pattern (expansion) with strong responses
         let mut component_motion = ComponentMotion {
             direction_responses: vec![vec![vec![0.0; 4]; 10]; 10],
-            speed_responses: vec![vec![0.0; 10]; 10],
+            speed_responses: vec![vec![1.0; 10]; 10],  // Add speed info
         };
 
-        // Simulate flow away from center
+        // Simulate flow away from center with correct direction mapping
         for x in 0..10 {
             for y in 0..10 {
                 let dx = x as f32 - 5.0;
                 let dy = y as f32 - 5.0;
+
+                // Skip center point
+                if dx.abs() < 0.1 && dy.abs() < 0.1 {
+                    continue;
+                }
+
                 let angle = dy.atan2(dx);
 
-                // Map angle to direction bin
-                let dir_idx = ((angle + std::f32::consts::PI) / (std::f32::consts::PI / 2.0)) as usize % 4;
-                component_motion.direction_responses[x][y][dir_idx] = 1.0;
+                // Map angle to direction bin (0°, 90°, 180°, 270°)
+                // atan2 returns -π to π, normalize to 0 to 2π
+                let normalized_angle = if angle < 0.0 {
+                    angle + 2.0 * std::f32::consts::PI
+                } else {
+                    angle
+                };
+
+                // Quantize to 4 directions
+                let dir_idx = ((normalized_angle / (std::f32::consts::PI / 2.0)).round() as usize) % 4;
+
+                // Stronger response for radial pattern
+                component_motion.direction_responses[x][y][dir_idx] = 2.0;
             }
         }
 
-        // Update cell multiple times
-        for _ in 0..50 {
-            cell.update(&component_motion, 5, 5, 0.01);
+        // Update cell many times with larger timestep
+        for _ in 0..100 {
+            cell.update(&component_motion, 5, 5, 0.1);
         }
 
         // Should detect expansion
         assert!(
-            cell.response > 0.0,
-            "Expansion cell should respond to radial flow"
+            cell.response > 0.01,
+            "Expansion cell should respond to radial flow, got response: {}", cell.response
         );
     }
 }

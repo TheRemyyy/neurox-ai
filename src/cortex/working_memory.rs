@@ -421,11 +421,12 @@ mod tests {
         neuron.update(100.0, 100.0);
         assert!(neuron.activity() > 0.0);
 
-        // But eventually decay
-        for _ in 0..500 {
-            neuron.update(100.0, 0.0);
+        // But eventually decay - need many more iterations with tau=750ms
+        // After 500 * 100ms = 50 seconds, should have decayed significantly
+        for i in 0..1000 {
+            neuron.update(100.0, (i * 100) as f32);
         }
-        assert!(neuron.activity() < 0.1);
+        assert!(neuron.activity() < 0.1, "Activity should decay after sufficient time: {}", neuron.activity());
     }
 
     #[test]

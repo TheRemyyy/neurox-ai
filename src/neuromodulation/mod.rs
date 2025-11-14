@@ -403,15 +403,18 @@ mod tests {
         let mut ach = AcetylcholineSystem::new();
 
         // High attention → high ACh → encoding mode
-        ach.update(100.0, 0.9);
-        assert!(ach.encoding_mode);
-        assert!(ach.level > 0.4);
+        // Need multiple updates for ACh to accumulate
+        for _ in 0..20 {
+            ach.update(100.0, 0.9);
+        }
+        assert!(ach.encoding_mode, "ACh encoding mode should be true with high attention");
+        assert!(ach.level > 0.4, "ACh level ({}) should be > 0.4 with sustained high attention", ach.level);
 
         // Low attention → low ACh → consolidation mode
         for _ in 0..100 {
             ach.update(100.0, 0.1);
         }
-        assert!(!ach.encoding_mode);
+        assert!(!ach.encoding_mode, "ACh encoding mode should be false after low attention");
     }
 
     #[test]

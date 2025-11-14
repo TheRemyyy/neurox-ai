@@ -195,7 +195,10 @@ mod tests {
         let dequantized: Vec<f32> = quantized.iter().map(|&q| config.dequantize(q)).collect();
 
         for (original, deq) in weights.iter().zip(dequantized.iter()) {
-            assert!((original - deq).abs() < 0.02, "Quantization error too large: original={}, deq={}, diff={}", original, deq, (original - deq).abs());
+            // INT8 quantization has scale of 2.0/255 ≈ 0.0078, so error should be < 0.01
+            assert!((original - deq).abs() < 0.01,
+                "Quantization error too large: original={}, deq={}, diff={}, quantized={:?}",
+                original, deq, (original - deq).abs(), quantized);
         }
     }
 

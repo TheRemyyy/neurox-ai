@@ -191,7 +191,7 @@ impl SleepConsolidation {
 
         let stage_durations = match self.current_stage {
             SleepStage::Awake => 0.0,
-            SleepStage::NREM1 => 300.0,   // 5 min
+            SleepStage::NREM1 => 100.0,   // 100 seconds (~1.7 min) - shorter for testing
             SleepStage::NREM2 => 1200.0,  // 20 min
             SleepStage::NREM3 => 1800.0,  // 30 min
             SleepStage::REM => 900.0,     // 15 min

@@ -461,18 +461,15 @@ mod tests {
     fn test_calcium_thresholds() {
         let mut cbp = CalciumBasedPlasticity::new(1000);
 
-        // Sustain moderate calcium (LTD range) for 10 timesteps
-        for _ in 0..10 {
-            cbp.calcium[0] = 0.6;
-        }
+        // Set calcium to LTD range (between theta_minus and theta_plus)
+        // theta_minus = 0.5, theta_plus = 1.0
+        cbp.calcium[0] = 0.7;  // In LTD range
         let dw_ltd = cbp.calculate_dw(0, 1.0);
-        assert!(dw_ltd < 0.0, "Moderate calcium should induce LTD");
+        assert!(dw_ltd < 0.0, "Moderate calcium ({}) should induce LTD, got dw={}", cbp.calcium[0], dw_ltd);
 
-        // Sustain high calcium (LTP range) for 10 timesteps
-        for _ in 0..10 {
-            cbp.calcium[0] = 1.5;
-        }
+        // Set calcium to LTP range (above theta_plus)
+        cbp.calcium[0] = 1.5;  // Above LTP threshold
         let dw_ltp = cbp.calculate_dw(0, 1.0);
-        assert!(dw_ltp > 0.0, "High calcium should induce LTP");
+        assert!(dw_ltp > 0.0, "High calcium ({}) should induce LTP, got dw={}", cbp.calcium[0], dw_ltp);
     }
 }
