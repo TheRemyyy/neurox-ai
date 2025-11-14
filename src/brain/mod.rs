@@ -563,8 +563,8 @@ impl NeuromorphicBrain {
         // 9. Update heterosynaptic plasticity with REAL spike data
         // This must happen AFTER R-STDP section where spike_events are collected
         // For now, use structural plasticity activity as proxy
-        let synaptic_activity = pre_activity[..10000.min(self.pattern_dim * 10).min(pre_activity.len())].to_vec();
-        let synaptic_activity = self.pad_or_truncate(&synaptic_activity, 10000.min(self.pattern_dim * 10));
+        // Heterosynaptic system was initialized with 10k synapses - must match!
+        let synaptic_activity = self.pad_or_truncate(&pre_activity, 10000);
 
         // Convert activity to sparse spike representation
         let mut pre_spikes = vec![false; synaptic_activity.len()];
