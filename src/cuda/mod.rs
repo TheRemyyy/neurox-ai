@@ -8,6 +8,8 @@ pub mod context;
 pub mod cognitive_kernels;
 pub mod sparse_kernels;
 pub mod quantization;
+pub mod v1_kernels;
+pub mod motion_kernels;
 
 pub use context::CudaContext;
 pub use kernels::*;
