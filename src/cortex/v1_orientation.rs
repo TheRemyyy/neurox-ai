@@ -442,12 +442,21 @@ impl V1Layer {
         // Update simple cells with recurrent inhibition
         for x in 0..self.width {
             for y in 0..self.height {
-                for (ori_idx, cell) in self.simple_cells[x][y].iter_mut().enumerate() {
-                    // Feedforward input from relay
-                    let ff_input = self.compute_gabor_response(cell, relay_input);
+                // Pre-compute inputs before mutation
+                let mut ff_inputs = Vec::new();
+                let mut inhibitions = Vec::new();
 
-                    // Recurrent inhibition from interneurons
+                for cell in &self.simple_cells[x][y] {
+                    let ff_input = self.compute_gabor_response(cell, relay_input);
                     let inhibition = self.compute_recurrent_inhibition(x, y, cell.preferred_orientation);
+                    ff_inputs.push(ff_input);
+                    inhibitions.push(inhibition);
+                }
+
+                // Now mutate cells
+                for (ori_idx, cell) in self.simple_cells[x][y].iter_mut().enumerate() {
+                    let ff_input = ff_inputs[ori_idx];
+                    let inhibition = inhibitions[ori_idx];
 
                     // Net input
                     let net_input = (ff_input - inhibition).max(0.0);

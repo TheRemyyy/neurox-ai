@@ -318,6 +318,8 @@ impl CerebellarHemisphere {
 
         // Update Purkinje cells and apply STDP
         let mut purkinje_output = vec![0.0; 8];
+        let mut pk_ids_for_stdp = Vec::new();
+
         for pk in &mut self.purkinje_cells {
             // Excitatory input from parallel fibers (granule cells)
             let mut pf_current = 0.0;
@@ -352,11 +354,16 @@ impl CerebellarHemisphere {
                 pk.last_spike = self.timestep;
             }
 
-            // Apply STDP at parallel fiber synapses
-            self.apply_stdp(pk.id, &granule_spikes);
+            // Mark for STDP update
+            pk_ids_for_stdp.push(pk.id);
 
             // Output is inverse of Purkinje cell activity (inhibitory output)
             purkinje_output[pk.id] = if spiked { 0.0 } else { 1.0 };
+        }
+
+        // Apply STDP after iteration
+        for pk_id in pk_ids_for_stdp {
+            self.apply_stdp(pk_id, &granule_spikes);
         }
 
         purkinje_output
