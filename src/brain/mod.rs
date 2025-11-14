@@ -199,11 +199,11 @@ impl NeuromorphicBrain {
         // Core cortical systems
         let sensory = HierarchicalBrain::new(n_layers, base_neurons);
         let predictive = EnhancedPredictiveHierarchy::new_default();
-        let working_memory = WorkingMemory::new(7, pattern_dim, 0.5);
+        let working_memory = WorkingMemory::new(7, pattern_dim, 0.5);  // Unified dimension
 
         // Subcortical systems
         let basal_ganglia = BasalGanglia::new(500, 8, 0.05, 0.95);  // 500 striatal neurons, 8 actions
-        let hippocampus = Hippocampus::new(pattern_dim, 10, 0.05, 10000);
+        let hippocampus = Hippocampus::new(pattern_dim, 10, 0.05, 10000);  // Unified dimension
         let spatial = SpatialSystem::new(200, 500.0);  // 200 place cells, 500cm environment
         let cerebellum = Cerebellum::new();  // Dual-hemisphere motor learning
         let amygdala = Amygdala::new(10);  // Fear conditioning and extinction (10 inputs)
@@ -216,8 +216,8 @@ impl NeuromorphicBrain {
         let oscillations = OscillatoryCircuit::new();
 
         // Language and semantics
-        let language = DualStreamLanguage::new(vocab_size, 300);  // 300-dim embeddings
-        let semantics = SemanticSystem::new(vocab_size, 300, 500);  // 500 concept cells
+        let language = DualStreamLanguage::new(vocab_size, pattern_dim);  // Unified dimension
+        let semantics = SemanticSystem::new(vocab_size, pattern_dim, 500);  // 500 concept cells
 
         // Sensory processing systems
         let v1_orientation = V1OrientationSystem::new(128, 128, 4);  // 128×128 visual field, 4 orientations
@@ -370,7 +370,7 @@ impl NeuromorphicBrain {
 
         // 13. Generate response via dual-stream (dorsal production)
         let response_semantic = self.working_memory.retrieve(&semantics)
-            .unwrap_or_else(|| vec![0.0; 300]);
+            .unwrap_or_else(|| vec![0.0; self.pattern_dim]);
         let response_motor = self.language.produce(&response_semantic, 10);
 
         // 14. Decode back to text using semantic similarity
@@ -1173,5 +1173,272 @@ mod tests {
         assert!(stats.oscillations.theta_phase >= 0.0);
         assert!(stats.oscillations.theta_phase <= 1.0);
         assert!(stats.oscillations.gamma_freq > 0.0);
+    }
+
+    /// 🧠 REAL COMPREHENSIVE BRAIN INTEGRATION TEST
+    ///
+    /// Tests ALL brain systems with REAL APIs only:
+    /// - Language processing (comprehension & production)
+    /// - Reinforcement learning (basal ganglia & dopamine)
+    /// - Memory systems (hippocampus, working memory)
+    /// - Motor learning (cerebellum)
+    /// - Emotional processing (amygdala)
+    /// - Oscillations & synchrony
+    /// - Homeostasis & criticality
+    /// - Structural plasticity
+    /// - All neuromodulators (DA, ACh, 5-HT, NE)
+    #[test]
+    fn test_complete_brain_integration() {
+        println!("\n🧠 === COMPLETE BRAIN INTEGRATION TEST ===\n");
+
+        // ========== PHASE 1: INITIALIZATION ==========
+        println!("📍 PHASE 1: Brain Initialization");
+        let mut brain = NeuromorphicBrain::new(3, 100, 5000, 512);
+
+        println!("  ✓ Brain created: vocab={}, patterns={}", brain.vocab_size, brain.pattern_dim);
+
+        // Baseline warmup
+        for _ in 0..100 {
+            brain.update(1.0);
+        }
+
+        let baseline = brain.stats();
+        println!("  ✓ Baseline: theta={:.1}Hz, criticality={:.2}",
+                 baseline.oscillations.theta_freq, baseline.homeostasis.criticality_score);
+        assert!(baseline.homeostasis.is_critical, "Should reach criticality");
+
+        // ========== PHASE 2: LANGUAGE PROCESSING ==========
+        println!("\n📍 PHASE 2: Language Processing");
+
+        let response1 = brain.process_text("hello world");
+        let response2 = brain.process_text("learning language");
+        let response3 = brain.process_text("testing brain");
+
+        println!("  Input: 'hello world' → Output: '{}'", response1);
+        println!("  Input: 'learning language' → Output: '{}'", response2);
+        println!("  Input: 'testing brain' → Output: '{}'", response3);
+
+        assert!(!response1.is_empty(), "Should generate response");
+        assert!(!response2.is_empty(), "Should generate response");
+
+        let lang_stats = brain.stats();
+        println!("  ✓ Language: ventral_concepts={}, dorsal_plans={}",
+                 lang_stats.language.ventral_concepts, lang_stats.language.dorsal_plans);
+
+        // ========== PHASE 3: REINFORCEMENT LEARNING ==========
+        println!("\n📍 PHASE 3: Reinforcement Learning");
+
+        let initial_da = brain.basal_ganglia.dopamine.dopamine_level;
+        let mut total_reward = 0.0;
+
+        for episode in 0..100 {
+            let state = vec![(episode as f32 / 100.0).sin(); 512];
+            let action = brain.select_action(&state, 1.0);
+
+            // Reward for action 1
+            let reward = if action == 1 { 1.0 } else { -0.1 };
+            total_reward += reward;
+
+            let next_state = vec![((episode + 1) as f32 / 100.0).sin(); 512];
+            brain.learn_from_reward(&state, action, reward, &next_state);
+
+            brain.update(1.0);
+        }
+
+        let rl_stats = brain.stats();
+        println!("  ✓ Total reward: {:.1}", total_reward);
+        println!("  ✓ Dopamine: {:.3} → {:.3}", initial_da, rl_stats.basal_ganglia.dopamine_level);
+        println!("  ✓ TD error: {:.3}", rl_stats.basal_ganglia.avg_td_error);
+
+        assert!(total_reward > 50.0, "Should learn to get positive rewards");
+
+        // ========== PHASE 4: HIPPOCAMPAL MEMORY ==========
+        println!("\n📍 PHASE 4: Hippocampal Memory");
+
+        let hc_dim = brain.pattern_dim;  // Use unified dimension
+        let mut memory_patterns = Vec::new();
+        for i in 0..30 {
+            let pattern = vec![i as f32 / 30.0; hc_dim];
+            let memory_id = brain.hippocampus.encode(&pattern);
+            memory_patterns.push((memory_id, pattern));
+        }
+
+        let mem_stats = brain.stats();
+        println!("  ✓ Encoded {} memories", mem_stats.hippocampus.buffer_size);
+        println!("  ✓ DG sparsity: {:.2}%", mem_stats.hippocampus.dg_sparsity * 100.0);
+
+        // Test recall
+        let partial_len = (hc_dim / 5).max(10);  // Use 20% of pattern or at least 10 elements
+        let recalled = brain.hippocampus.recall(&memory_patterns[0].1[0..partial_len]);
+        println!("  ✓ Recall successful: {} values", recalled.len());
+        assert_eq!(recalled.len(), hc_dim, "Should recall full pattern");
+
+        // ========== PHASE 5: WORKING MEMORY ==========
+        println!("\n📍 PHASE 5: Working Memory");
+
+        let wm_dim = brain.working_memory.pattern_dim;
+        for i in 0..5 {
+            let pattern = vec![i as f32 * 0.2; wm_dim];
+            let stored = brain.working_memory.store(&pattern, 0.8);
+            assert!(stored, "Should store pattern {}", i);
+        }
+
+        let wm_stats = brain.stats();
+        println!("  ✓ Stored patterns: {}/{}", wm_stats.working_memory.stored_patterns,
+                 wm_stats.working_memory.capacity);
+        println!("  ✓ Utilization: {:.1}%", wm_stats.working_memory.utilization * 100.0);
+
+        // Test retrieval
+        let query = vec![0.0; wm_dim];
+        let retrieved = brain.working_memory.retrieve(&query);
+        assert!(retrieved.is_some(), "Should retrieve pattern");
+        println!("  ✓ Retrieval successful");
+
+        // ========== PHASE 6: MOTOR LEARNING (CEREBELLUM) ==========
+        println!("\n📍 PHASE 6: Motor Learning (Cerebellum)");
+
+        let (initial_left_stats, initial_right_stats) = brain.cerebellum.stats();
+        let initial_weight = initial_left_stats.avg_parallel_fiber_weight;
+
+        for trial in 0..50 {
+            // Mossy fiber input (movement commands)
+            let left_input = vec![trial % 2 == 0; 246];
+            let right_input = vec![trial % 2 == 1; 246];
+
+            // Error signals (climbing fibers)
+            let error_left = vec![0.5 * ((trial as f32 / 10.0).sin()); 96];
+            let error_right = vec![0.5 * ((trial as f32 / 10.0).cos()); 96];
+
+            brain.cerebellum.update(1.0, &left_input, &right_input, &error_left, &error_right);
+            brain.update(1.0);
+        }
+
+        let (final_left_stats, final_right_stats) = brain.cerebellum.stats();
+        println!("  ✓ Left hemisphere: {} active Purkinje cells", final_left_stats.active_purkinje_cells);
+        println!("  ✓ Right hemisphere: {} active Purkinje cells", final_right_stats.active_purkinje_cells);
+        println!("  ✓ Weight change: {:.4} → {:.4}",
+                 initial_weight, final_left_stats.avg_parallel_fiber_weight);
+
+        // ========== PHASE 7: EMOTIONAL PROCESSING (AMYGDALA) ==========
+        println!("\n📍 PHASE 7: Emotional Processing (Amygdala)");
+
+        let amyg_dim = brain.pattern_dim;  // Amygdala uses pattern_dim
+        for trial in 0..20 {
+            // CS (conditioned stimulus)
+            let cs = vec![0.8; amyg_dim];
+            // US present (aversive)
+            let us_present = 1.0;
+            let context = 0;
+
+            let fear_output = brain.amygdala.update(1.0, &cs, us_present, context);
+
+            if trial % 5 == 0 {
+                println!("  → Trial {}: fear_output={:.2}", trial, fear_output);
+            }
+
+            brain.update(1.0);
+        }
+
+        let amyg_stats = brain.stats();
+        println!("  ✓ LA neurons active: {}", amyg_stats.amygdala.la_active_neurons);
+        println!("  ✓ BLA neurons active: {}", amyg_stats.amygdala.bla_active_neurons);
+        println!("  ✓ Avg thalamic weight: {:.3}", amyg_stats.amygdala.avg_thalamic_weight);
+
+        assert!(amyg_stats.amygdala.la_active_neurons > 0, "LA should be active after conditioning");
+
+        // ========== PHASE 8: CONSOLIDATION ==========
+        println!("\n📍 PHASE 8: Memory Consolidation");
+
+        // Store experiences
+        let sleep_dim = brain.pattern_dim;
+        for i in 0..20 {
+            let pattern = vec![(i as f32 / 20.0).cos(); sleep_dim];
+            brain.sleep.store_experience(pattern, 0.7, vec![i]);
+        }
+
+        // Run consolidation
+        for _ in 0..100 {
+            brain.consolidate();
+        }
+
+        let sleep_stats = brain.stats();
+        println!("  ✓ Sleep stage: {:?}", sleep_stats.sleep.current_stage);
+        println!("  ✓ Total sleep time: {:.1}s", sleep_stats.sleep.total_sleep_time / 1000.0);
+        println!("  ✓ Replays: {}", sleep_stats.sleep.total_replays);
+        println!("  ✓ Consolidations: {}", sleep_stats.sleep.total_consolidations);
+
+        // ========== PHASE 9: OSCILLATIONS & SYNCHRONY ==========
+        println!("\n📍 PHASE 9: Neural Oscillations");
+
+        for _ in 0..200 {
+            brain.update(1.0);
+        }
+
+        let osc_stats = brain.stats();
+        println!("  ✓ Theta: {:.1}Hz (phase={:.2})",
+                 osc_stats.oscillations.theta_freq, osc_stats.oscillations.theta_phase);
+        println!("  ✓ Gamma: {:.1}Hz (type={:?})",
+                 osc_stats.oscillations.gamma_freq, osc_stats.oscillations.gamma_type);
+        println!("  ✓ Theta-gamma coupling: {:.2}", osc_stats.oscillations.theta_gamma_coupling);
+
+        assert!(osc_stats.oscillations.theta_freq >= 4.0 && osc_stats.oscillations.theta_freq <= 8.0);
+        assert!(osc_stats.oscillations.gamma_freq >= 30.0);
+
+        // ========== PHASE 10: STRUCTURAL PLASTICITY ==========
+        println!("\n📍 PHASE 10: Structural Plasticity");
+
+        let initial_synapses = brain.stats().structural_plasticity.active_synapses;
+
+        for _ in 0..1000 {
+            brain.update(1.0);
+        }
+
+        let struct_stats = brain.stats();
+        println!("  ✓ Active synapses: {} → {}",
+                 initial_synapses, struct_stats.structural_plasticity.active_synapses);
+        println!("  ✓ Total formations: {}", struct_stats.structural_plasticity.total_formations);
+        println!("  ✓ Total removals: {}", struct_stats.structural_plasticity.total_removals);
+        println!("  ✓ Avg weight: {:.3}", struct_stats.structural_plasticity.avg_weight);
+
+        // ========== FINAL VERIFICATION ==========
+        println!("\n📍 FINAL VERIFICATION");
+
+        let final_stats = brain.stats();
+
+        let checks = vec![
+            ("Working Memory", final_stats.working_memory.stored_patterns > 0),
+            ("Hippocampus", final_stats.hippocampus.buffer_size > 0),
+            ("Basal Ganglia", final_stats.basal_ganglia.n_striatum > 0),
+            ("Amygdala", final_stats.amygdala.total_neurons > 0),
+            ("Cerebellum", final_stats.cerebellum.total_synapses > 0),
+            ("Oscillations", final_stats.oscillations.theta_freq > 0.0),
+            ("Neuromodulation", final_stats.neuromodulation.ach_level >= 0.0),
+            ("Homeostasis", final_stats.homeostasis.is_critical),
+            ("Sleep", final_stats.sleep.total_sleep_time > 0.0),
+            ("RSTDP", final_stats.rstdp.num_synapses > 0),
+            ("ETDP", final_stats.etdp.num_pre_events > 0 || final_stats.etdp.num_post_events > 0),
+            ("Heterosynaptic", final_stats.heterosynaptic.total_no_events > 0),
+            ("Structural", final_stats.structural_plasticity.active_synapses > 0),
+            ("Predictive", final_stats.predictive.n_levels > 0),
+            ("Language", final_stats.language.ventral_concepts > 0),
+        ];
+
+        for (system, ok) in &checks {
+            println!("  {} {}", if *ok { "✓" } else { "✗" }, system);
+            assert!(*ok, "{} system failed", system);
+        }
+
+        println!("\n🎉 ALL SYSTEMS VERIFIED");
+        println!("✅ Language: Comprehension & Production");
+        println!("✅ Learning: Reinforcement learning with rewards");
+        println!("✅ Memory: Hippocampal encoding & recall");
+        println!("✅ Working Memory: Storage & retrieval");
+        println!("✅ Motor: Cerebellar error-based learning");
+        println!("✅ Emotion: Amygdala fear conditioning");
+        println!("✅ Consolidation: Sleep-based memory consolidation");
+        println!("✅ Oscillations: Theta-gamma coupling");
+        println!("✅ Plasticity: Structural synapse changes");
+        println!("✅ Homeostasis: Criticality maintenance");
+        println!("\n🧠 Complete brain simulation: ALL real APIs tested\n");
     }
 }

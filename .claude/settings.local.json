@@ -23,7 +23,8 @@
       "Bash(cargo test:*)",
       "Bash(Select-String -Pattern \"(error|warning:.*unused)\")",
       "Bash(find:*)",
-      "Bash(Select-String -Pattern \"error\\[E\" -Context 2,0)"
+      "Bash(Select-String -Pattern \"error\\[E\" -Context 2,0)",
+      "Bash(Select-String -Pattern \"(Phase|✓|COMPLETE|assertions|test result)\" -Context 1,0)"
     ],
     "deny": [],
     "ask": []
