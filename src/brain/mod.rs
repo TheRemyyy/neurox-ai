@@ -160,6 +160,14 @@ pub struct NeuromorphicBrain {
     /// Support 20+ biological firing patterns
     pub izhikevich_neurons: Vec<crate::neuron::IzhikevichNeuron>,
 
+    /// Dendritic neurons (active dendrites, NMDA spikes)
+    /// 2-5x capacity boost via nonlinear integration
+    pub dendritic_neurons: Vec<crate::neuron::dendritic::DendriticNeuron>,
+
+    /// Synaptic vesicle pools (RRP, Recycling, Reserve)
+    /// Simulation of neurotransmitter depletion and recovery
+    pub vesicle_pools: Vec<crate::synapse::vesicles::VesiclePools>,
+
     /// Sleep consolidation (offline replay)
     pub sleep: SleepConsolidation,
 
@@ -278,6 +286,20 @@ impl NeuromorphicBrain {
             }
         }
 
+        // Create Dendritic neurons (NMDA plateau demonstration)
+        let mut dendritic_neurons = Vec::new();
+        for i in 0..100 {
+            // 5 branches per neuron, 20 synapses per branch
+            dendritic_neurons.push(crate::neuron::dendritic::DendriticNeuron::new(200 + i as u32, 5, 20));
+        }
+
+        // Initialize vesicle pools for neurotransmitter dynamics
+        let mut vesicle_pools = Vec::new();
+        for _ in 0..10 {
+            // 1000 vesicles total per pool
+            vesicle_pools.push(crate::synapse::vesicles::VesiclePools::new(1000.0));
+        }
+
         let sleep = SleepConsolidation::new();  // Offline consolidation
 
         // Attention system
@@ -376,6 +398,8 @@ impl NeuromorphicBrain {
             memristive_network,
             cadex_neurons,
             izhikevich_neurons,
+            dendritic_neurons,
+            vesicle_pools,
             sleep,
             attention,
             gpu_device,
@@ -788,6 +812,31 @@ impl NeuromorphicBrain {
                     hetero_activity[syn_id] = activity;
                 }
             }
+        }
+
+        // 9c. Update Dendritic Neurons (Active Dendrites)
+        // Simulate sparse synaptic inputs to branches
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+        
+        for neuron in &mut self.dendritic_neurons {
+            // Generate random branch inputs (simulated cortical background)
+            let mut branch_inputs = Vec::new();
+            for _ in 0..neuron.n_branches {
+                let spikes: Vec<bool> = (0..20).map(|_| rng.gen::<f32>() < 0.05).collect(); // 5% active
+                branch_inputs.push(spikes);
+            }
+            
+            neuron.update(dt, &branch_inputs);
+            // Dendritic neurons maintain internal calcium state automatically
+        }
+
+        // 9d. Update Vesicle Pools (Neurotransmitter Dynamics)
+        // Release proportional to arousal/attention
+        for pool in &mut self.vesicle_pools {
+            // Calcium proxy: attention level * 0.01
+            let calcium_influx = attention * 0.01;
+            pool.update(dt, calcium_influx);
         }
 
         // Apply reward signal from basal ganglia dopamine

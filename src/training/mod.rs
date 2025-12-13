@@ -5,6 +5,7 @@
 use crate::simulation::Simulator;
 use crate::datasets::MNISTImage;
 use crate::learning::{TripletSTDP, HomeostaticPlasticity, STDPConfig, STPDynamics};
+use crate::learning::quantization::QuantizationConfig;
 use cudarc::driver::DeviceSlice;
 
 /// Training configuration
@@ -365,6 +366,16 @@ impl MNISTTrainer {
         // Download column indices
         let mut col_idx = vec![0; nnz];
         device.dtoh_sync_copy_into(&conn_gpu.col_idx, &mut col_idx)?;
+
+        // Apply 8-bit quantization simulation (QAT check)
+        let w_min = weights.iter().copied().fold(f32::INFINITY, f32::min);
+        let w_max = weights.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+        let quantizer = QuantizationConfig::int8(w_min, w_max);
+        
+        for w in &mut weights {
+            *w = quantizer.qat_forward(*w);
+        }
+        log::info!("Applied 8-bit quantization simulation to weights");
 
         let connectivity = SparseConnectivity {
             row_ptr,

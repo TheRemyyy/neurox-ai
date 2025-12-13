@@ -52,6 +52,8 @@ extern "C" __global__ void spike_correlation(
 
 /// Softmax kernel for attention weights
 pub const SOFTMAX_KERNEL: &str = r#"
+#define INFINITY (__int_as_float(0x7f800000))
+
 extern "C" __global__ void softmax(
     float* scores,
     const int n_scores
