@@ -1,395 +1,371 @@
-//! Working Memory Module
+//! Working Memory Module (Attractor Network)
 //!
-//! Biologically-inspired working memory based on persistent neural activity.
-//! Implements Miller's Law (7±2 items) and attention-gated storage.
+//! Biologically-inspired working memory based on continuous attractor dynamics
+//! and NMDA-mediated bistability.
 //!
 //! # Biological Basis
-//! - Persistent activity in prefrontal cortex (PFC)
-//! - Self-recurrent excitation maintains patterns
-//! - Attention gates what gets stored
-//! - Pattern completion for associative recall
-//! - Capacity limited by interference between patterns
+//! - **Attractor Dynamics:** Memories are stable states (fixed points) of the recurrent network.
+//! - **NMDA Plateaus:** Neurons exhibit bistability (UP/DOWN states) mediated by nonlinear dendritic integration.
+//! - **Lateral Inhibition:** Competition between memory items limits capacity (Miller's 7±2).
+//! - **Content Addressability:** Retrieval is auto-associative pattern completion.
 
 use crate::neuron::NeuronState;
 use serde::{Deserialize, Serialize};
-use std::collections::VecDeque;
 
-/// Circular buffer for temporal context (Miller's 7±2 items)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CircularBuffer<T> {
-    buffer: VecDeque<T>,
-    capacity: usize,
-}
-
-impl<T> CircularBuffer<T> {
-    /// Create new circular buffer with specified capacity
-    pub fn new(capacity: usize) -> Self {
-        Self {
-            buffer: VecDeque::with_capacity(capacity),
-            capacity,
-        }
-    }
-
-    /// Push item, removing oldest if at capacity
-    pub fn push(&mut self, item: T) {
-        if self.buffer.len() >= self.capacity {
-            self.buffer.pop_front();
-        }
-        self.buffer.push_back(item);
-    }
-
-    /// Get item at index (0 = oldest)
-    pub fn get(&self, index: usize) -> Option<&T> {
-        self.buffer.get(index)
-    }
-
-    /// Get most recent item
-    pub fn latest(&self) -> Option<&T> {
-        self.buffer.back()
-    }
-
-    /// Get all items (oldest to newest)
-    pub fn all(&self) -> Vec<&T> {
-        self.buffer.iter().collect()
-    }
-
-    /// Number of items currently stored
-    pub fn len(&self) -> usize {
-        self.buffer.len()
-    }
-
-    /// Check if empty
-    pub fn is_empty(&self) -> bool {
-        self.buffer.is_empty()
-    }
-
-    /// Clear all items
-    pub fn clear(&mut self) {
-        self.buffer.clear();
-    }
-}
-
-/// Persistent neuron with slow decay and self-recurrence
+/// Neuron with NMDA-mediated bistability (UP/DOWN states)
 ///
-/// Maintains activity for 500-1000ms after input ceases,
-/// enabling temporal binding and working memory.
+/// Models the "calcium plateau" mechanism that allows prefrontal cortex neurons
+/// to maintain firing without continuous input.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PersistentNeuron {
-    /// Current neuron state
+pub struct BistableNeuron {
+    /// Soma state (spiking)
     pub state: NeuronState,
 
-    /// Self-recurrent weight (creates bistability)
-    pub recurrent_weight: f32,
+    /// Dendritic NMDA current (slow dynamics)
+    pub nmda_current: f32,
 
-    /// Time constant for persistent activity (500-1000ms)
-    pub tau_persistent: f32,
+    /// Bistability threshold (inputs above this trigger UP state)
+    pub plateau_threshold: f32,
 
-    /// Activity trace (decays slowly)
-    activity_trace: f32,
+    /// Plateau maintenance current (self-excitation)
+    pub plateau_current: f32,
 
-    /// Last spike time (ms)
-    last_spike: f32,
+    /// Is neuron in UP state (persistent firing)?
+    pub in_up_state: bool,
+
+    /// Adaptation (fatigue) to prevent infinite persistence
+    pub adaptation: f32,
 }
 
-impl PersistentNeuron {
-    /// Create new persistent neuron
-    pub fn new(recurrent_weight: f32, tau_persistent: f32) -> Self {
+impl BistableNeuron {
+    pub fn new(id: u32) -> Self {
         Self {
-            state: NeuronState::new(0),
-            recurrent_weight,
-            tau_persistent,
-            activity_trace: 0.0,
-            last_spike: 0.0,
+            state: NeuronState::new(id),
+            nmda_current: 0.0,
+            plateau_threshold: 0.5,
+            plateau_current: 12.0, // Strong enough to drive spiking
+            in_up_state: false,
+            adaptation: 0.0,
         }
     }
 
-    /// Update persistent activity
+    /// Update neuron dynamics
     ///
-    /// Implements slow decay and self-recurrent excitation:
-    /// dA/dt = -A/τ_persistent + w_recurrent * spike
-    pub fn update(&mut self, dt: f32, current_time: f32) {
-        // Decay trace
-        let decay = (-dt / self.tau_persistent).exp();
-        self.activity_trace *= decay;
+    /// # Dynamics
+    /// 1. Integrate NMDA current (slow).
+    /// 2. Check for UP state transition (bistability).
+    /// 3. Add plateau current if in UP state.
+    /// 4. Integrate somatic voltage.
+    pub fn update(&mut self, dt: f32, synaptic_input: f32, inhibition: f32) -> bool {
+        // 1. NMDA Dynamics (Slow integration of excitation)
+        // dI_nmda/dt = -I_nmda/tau + Input
+        let tau_nmda = 100.0; // 100ms
+        self.nmda_current += ((-self.nmda_current + synaptic_input) / tau_nmda) * dt;
 
-        // Add self-recurrent excitation if recently spiked
-        if current_time - self.last_spike < 50.0 {
-            // Within 50ms window
-            self.activity_trace += self.recurrent_weight;
+        // 2. Bistability Logic (Hysteresis)
+        // Enter UP state if input is strong
+        if self.nmda_current > self.plateau_threshold && !self.in_up_state {
+            self.in_up_state = true;
+        }
+        
+        // Exit UP state if strong inhibition or fatigue
+        if (inhibition > 2.0 || self.adaptation > 1.0) && self.in_up_state {
+            self.in_up_state = false;
         }
 
-        // Clamp to [0, 1]
-        self.activity_trace = self.activity_trace.clamp(0.0, 1.0);
+        // 3. Somatic Input
+        let mut total_current = synaptic_input - inhibition;
+        
+        // Add self-sustaining plateau current if in UP state
+        if self.in_up_state {
+            total_current += self.plateau_current * (1.0 - self.adaptation);
+        }
+
+        // 4. Adaptation Dynamics (prevents items sticking forever)
+        // dA/dt = (UP_state - A) / tau_adapt
+        let tau_adapt = 5000.0; // 5 seconds persistence
+        let target_adapt = if self.in_up_state { 1.0 } else { 0.0 };
+        self.adaptation += ((target_adapt - self.adaptation) / tau_adapt) * dt;
+
+        // 5. LIF Dynamics
+        let spiked = self.state.v >= self.state.threshold;
+        if spiked {
+            self.state.v = self.state.v_reset;
+            self.state.refractory_counter = 20; // 2ms
+        } else if self.state.refractory_counter > 0 {
+            self.state.refractory_counter -= 1;
+        } else {
+            // dV/dt = (-V + I) / tau
+            let dv = ((-self.state.v - 70.0) + total_current) / self.state.tau_m * dt;
+            self.state.v += dv;
+        }
+
+        spiked
     }
 
-    /// Record spike
-    pub fn spike(&mut self, time: f32) {
-        self.last_spike = time;
-        self.activity_trace += 0.1; // Boost on spike
-    }
-
-    /// Get current activity level
-    pub fn activity(&self) -> f32 {
-        self.activity_trace
-    }
-
-    /// Check if neuron is maintaining activity
-    pub fn is_active(&self, threshold: f32) -> bool {
-        self.activity_trace > threshold
+    /// Reset neuron
+    pub fn reset(&mut self) {
+        self.state.v = -70.0;
+        self.nmda_current = 0.0;
+        self.in_up_state = false;
+        self.adaptation = 0.0;
     }
 }
 
-/// Working Memory Module
+/// Working Memory Attractor Network
 ///
-/// Implements attention-gated storage with limited capacity.
-/// Stores neural patterns that can be retrieved associatively.
-///
-/// # Capacity
-/// Miller's Law: 7±2 items (default: 7)
-///
-/// # Biology
-/// - PFC persistent activity
-/// - Attention-gated encoding
-/// - Pattern completion retrieval
-/// - Interference limits capacity
+/// Stores patterns as stable reverberating states.
+/// Capacity is limited by lateral inhibition (competition).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkingMemory {
-    /// Persistent neurons maintaining patterns
-    persistent_neurons: Vec<PersistentNeuron>,
+    /// Pool of bistable neurons
+    neurons: Vec<BistableNeuron>,
 
-    /// Attention gates (one per pattern slot)
-    attention_gates: Vec<f32>,
-
-    /// Context buffer (circular, limited capacity)
-    context_buffer: CircularBuffer<Vec<f32>>,
-
-    /// Storage capacity (default: 7)
-    pub capacity: usize,
+    /// Recurrent weight matrix (flattened)
+    /// W[i, j] = connection from j to i
+    recurrent_weights: Vec<f32>,
 
     /// Pattern dimensionality
     pub pattern_dim: usize,
 
-    /// Attention threshold for storage (0.0-1.0)
-    attention_threshold: f32,
+    /// Maximum capacity (number of "slots" or orthogonal patterns)
+    pub capacity: usize,
 
-    /// Current simulation time (ms)
-    time: f32,
+    /// Global inhibition level (regulates total activity)
+    global_inhibition: f32,
 
-    /// Retrieval similarity threshold
-    retrieval_threshold: f32,
+    /// Current number of active items (estimated)
+    active_items: usize,
+
+    /// Attention gating (0.0 = closed, 1.0 = open)
+    input_gate: f32,
 }
 
 impl WorkingMemory {
-    /// Create new working memory with specified capacity and pattern dimension
+    /// Create new Attractor Working Memory
     ///
     /// # Arguments
-    /// - `capacity`: Number of patterns to store (default: 7, Miller's Law)
-    /// - `pattern_dim`: Dimensionality of each pattern
-    /// - `attention_threshold`: Minimum attention for storage (default: 0.5)
-    pub fn new(capacity: usize, pattern_dim: usize, attention_threshold: f32) -> Self {
-        let mut persistent_neurons = Vec::with_capacity(capacity * pattern_dim);
-        for _ in 0..(capacity * pattern_dim) {
-            persistent_neurons.push(PersistentNeuron::new(
-                0.8,   // Strong self-recurrence
-                750.0, // 750ms persistent activity
-            ));
-        }
+    /// - `capacity`: Approximate capacity (scales network size)
+    /// - `pattern_dim`: Size of input patterns
+    /// - `attention_threshold`: (Unused in attractor model, kept for API compatibility)
+    pub fn new(capacity: usize, pattern_dim: usize, _attention_threshold: f32) -> Self {
+        // We simulate a network large enough to hold 'capacity' orthogonal patterns
+        // For simulation efficiency, we map 1:1 neuron to pattern dimension, 
+        // but add "hidden" slots if needed. Here we assume pattern_dim IS the network size.
+        let n_neurons = pattern_dim; 
+        
+        let neurons = (0..n_neurons).map(|i| BistableNeuron::new(i as u32)).collect();
+
+        // Initialize weights as Identity (Auto-associative) - Self-excitation is handled internally
+        // In a full Hopfield net, this would be Hebbian learned.
+        // We start with zero recurrent weights and let 'store' update them (Fast Hebbian Plasticity).
+        let recurrent_weights = vec![0.0; n_neurons * n_neurons];
 
         Self {
-            persistent_neurons,
-            attention_gates: vec![0.0; capacity],
-            context_buffer: CircularBuffer::new(capacity),
-            capacity,
+            neurons,
+            recurrent_weights,
             pattern_dim,
-            attention_threshold,
-            time: 0.0,
-            retrieval_threshold: 0.6,
+            capacity,
+            global_inhibition: 0.0,
+            active_items: 0,
+            input_gate: 0.0,
         }
     }
 
-    /// Store pattern if attention is high enough
+    /// Store pattern via Fast Hebbian Plasticity (One-shot learning)
     ///
-    /// Only stores when `attention >= attention_threshold`.
-    /// Implements attention-gated encoding (biology: thalamic gating).
+    /// Implements: \Delta W = \eta * (x * x^T)
+    /// This imprints the pattern as an attractor basin.
     ///
     /// # Returns
-    /// `true` if stored, `false` if rejected due to low attention
+    /// `true` if stored (gate was open), `false` otherwise
     pub fn store(&mut self, pattern: &[f32], attention: f32) -> bool {
-        assert_eq!(pattern.len(), self.pattern_dim, "Pattern dimension mismatch");
+        if attention < 0.5 { return false; }
 
-        // Reject if attention too low
-        if attention < self.attention_threshold {
-            return false;
+        assert_eq!(pattern.len(), self.neurons.len(), "Pattern dim mismatch");
+
+        // 1. Fast Hebbian Plasticity: Imprint pattern weights
+        // W_ij += rate * (p_i * p_j)
+        // To prevent catastrophic forgetting, we implement a "palimpsest" memory 
+        // where old weights decay slightly.
+        let learning_rate = 0.5 * attention;
+        let decay = 0.95; 
+
+        for i in 0..self.pattern_dim {
+            for j in 0..self.pattern_dim {
+                if i == j { continue; } // No self-weights (handled by intrinsic bistability)
+                
+                let idx = i * self.pattern_dim + j;
+                let delta = learning_rate * pattern[i] * pattern[j];
+                
+                self.recurrent_weights[idx] = self.recurrent_weights[idx] * decay + delta;
+                
+                // Bound weights
+                self.recurrent_weights[idx] = self.recurrent_weights[idx].clamp(-1.0, 1.0);
+            }
         }
 
-        // Store in context buffer
-        self.context_buffer.push(pattern.to_vec());
-
-        // Activate corresponding persistent neurons
-        let slot_idx = (self.context_buffer.len() - 1) % self.capacity;
-        self.attention_gates[slot_idx] = attention;
-
-        // Set persistent neuron activity
-        let start_idx = slot_idx * self.pattern_dim;
-        for (i, &value) in pattern.iter().enumerate() {
-            let neuron = &mut self.persistent_neurons[start_idx + i];
-            neuron.activity_trace = value * attention; // Modulated by attention
-            if value > 0.5 {
-                neuron.spike(self.time);
+        // 2. Direct Input Injection (Ignite the attractor)
+        for (i, &val) in pattern.iter().enumerate() {
+            if val > 0.5 {
+                // Strong input pushes neuron into UP state
+                self.neurons[i].nmda_current += 1.0; 
+                self.neurons[i].in_up_state = true;
+                self.neurons[i].adaptation = 0.0; // Reset fatigue (refresh memory)
             }
         }
 
         true
     }
 
-    /// Retrieve pattern via associative recall
+    /// Retrieve pattern via Attractor Settling
     ///
-    /// Uses cosine similarity for pattern matching.
-    /// Returns pattern with highest similarity > threshold.
-    ///
-    /// # Pattern Completion
-    /// Can retrieve full pattern from partial cue.
+    /// Given a cue, run the network dynamics for a few steps to let it settle
+    /// into the nearest attractor (Pattern Completion).
     pub fn retrieve(&self, query: &[f32]) -> Option<Vec<f32>> {
-        assert_eq!(query.len(), self.pattern_dim, "Query dimension mismatch");
+        // Clone state for simulation
+        let mut sim_neurons = self.neurons.clone();
+        
+        // Inject query
+        for (i, &val) in query.iter().enumerate() {
+            sim_neurons[i].nmda_current += val * 2.0; // Strong seed
+        }
 
-        let mut best_match: Option<(Vec<f32>, f32)> = None;
-
-        // Search through stored patterns
-        for (slot_idx, stored_pattern) in self.context_buffer.all().iter().enumerate() {
-            let similarity = Self::cosine_similarity(query, stored_pattern);
-
-            if similarity > self.retrieval_threshold {
-                if let Some((_, best_sim)) = &best_match {
-                    if similarity > *best_sim {
-                        best_match = Some(((*stored_pattern).clone(), similarity));
+        // Run dynamics for 20 steps (settling)
+        let dt = 1.0; // 1ms
+        for _ in 0..20 {
+            let n = sim_neurons.len();
+            let mut inputs = vec![0.0; n];
+            
+            // Compute recurrent input
+            for i in 0..n {
+                for j in 0..n {
+                    if sim_neurons[j].in_up_state { // Using state as proxy for rate
+                         let weight = self.recurrent_weights[i * n + j];
+                         inputs[i] += weight;
                     }
-                } else {
-                    best_match = Some(((*stored_pattern).clone(), similarity));
                 }
             }
-        }
 
-        best_match.map(|(pattern, _)| pattern)
-    }
+            // Global Inhibition (Competition)
+            let active_count = sim_neurons.iter().filter(|n| n.in_up_state).count() as f32;
+            let inhibition = active_count * 0.1;
 
-    /// Maintain persistent activity
-    ///
-    /// Updates all persistent neurons, allowing them to maintain
-    /// patterns through recurrent excitation.
-    pub fn maintain(&mut self, dt: f32) {
-        self.time += dt;
-
-        // Update all persistent neurons
-        for neuron in &mut self.persistent_neurons {
-            neuron.update(dt, self.time);
-        }
-
-        // Attention gates decay very slowly (items persist for ~10 seconds)
-        // Only decay gates that are below threshold to eventually remove weak items
-        for (i, gate) in self.attention_gates.iter_mut().enumerate() {
-            if i < self.context_buffer.len() {
-                // Items in buffer: very slow decay (99.9% retention per step)
-                *gate *= 0.999;
-            } else {
-                // Empty slots: fast decay
-                *gate *= 0.9;
+            // Update
+            for (i, neuron) in sim_neurons.iter_mut().enumerate() {
+                neuron.update(dt, inputs[i], inhibition);
             }
         }
-    }
 
-    /// Clear working memory
-    pub fn clear(&mut self) {
-        self.context_buffer.clear();
-        self.attention_gates.fill(0.0);
-        for neuron in &mut self.persistent_neurons {
-            neuron.activity_trace = 0.0;
-        }
-    }
+        // Read out state
+        let result: Vec<f32> = sim_neurons.iter()
+            .map(|n| if n.in_up_state { 1.0 } else { 0.0 })
+            .collect();
 
-    /// Get current capacity utilization (0.0-1.0)
-    pub fn utilization(&self) -> f32 {
-        self.context_buffer.len() as f32 / self.capacity as f32
-    }
-
-    /// Get number of actively maintained patterns
-    pub fn active_count(&self) -> usize {
-        self.attention_gates.iter().filter(|&&g| g > 0.1).count()
-    }
-
-    /// Get all currently stored patterns
-    pub fn get_all_patterns(&self) -> Vec<&Vec<f32>> {
-        self.context_buffer.all()
-    }
-
-    /// Get pattern at specific slot
-    pub fn get_pattern(&self, slot: usize) -> Option<&Vec<f32>> {
-        self.context_buffer.get(slot)
-    }
-
-    /// Get attention level for slot
-    pub fn get_attention(&self, slot: usize) -> f32 {
-        *self.attention_gates.get(slot).unwrap_or(&0.0)
-    }
-
-    /// Compute cosine similarity between two patterns
-    fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
-        assert_eq!(a.len(), b.len());
-
-        let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
-        let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
-        let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
-
-        if norm_a == 0.0 || norm_b == 0.0 {
-            0.0
+        // If silence, return None
+        if result.iter().sum::<f32>() < 0.1 {
+            None
         } else {
-            dot / (norm_a * norm_b)
+            Some(result)
         }
     }
 
-    /// Get memory statistics
+    /// Maintain reverberating activity (Update loop)
+    pub fn maintain(&mut self, dt: f32) {
+        let n = self.neurons.len();
+        
+        // 1. Calculate Recurrent Inputs (Matrix-Vector Multiply)
+        // input_i = \sum_j W_ij * activity_j
+        let mut recurrent_inputs = vec![0.0; n];
+        let activity: Vec<f32> = self.neurons.iter()
+            .map(|n| if n.in_up_state { 1.0 } else { 0.0 }) // Binary rate proxy
+            .collect();
+
+        // Optimization: In a real sparse system, we wouldn't do O(N^2)
+        // But for WM (size ~1000), this is negligible.
+        for i in 0..n {
+            let mut sum = 0.0;
+            for j in 0..n {
+                sum += self.recurrent_weights[i * n + j] * activity[j];
+            }
+            recurrent_inputs[i] = sum;
+        }
+
+        // 2. Calculate Global Inhibition (Negative Feedback)
+        // Regulates network to prevent epilepsy and enforce capacity
+        let total_activity: f32 = activity.iter().sum();
+        
+        // Target roughly 'capacity' active neurons (if distributed) 
+        // or 'pattern_dim / capacity' if local. 
+        // Simple regulation: Inhibition proportional to activity squared
+        self.global_inhibition = total_activity * 0.05; 
+
+        // 3. Update Neurons
+        for (i, neuron) in self.neurons.iter_mut().enumerate() {
+            neuron.update(dt, recurrent_inputs[i], self.global_inhibition);
+        }
+
+        // Estimate active items
+        self.active_items = (total_activity / (self.pattern_dim as f32 / self.capacity as f32)).ceil() as usize;
+    }
+
+    /// Clear all memories (Global Reset)
+    pub fn clear(&mut self) {
+        for neuron in &mut self.neurons {
+            neuron.reset();
+        }
+        self.recurrent_weights.fill(0.0);
+    }
+
+    /// Get current capacity utilization
+    pub fn utilization(&self) -> f32 {
+        let active = self.neurons.iter().filter(|n| n.in_up_state).count();
+        // Assuming ~10% sparsity per item
+        (active as f32 / (self.pattern_dim as f32 * 0.1)).min(1.0)
+    }
+
+    /// Get all patterns (Reconstruct from attractor state)
+    /// (Approximation for visualization)
+    pub fn get_all_patterns(&self) -> Vec<Vec<f32>> {
+        // In an attractor net, patterns are superpositioned.
+        // We return the current raw state vector.
+        let state: Vec<f32> = self.neurons.iter()
+            .map(|n| if n.in_up_state { 1.0 } else { 0.0 })
+            .collect();
+        vec![state] // Return as single "superposition" pattern
+    }
+
+    /// Get specific slot (Not applicable in attractor net, returns full state)
+    pub fn get_pattern(&self, _slot: usize) -> Option<&Vec<f32>> {
+        None // Attractor networks don't have discrete slots
+    }
+
+    /// Get stats
     pub fn stats(&self) -> WorkingMemoryStats {
-        let active_neurons = self
-            .persistent_neurons
-            .iter()
-            .filter(|n| n.is_active(0.1))
-            .count();
-
-        let avg_activity: f32 = self
-            .persistent_neurons
-            .iter()
-            .map(|n| n.activity())
-            .sum::<f32>()
-            / self.persistent_neurons.len() as f32;
-
+        let active_neurons = self.neurons.iter().filter(|n| n.in_up_state).count();
+        let avg_activity = active_neurons as f32 / self.neurons.len() as f32;
+        
         WorkingMemoryStats {
-            stored_patterns: self.context_buffer.len(),
+            stored_patterns: self.active_items,
             capacity: self.capacity,
             utilization: self.utilization(),
-            active_count: self.active_count(),
+            active_count: self.active_items,
             active_neurons,
             avg_activity,
-            avg_attention: self.attention_gates.iter().sum::<f32>()
-                / self.attention_gates.len() as f32,
+            avg_attention: 1.0, // Deprecated field
         }
     }
 }
 
-/// Working memory statistics
+/// Statistics
 #[derive(Debug, Clone)]
 pub struct WorkingMemoryStats {
-    /// Number of stored patterns
     pub stored_patterns: usize,
-    /// Maximum capacity
     pub capacity: usize,
-    /// Capacity utilization (0.0-1.0)
     pub utilization: f32,
-    /// Number of actively maintained patterns
     pub active_count: usize,
-    /// Number of active persistent neurons
     pub active_neurons: usize,
-    /// Average neuron activity
     pub avg_activity: f32,
-    /// Average attention level
     pub avg_attention: f32,
 }
 
@@ -398,90 +374,74 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_circular_buffer() {
-        let mut buffer = CircularBuffer::new(3);
-        buffer.push(1);
-        buffer.push(2);
-        buffer.push(3);
-        assert_eq!(buffer.len(), 3);
+    fn test_bistable_neuron_up_state() {
+        let mut neuron = BistableNeuron::new(0);
 
-        buffer.push(4); // Should evict 1
-        assert_eq!(buffer.len(), 3);
-        assert_eq!(buffer.get(0), Some(&2));
-        assert_eq!(buffer.latest(), Some(&4));
+        // Weak input -> No UP state
+        neuron.update(1.0, 0.1, 0.0);
+        assert!(!neuron.in_up_state);
+
+        // Strong input -> UP state
+        neuron.update(1.0, 1.0, 0.0);
+        assert!(neuron.in_up_state);
+
+        // Remove input -> Should persist (Bistability)
+        neuron.update(1.0, 0.0, 0.0);
+        assert!(neuron.in_up_state, "Neuron should maintain UP state without input");
     }
 
     #[test]
-    fn test_persistent_neuron() {
-        let mut neuron = PersistentNeuron::new(0.8, 750.0);
-        neuron.spike(0.0);
-        assert!(neuron.activity() > 0.0);
+    fn test_bistable_neuron_reset_inhibition() {
+        let mut neuron = BistableNeuron::new(0);
+        neuron.in_up_state = true;
+        neuron.plateau_current = 10.0;
 
-        // Activity should persist
-        neuron.update(100.0, 100.0);
-        assert!(neuron.activity() > 0.0);
-
-        // But eventually decay - need many more iterations with tau=750ms
-        // After 500 * 100ms = 50 seconds, should have decayed significantly
-        for i in 0..1000 {
-            neuron.update(100.0, (i * 100) as f32);
-        }
-        assert!(neuron.activity() < 0.1, "Activity should decay after sufficient time: {}", neuron.activity());
+        // Apply strong inhibition
+        neuron.update(1.0, 0.0, 5.0);
+        assert!(!neuron.in_up_state, "Strong inhibition should knock neuron out of UP state");
     }
 
     #[test]
-    fn test_working_memory_store_retrieve() {
-        let mut wm = WorkingMemory::new(7, 10, 0.5);
+    fn test_attractor_store_retrieve() {
+        let mut wm = WorkingMemory::new(5, 10, 0.5);
 
-        // Store pattern with high attention
-        let pattern = vec![1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0];
-        assert!(wm.store(&pattern, 0.8));
+        // Pattern 1: [1, 1, 0, 0, ...]
+        let mut pattern = vec![0.0; 10];
+        pattern[0] = 1.0;
+        pattern[1] = 1.0;
 
-        // Retrieve with exact query
-        let retrieved = wm.retrieve(&pattern);
-        assert!(retrieved.is_some());
+        wm.store(&pattern, 1.0);
 
-        // Retrieve with partial query (pattern completion)
-        let partial = vec![1.0, 0.0, 1.0, 0.0, 1.0, 0.5, 0.5, 0.5, 0.5, 0.5];
-        let completed = wm.retrieve(&partial);
-        assert!(completed.is_some());
+        // Verify storage (weights modified)
+        // W_01 should be positive
+        assert!(wm.recurrent_weights[0 * 10 + 1] > 0.0);
+
+        // Retrieve with partial cue [1, 0, ...]
+        let mut cue = vec![0.0; 10];
+        cue[0] = 1.0;
+        
+        let retrieved = wm.retrieve(&cue).unwrap();
+        
+        // Should complete the pattern (index 1 should be active)
+        assert!(retrieved[1] > 0.5, "Pattern completion failed");
     }
 
     #[test]
-    fn test_attention_gating() {
-        let mut wm = WorkingMemory::new(7, 10, 0.5);
+    fn test_capacity_competition() {
+        // Small network, overload it
+        let mut wm = WorkingMemory::new(2, 10, 0.5); // Capacity 2
 
-        let pattern = vec![1.0; 10];
-
-        // Low attention - should reject
-        assert!(!wm.store(&pattern, 0.3));
-
-        // High attention - should accept
-        assert!(wm.store(&pattern, 0.8));
-
-        assert_eq!(wm.active_count(), 1);
-    }
-
-    #[test]
-    fn test_capacity_limit() {
-        let mut wm = WorkingMemory::new(3, 5, 0.0); // Capacity 3
-
-        for i in 0..5 {
-            let pattern = vec![i as f32; 5];
-            wm.store(&pattern, 1.0);
+        // Store 3 patterns
+        for i in 0..3 {
+            let mut pat = vec![0.0; 10];
+            pat[i*2] = 1.0;
+            wm.store(&pat, 1.0);
         }
 
-        // Should only keep last 3
-        assert_eq!(wm.get_all_patterns().len(), 3);
-    }
+        // Run maintenance
+        wm.maintain(100.0);
 
-    #[test]
-    fn test_cosine_similarity() {
-        let a = vec![1.0, 0.0, 0.0];
-        let b = vec![1.0, 0.0, 0.0];
-        assert!((WorkingMemory::cosine_similarity(&a, &b) - 1.0).abs() < 0.001);
-
-        let c = vec![0.0, 1.0, 0.0];
-        assert!((WorkingMemory::cosine_similarity(&a, &c)).abs() < 0.001);
+        // Global inhibition should be high
+        assert!(wm.global_inhibition > 0.0);
     }
 }

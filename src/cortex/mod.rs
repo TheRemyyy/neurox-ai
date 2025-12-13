@@ -13,9 +13,7 @@ pub mod mt_mst;
 pub mod barrel_cortex;
 pub mod sleep;
 
-pub use working_memory::{
-    CircularBuffer, PersistentNeuron, WorkingMemory, WorkingMemoryStats,
-};
+pub use working_memory::{BistableNeuron, WorkingMemory, WorkingMemoryStats};
 pub use predictive_coding::{
     PredictiveCodingLayer, PredictiveHierarchy,
 };
