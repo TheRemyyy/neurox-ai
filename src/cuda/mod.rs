@@ -3,19 +3,18 @@
 //! Leverages cudarc for runtime PTX compilation and safe CUDA abstractions.
 //! Optimized for RTX 3070 (8GB VRAM, 5888 CUDA cores).
 
-pub mod kernels;
-pub mod context;
 pub mod cognitive_kernels;
-pub mod sparse_kernels;
-pub mod quantization;
-pub mod v1_kernels;
+pub mod cognitive_system;
+pub mod context;
+pub mod kernels;
 pub mod motion_kernels;
+pub mod quantization;
+pub mod sparse_kernels;
+pub mod v1_kernels;
 
+pub use cognitive_system::GpuCognitiveSystem;
 pub use context::CudaContext;
-pub use kernels::*;
-pub use cognitive_kernels::*;
-pub use sparse_kernels::*;
-pub use quantization::*;
+
 
 use cudarc::driver::LaunchConfig;
 

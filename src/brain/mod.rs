@@ -32,7 +32,7 @@ use crate::cortex::{
     V1OrientationSystem, NeuromorphicCochlea, MotionProcessingSystem,
     BarrelCortex, SleepConsolidation, SleepStats,
 };
-use crate::cuda::{v1_kernels::GpuV1OrientationSystem, motion_kernels::GpuMotionSystem};
+use crate::cuda::{v1_kernels::GpuV1OrientationSystem, motion_kernels::GpuMotionSystem, GpuCognitiveSystem, CudaContext};
 use crate::language::{DualStreamLanguage, DualStreamStats};
 use crate::learning::{
     HomeostaticSystem, HomeostaticStats, HeterosynapticPlasticity, HeterosynapticStats,
@@ -179,6 +179,10 @@ pub struct NeuromorphicBrain {
     #[serde(skip)]
     gpu_motion: Option<GpuMotionSystem>,
 
+    /// GPU Cognitive System (Attention, WM, etc.)
+    #[serde(skip)]
+    gpu_cognitive: Option<GpuCognitiveSystem>,
+
     // === PARAMETERS ===
     /// Token vocabulary size
     vocab_size: usize,
@@ -281,10 +285,19 @@ impl NeuromorphicBrain {
         let attention = AttentionSystem::new(pattern_dim, connectivity, 2.0);
 
         // === GPU INITIALIZATION ===
-        let (gpu_device, gpu_v1, gpu_motion) = match CudaDevice::new(0) {
+        let (gpu_device, gpu_v1, gpu_motion, gpu_cognitive) = match CudaDevice::new(0) {
             Ok(device) => {
                 log::info!("🚀 GPU ACCELERATION ENABLED!");
                 // Note: CudaDevice::new already returns Arc<CudaDevice>
+
+                // Create context wrapper
+                let context = match CudaContext::new(0) {
+                    Ok(ctx) => Some(ctx),
+                    Err(e) => {
+                        log::warn!("Failed to create CudaContext: {}", e);
+                        None
+                    }
+                };
 
                 // Initialize GPU V1 (100x faster)
                 let gpu_v1 = match GpuV1OrientationSystem::new(device.clone(), 128, 128, 4) {
@@ -310,12 +323,28 @@ impl NeuromorphicBrain {
                     }
                 };
 
-                (Some(device), gpu_v1, gpu_motion)
+                // Initialize GPU Cognitive System (New!)
+                let gpu_cognitive = if let Some(ctx) = context {
+                    match GpuCognitiveSystem::new(&ctx, 1000, pattern_dim) {
+                        Ok(cog) => {
+                            log::info!("  ✓ GPU Cognitive System: Attention & Memory on CUDA");
+                            Some(cog)
+                        }
+                        Err(e) => {
+                            log::warn!("  ✗ GPU Cognitive failed: {}", e);
+                            None
+                        }
+                    }
+                } else {
+                    None
+                };
+
+                (Some(device), gpu_v1, gpu_motion, gpu_cognitive)
             }
             Err(e) => {
                 log::warn!("⚠️  CUDA not available: {} (using CPU)", e);
                 log::warn!("   Brain will run ~28× slower without GPU");
-                (None, None, None)
+                (None, None, None, None)
             }
         };
 
@@ -352,6 +381,7 @@ impl NeuromorphicBrain {
             gpu_device,
             gpu_v1,
             gpu_motion,
+            gpu_cognitive,
             vocab_size,
             pattern_dim,
             time: 0.0,
@@ -385,7 +415,22 @@ impl NeuromorphicBrain {
         self.semantics.hub.encode(&semantics);
 
         // 4. Update neuromodulation based on attention and novelty
-        let attention_level = 0.8;
+        // GPU Acceleration for Attention
+        let attention_level = if let Some(ref mut gpu_cog) = self.gpu_cognitive {
+            // Flatten semantic vector for GPU
+            let n_concepts = self.semantics.hub.n_cells;
+            let dim = self.semantics.hub.dim;
+            
+            // Dummy keys for now (would be memory slots)
+            let keys_flat = vec![0.5; n_concepts * dim]; 
+            
+            match gpu_cog.compute_attention(&semantics, &keys_flat, n_concepts, dim) {
+                Ok(scores) => scores.iter().sum::<f32>().min(1.0), // Mock aggregate attention
+                Err(_) => 0.8
+            }
+        } else {
+            0.8
+        };
         let prediction_error = self.predictive.total_error();
         self.neuromodulation.update(dt, attention_level, prediction_error, 0.3, false);
 

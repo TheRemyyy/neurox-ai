@@ -2,7 +2,8 @@
 //!
 //! Handles GPU device initialization, memory allocation, and resource cleanup.
 
-use super::{GpuMemoryInfo, LIFUpdateKernel, SpikePropagationKernel, TripletSTDPKernel, STDPTraceDecayKernel, VectorAccumulateKernel};
+use super::GpuMemoryInfo;
+use crate::cuda::kernels::{LIFUpdateKernel, SpikePropagationKernel, TripletSTDPKernel, STDPTraceDecayKernel, VectorAccumulateKernel};
 use cudarc::driver::{CudaDevice, CudaSlice};
 use std::sync::Arc;
 
