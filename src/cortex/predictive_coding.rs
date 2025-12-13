@@ -14,7 +14,7 @@
 //! - **Plasticity:** Local Hebbian learning minimizing Free Energy (F ~ Error²).
 
 use crate::connectivity::SparseConnectivity;
-use crate::neuron::{LIFNeuron, NeuronState}; // Use standard traits
+use crate::neuron::{LIFNeuron, Neuron, NeuronState}; // Use standard traits
 use serde::{Deserialize, Serialize};
 
 /// Single predictive coding layer implementing a Canonical Microcircuit

@@ -324,6 +324,11 @@ impl WorkingMemory {
         (active as f32 / (self.pattern_dim as f32 * 0.1)).min(1.0)
     }
 
+    /// Get number of active items
+    pub fn active_count(&self) -> usize {
+        self.active_items
+    }
+
     /// Get all patterns (Reconstruct from attractor state)
     /// (Approximation for visualization)
     pub fn get_all_patterns(&self) -> Vec<Vec<f32>> {

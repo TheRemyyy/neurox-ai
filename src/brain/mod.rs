@@ -656,7 +656,8 @@ impl NeuromorphicBrain {
         for pattern in wm_activity.iter().take(10) {  // Up to 10 patterns
             pre_activity.extend_from_slice(&pattern[..pattern.len().min(100)]);
         }
-        pre_activity.resize(self.pattern_dim.min(1000), 0.0);
+        // Resize to match structural plasticity neuron count to avoid out of bounds
+        pre_activity.resize(self.structural_plasticity.neuron_positions.len(), 0.0);
 
         // Post-activity from attention-modulated patterns
         post_activity = pre_activity.iter().map(|&x| x * attention).collect();

@@ -4,6 +4,4 @@
 
 pub mod hippocampus;
 
-pub use hippocampus::{
-    FeedforwardLayer, Hippocampus, HippocampusStats, MemoryTrace, RecurrentNetwork, SparseEncoder,
-};
+pub use hippocampus::{Hippocampus, HippocampusStats};
