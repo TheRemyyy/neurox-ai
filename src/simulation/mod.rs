@@ -324,33 +324,15 @@ impl Simulator {
             )?;
 
             // ✅ OPTIMIZATION: Accumulate synaptic currents directly on GPU
-            // This eliminates 3 CPU↔GPU transfers (down + down + up = 3 transfers)
-            // Now: 0 transfers - all done on GPU via CUDA kernel
-            // TODO: Create accumulate_kernel() to add synaptic_currents to input_currents on GPU
-            //
-            // For now, we keep transfers but batch them (optimization: run every N steps)
-            if self.timestep % 10 == 0 {
-                // Only transfer every 10 steps to amortize cost
-                let mut syn_curr = vec![0.0; self.n_neurons];
-                self.cuda
-                    .device()
-                    .dtoh_sync_copy_into(&self.synaptic_currents, &mut syn_curr)?;
-
-                let mut input_curr = vec![0.0; self.n_neurons];
-                self.cuda
-                    .device()
-                    .dtoh_sync_copy_into(&self.input_currents, &mut input_curr)?;
-
-                // Accumulate
-                for i in 0..self.n_neurons {
-                    input_curr[i] += syn_curr[i];
-                }
-
-                // Upload back
-                self.cuda
-                    .device()
-                    .htod_sync_copy_into(&input_curr, &mut self.input_currents)?;
-            }
+            // This eliminates 3 CPU↔GPU transfers.
+            let config = KernelConfig::for_neurons(self.n_neurons);
+            
+            self.cuda.accumulate_kernel().launch(
+                config,
+                &self.synaptic_currents,
+                &mut self.input_currents,
+                self.n_neurons as i32
+            )?;
         }
 
         Ok(())

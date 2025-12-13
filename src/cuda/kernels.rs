@@ -341,6 +341,19 @@ extern "C" __global__ void stdp_trace_decay(
 }
 "#;
 
+/// Vector Accumulation Kernel (dest += src)
+pub const VECTOR_ACCUMULATE_KERNEL: &str = r#"
+extern "C" __global__ void vector_accumulate(
+    const float* src,
+    float* dest,
+    const int n
+) {
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    if (tid >= n) return;
+    dest[tid] += src[tid];
+}
+"#;
+
 /// CUDA kernel wrapper for LIF neuron update
 pub struct LIFUpdateKernel {
     device: Arc<CudaDevice>,
@@ -402,6 +415,39 @@ impl LIFUpdateKernel {
     /// Get device name for diagnostics
     pub fn device_name(&self) -> Result<String, cudarc::driver::DriverError> {
         self.device.name()
+    }
+}
+
+/// CUDA kernel wrapper for Vector Accumulation
+pub struct VectorAccumulateKernel {
+    device: Arc<CudaDevice>,
+    function: CudaFunction,
+}
+
+impl VectorAccumulateKernel {
+    pub fn new(device: Arc<CudaDevice>) -> Result<Self, Box<dyn std::error::Error>> {
+        let ptx = cudarc::nvrtc::compile_ptx(VECTOR_ACCUMULATE_KERNEL)?;
+        device.load_ptx(ptx, "neurox_accumulate", &["vector_accumulate"])?;
+        let function = device.get_func("neurox_accumulate", "vector_accumulate").unwrap();
+        Ok(Self { device, function })
+    }
+
+    pub fn launch(
+        &self,
+        config: super::KernelConfig,
+        src: &cudarc::driver::CudaSlice<f32>,
+        dest: &mut cudarc::driver::CudaSlice<f32>,
+        n: i32,
+    ) -> Result<(), cudarc::driver::DriverError> {
+        let params = (src, dest, n);
+        unsafe {
+            self.function.clone().launch(config.to_launch_config(), params)?;
+        }
+        Ok(())
+    }
+
+    pub fn synchronize(&self) -> Result<(), cudarc::driver::DriverError> {
+        self.device.synchronize()
     }
 }
 

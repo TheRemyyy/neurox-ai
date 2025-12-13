@@ -2,7 +2,7 @@
 //!
 //! Handles GPU device initialization, memory allocation, and resource cleanup.
 
-use super::{GpuMemoryInfo, LIFUpdateKernel, SpikePropagationKernel, TripletSTDPKernel, STDPTraceDecayKernel};
+use super::{GpuMemoryInfo, LIFUpdateKernel, SpikePropagationKernel, TripletSTDPKernel, STDPTraceDecayKernel, VectorAccumulateKernel};
 use cudarc::driver::{CudaDevice, CudaSlice};
 use std::sync::Arc;
 
@@ -22,6 +22,9 @@ pub struct CudaContext {
 
     /// STDP trace decay kernel
     trace_kernel: STDPTraceDecayKernel,
+
+    /// Vector accumulation kernel
+    accumulate_kernel: VectorAccumulateKernel,
 
     /// Device ordinal
     device_id: usize,
@@ -48,6 +51,9 @@ impl CudaContext {
         log::info!("Compiling STDP trace decay kernel...");
         let trace_kernel = STDPTraceDecayKernel::new(device.clone())?;
 
+        log::info!("Compiling Vector Accumulate kernel...");
+        let accumulate_kernel = VectorAccumulateKernel::new(device.clone())?;
+
         log::info!("CUDA context initialized successfully");
 
         Ok(Self {
@@ -56,6 +62,7 @@ impl CudaContext {
             spike_kernel,
             stdp_kernel,
             trace_kernel,
+            accumulate_kernel,
             device_id,
         })
     }
@@ -137,6 +144,11 @@ impl CudaContext {
     /// Get STDP trace decay kernel
     pub fn trace_kernel(&self) -> &STDPTraceDecayKernel {
         &self.trace_kernel
+    }
+
+    /// Get vector accumulation kernel
+    pub fn accumulate_kernel(&self) -> &VectorAccumulateKernel {
+        &self.accumulate_kernel
     }
 
     /// Synchronize device (wait for all operations to complete)
