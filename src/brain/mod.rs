@@ -630,7 +630,8 @@ impl NeuromorphicBrain {
                                (left_motor_out.len() + right_motor_out.len()) as f32;
 
         // 6. Update amygdala (emotional processing)
-        let context = 0;  // Placeholder context
+        // Use active pattern count as a simple environmental context proxy
+        let context = self.working_memory.active_count() as usize;
         let cs_input = vec![attention; 10];  // Conditioned stimulus from attention
         let us_present = if pred_error > 0.5 { 1.0 } else { 0.0 };  // Unconditioned stimulus from error
         let fear_output = self.amygdala.update(dt, &cs_input, us_present, context);
