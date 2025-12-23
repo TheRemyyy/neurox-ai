@@ -16,7 +16,7 @@
 
 ---
 
-## Overview
+## <a id="overview"></a>Overview
 
 NeuroxAI is a high-performance neuromorphic computing platform that simulates biologically-realistic spiking neural networks. Built in Rust with CUDA acceleration, it implements state-of-the-art learning algorithms and cognitive architectures inspired by the human brain.
 
@@ -37,7 +37,7 @@ NeuroxAI is a high-performance neuromorphic computing platform that simulates bi
 - **NVIDIA GPU** with Compute Capability 7.0+ (RTX series recommended)
 - **Windows/Linux** (macOS not supported due to CUDA)
 
-## Installation
+## <a id="installation"></a>Installation
 
 ```bash
 # Clone the repository
