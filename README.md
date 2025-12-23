@@ -10,6 +10,8 @@
 
 *Biologically-inspired spiking neural networks targeting 1-10M neurons with real-time performance*
 
+[Overview](#overview) • [Installation](#installation) • [Usage](#usage) • [Architecture](#architecture) • [Performance](#performance)
+
 </div>
 
 ---
@@ -46,7 +48,7 @@ cd neurox-ai
 cargo build --release
 ```
 
-## Usage
+## <a id="usage"></a>Usage
 
 ### System Information
 
@@ -95,7 +97,7 @@ neurox-ai/
 └── tests/                   # Test suite
 ```
 
-## Architecture Highlights
+## <a id="architecture"></a>Architecture Highlights
 
 ### Neuron Models
 
@@ -116,7 +118,7 @@ neurox-ai/
 - Working memory with capacity limits
 - Sleep-dependent consolidation
 
-## Performance
+## <a id="performance"></a>Performance
 
 Optimized for NVIDIA RTX GPUs with:
 
