@@ -2,7 +2,7 @@
 name = "neurox-ai" 
 version = "0.1.0"
 edition = "2021"
-authors = ["NeuroxAI Team"]
+authors = ["TheRemyyy", "Aegis Labs"]
 description = "GPU-accelerated neuromorphic computing platform with biologically-inspired spiking neural networks"
 repository = "https://github.com/TheRemyyy/neurox-ai"
 license = "MIT"
