@@ -1,6 +1,6 @@
-# NeuroxAI
-
 <div align="center">
+
+# NeuroxAI
 
 **GPU-Accelerated Neuromorphic Computing Platform**
 
