@@ -1,6 +1,6 @@
 //! Neuromorphic Model Serialization
 //!
-//! Binary format for spiking neural network models - NOT like LLM checkpoints!
+//! Binary format for spiking neural network models with biological dynamics.
 //! This stores biological dynamics: spikes, plasticity, temporal state.
 //!
 //! Format (.nrx binary):
@@ -10,12 +10,12 @@
 //! - Plasticity traces (short-term & long-term)
 //! - Homeostatic state
 //!
-//! This is fundamentally different from transformer weights!
+//! Designed for neuromorphic computing, not traditional deep learning.
 
-use std::fs::File;
-use std::io::{Write, Read, BufWriter, BufReader};
-use std::path::Path;
 use crate::connectivity::SparseConnectivity;
+use std::fs::File;
+use std::io::{BufReader, BufWriter, Read, Write};
+use std::path::Path;
 
 /// Magic bytes for neuromorphic model files
 const MAGIC: &[u8; 4] = b"NRXB"; // NeuroX Binary
@@ -23,7 +23,7 @@ const MAGIC: &[u8; 4] = b"NRXB"; // NeuroX Binary
 /// Current serialization version
 const VERSION: u32 = 1;
 
-/// Complete neuromorphic model state (brain-like, not LLM!)
+/// Complete neuromorphic model state with biological dynamics
 #[derive(Debug)]
 pub struct NeuromorphicModel {
     /// Network metadata
@@ -75,7 +75,7 @@ pub struct NeuronParameters {
     pub membrane_v: Option<Vec<f32>>,
 }
 
-/// Synaptic plasticity state (biological learning, not backprop!)
+/// Synaptic plasticity state for biological learning mechanisms
 #[derive(Debug, Clone)]
 pub struct PlasticityState {
     /// STDP pre-synaptic traces
@@ -181,7 +181,10 @@ impl NeuromorphicModel {
         Ok(())
     }
 
-    fn write_connectivity<W: Write>(&self, writer: &mut W) -> Result<(), Box<dyn std::error::Error>> {
+    fn write_connectivity<W: Write>(
+        &self,
+        writer: &mut W,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         // Write CSR arrays
         writer.write_all(&(self.connectivity.row_ptr.len() as u32).to_le_bytes())?;
         for &val in &self.connectivity.row_ptr {
@@ -201,7 +204,10 @@ impl NeuromorphicModel {
         Ok(())
     }
 
-    fn write_neuron_params<W: Write>(&self, writer: &mut W) -> Result<(), Box<dyn std::error::Error>> {
+    fn write_neuron_params<W: Write>(
+        &self,
+        writer: &mut W,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         // Thresholds
         writer.write_all(&(self.neuron_params.thresholds.len() as u32).to_le_bytes())?;
         for &val in &self.neuron_params.thresholds {
@@ -235,7 +241,11 @@ impl NeuromorphicModel {
         Ok(())
     }
 
-    fn write_optional_vec<W: Write>(&self, writer: &mut W, vec: &Option<Vec<f32>>) -> Result<(), Box<dyn std::error::Error>> {
+    fn write_optional_vec<W: Write>(
+        &self,
+        writer: &mut W,
+        vec: &Option<Vec<f32>>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         match vec {
             Some(v) => {
                 writer.write_all(&1u8.to_le_bytes())?; // Present flag
@@ -276,7 +286,9 @@ impl NeuromorphicModel {
         })
     }
 
-    fn read_connectivity<R: Read>(reader: &mut R) -> Result<SparseConnectivity, Box<dyn std::error::Error>> {
+    fn read_connectivity<R: Read>(
+        reader: &mut R,
+    ) -> Result<SparseConnectivity, Box<dyn std::error::Error>> {
         let row_ptr = Self::read_vec_i32(reader)?;
         let col_idx = Self::read_vec_i32(reader)?;
         let weights = Self::read_vec_f32(reader)?;
@@ -293,7 +305,9 @@ impl NeuromorphicModel {
         })
     }
 
-    fn read_neuron_params<R: Read>(reader: &mut R) -> Result<NeuronParameters, Box<dyn std::error::Error>> {
+    fn read_neuron_params<R: Read>(
+        reader: &mut R,
+    ) -> Result<NeuronParameters, Box<dyn std::error::Error>> {
         let thresholds = Self::read_vec_f32(reader)?;
         let tau_m = Self::read_vec_f32(reader)?;
         let v_reset = Self::read_vec_f32(reader)?;
@@ -307,7 +321,9 @@ impl NeuromorphicModel {
         })
     }
 
-    fn read_plasticity<R: Read>(reader: &mut R) -> Result<PlasticityState, Box<dyn std::error::Error>> {
+    fn read_plasticity<R: Read>(
+        reader: &mut R,
+    ) -> Result<PlasticityState, Box<dyn std::error::Error>> {
         let pre_traces = Self::read_optional_vec_f32(reader)?;
         let post_traces_1 = Self::read_optional_vec_f32(reader)?;
         let post_traces_2 = Self::read_optional_vec_f32(reader)?;
@@ -363,7 +379,9 @@ impl NeuromorphicModel {
         Ok(vec)
     }
 
-    fn read_optional_vec_f32<R: Read>(reader: &mut R) -> Result<Option<Vec<f32>>, Box<dyn std::error::Error>> {
+    fn read_optional_vec_f32<R: Read>(
+        reader: &mut R,
+    ) -> Result<Option<Vec<f32>>, Box<dyn std::error::Error>> {
         let mut flag = [0u8; 1];
         reader.read_exact(&mut flag)?;
 

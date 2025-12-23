@@ -2,10 +2,10 @@
 //!
 //! Implements Triplet STDP training with Winner-Take-All dynamics
 
-use crate::simulation::Simulator;
 use crate::datasets::MNISTImage;
-use crate::learning::{TripletSTDP, HomeostaticPlasticity, STDPConfig, STPDynamics};
 use crate::learning::quantization::QuantizationConfig;
+use crate::learning::{HomeostaticPlasticity, STDPConfig, STPDynamics, TripletSTDP};
+use crate::simulation::Simulator;
 use cudarc::driver::DeviceSlice;
 
 /// Training configuration
@@ -42,11 +42,11 @@ impl Default for TrainingConfig {
             n_epochs: 10,
             batch_size: 100,
             presentation_duration: 350.0, // 350ms per image
-            isi_duration: 150.0,           // 150ms rest between images
+            isi_duration: 150.0,          // 150ms rest between images
             lr_decay: 0.95,
-            wta_strength: 18.0,            // Lateral inhibition strength (17-20)
-            target_rate: 5.0,              // 5 Hz target
-            consolidation_interval: 5,     // Every 5 epochs
+            wta_strength: 18.0,        // Lateral inhibition strength (17-20)
+            target_rate: 5.0,          // 5 Hz target
+            consolidation_interval: 5, // Every 5 epochs
         }
     }
 }
@@ -100,11 +100,7 @@ pub struct MNISTTrainer {
 
 impl MNISTTrainer {
     /// Create new MNIST trainer
-    pub fn new(
-        simulator: Simulator,
-        config: TrainingConfig,
-        stdp_config: STDPConfig,
-    ) -> Self {
+    pub fn new(simulator: Simulator, config: TrainingConfig, stdp_config: STDPConfig) -> Self {
         let n_neurons = simulator.n_neurons();
 
         // Initialize STDP
@@ -212,7 +208,9 @@ impl MNISTTrainer {
 
         // Update thresholds based on firing rates
         for neuron_id in 0..thresholds.len() {
-            let new_threshold = self.homeostasis.update_threshold(neuron_id, thresholds[neuron_id]);
+            let new_threshold = self
+                .homeostasis
+                .update_threshold(neuron_id, thresholds[neuron_id]);
             thresholds[neuron_id] = new_threshold;
         }
 
@@ -275,7 +273,10 @@ impl MNISTTrainer {
     }
 
     /// Apply sleep-like consolidation (REM sleep mechanism)
-    pub fn consolidate(&mut self, replay_samples: &[MNISTImage]) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn consolidate(
+        &mut self,
+        replay_samples: &[MNISTImage],
+    ) -> Result<(), Box<dyn std::error::Error>> {
         log::info!("Applying sleep-like consolidation...");
 
         // 1. Replay important samples with 2× learning rate
@@ -340,15 +341,22 @@ impl MNISTTrainer {
         &self.stats
     }
 
-    /// Export trained model as neuromorphic brain state (not LLM weights!)
-    pub fn export_model(&self, architecture_desc: String) -> Result<crate::serialization::NeuromorphicModel, Box<dyn std::error::Error>> {
-        use crate::serialization::{NeuromorphicModel, ModelMetadata, NeuronParameters, PlasticityState};
+    /// Export trained model as neuromorphic brain state
+    pub fn export_model(
+        &self,
+        architecture_desc: String,
+    ) -> Result<crate::serialization::NeuromorphicModel, Box<dyn std::error::Error>> {
+        use crate::serialization::{
+            ModelMetadata, NeuromorphicModel, NeuronParameters, PlasticityState,
+        };
         use crate::SparseConnectivity;
 
-        log::info!("Exporting neuromorphic model (brain-like, not LLM!)...");
+        log::info!("Exporting neuromorphic model...");
 
         // Get connectivity from GPU
-        let conn_gpu = self.simulator.get_connectivity()
+        let conn_gpu = self
+            .simulator
+            .get_connectivity()
             .ok_or("No connectivity found in simulator")?;
 
         let device = self.simulator.cuda.device();
@@ -371,7 +379,7 @@ impl MNISTTrainer {
         let w_min = weights.iter().copied().fold(f32::INFINITY, f32::min);
         let w_max = weights.iter().copied().fold(f32::NEG_INFINITY, f32::max);
         let quantizer = QuantizationConfig::int8(w_min, w_max);
-        
+
         for w in &mut weights {
             *w = quantizer.qat_forward(*w);
         }
@@ -403,14 +411,18 @@ impl MNISTTrainer {
             pre_traces: Some(self.stdp.get_pre_traces()),
             post_traces_1: Some(self.stdp.get_post_traces_1()),
             post_traces_2: Some(self.stdp.get_post_traces_2()),
-            stp_u: self.stp.as_ref().map(|stp| stp.iter().map(|s| s.u_s).collect()),
-            stp_x: self.stp.as_ref().map(|stp| stp.iter().map(|s| s.x_s).collect()),
+            stp_u: self
+                .stp
+                .as_ref()
+                .map(|stp| stp.iter().map(|s| s.u_s).collect()),
+            stp_x: self
+                .stp
+                .as_ref()
+                .map(|stp| stp.iter().map(|s| s.x_s).collect()),
         };
 
         // Create metadata
-        let final_accuracy = self.stats.last()
-            .map(|s| s.test_accuracy)
-            .unwrap_or(0.0);
+        let final_accuracy = self.stats.last().map(|s| s.test_accuracy).unwrap_or(0.0);
 
         let metadata = ModelMetadata {
             n_neurons: self.simulator.n_neurons(),
@@ -421,9 +433,18 @@ impl MNISTTrainer {
             final_accuracy,
         };
 
-        log::info!("Model exported: {} neurons, {} synapses", metadata.n_neurons, metadata.n_synapses);
+        log::info!(
+            "Model exported: {} neurons, {} synapses",
+            metadata.n_neurons,
+            metadata.n_synapses
+        );
 
-        Ok(NeuromorphicModel::new(metadata, connectivity, neuron_params, plasticity))
+        Ok(NeuromorphicModel::new(
+            metadata,
+            connectivity,
+            neuron_params,
+            plasticity,
+        ))
     }
 }
 
