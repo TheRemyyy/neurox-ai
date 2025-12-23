@@ -250,7 +250,7 @@ impl BrainLoader {
         let dataset = TextDataset::from_file(file_path, window_size)?;
         let stats = dataset.stats();
         println!(
-            "  Načteno {} vět, {} slov, slovník {} slov",
+            "  Loaded {} sentences, {} words, vocabulary of {} words",
             stats.sentence_count, stats.total_words, stats.vocab_size
         );
 
@@ -259,7 +259,7 @@ impl BrainLoader {
         }
 
         let pairs = dataset.generate_skipgram_pairs();
-        println!("  Generováno {} trénovacích párů", pairs.len());
+        println!("  Generated {} training pairs", pairs.len());
 
         let learning_rate = 0.1;
         let batch_size = 100;
@@ -282,7 +282,7 @@ impl BrainLoader {
 
             if (batch_idx + 1) % 10 == 0 || batch_idx == total_batches - 1 {
                 print!(
-                    "\r  Trénink: {}/{} batchů ({:.0}%)",
+                    "\r  Training: {}/{} batches ({:.0}%)",
                     batch_idx + 1,
                     total_batches,
                     (batch_idx + 1) as f32 / total_batches as f32 * 100.0
