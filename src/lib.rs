@@ -6,70 +6,83 @@
 #![warn(clippy::all)]
 #![allow(clippy::too_many_arguments)]
 
-pub mod neuron;
-pub mod cuda;
 pub mod connectivity;
-pub mod simulation;
-pub mod learning;
-pub mod synapse;
-pub mod utils;
+pub mod cuda;
 pub mod datasets;
-pub mod training;
+pub mod learning;
+pub mod neuron;
 pub mod serialization;
+pub mod simulation;
+pub mod synapse;
+pub mod training;
+pub mod utils;
 
 // Cognitive architecture modules
-pub mod cortex;
 pub mod attention;
-pub mod memory;
-pub mod language;
 pub mod brain;
+pub mod cortex;
+pub mod language;
+pub mod memory;
 
 // New biological systems
 pub mod basal_ganglia;
 pub mod neuromodulation;
 pub mod oscillations;
-pub mod spatial;
 pub mod semantics;
+pub mod spatial;
+
+// Human-limit upgrade modules (2025)
+pub mod affect;
+pub mod cognition;
+pub mod motivation;
+pub mod reasoning;
 
 // Re-export key types
-pub use neuron::{LIFNeuron, NeuronState};
+pub use connectivity::{ConnectivityType, ProceduralConnectivity, SparseConnectivity};
 pub use cuda::CudaContext;
-pub use simulation::{Simulator, OptimizationStats};
-pub use connectivity::{ProceduralConnectivity, SparseConnectivity, ConnectivityType};
 pub use datasets::{MNISTDataset, MNISTImage};
-pub use training::{TrainingConfig, MNISTTrainer, train_mnist};
-pub use serialization::{NeuromorphicModel, ModelMetadata, NeuronParameters, PlasticityState};
+pub use neuron::{LIFNeuron, NeuronState};
+pub use serialization::{ModelMetadata, NeuromorphicModel, NeuronParameters, PlasticityState};
+pub use simulation::{OptimizationStats, Simulator};
+pub use training::{train_mnist, MNISTTrainer, TrainingConfig};
 
 // Re-export cognitive modules
+pub use attention::{AttentionStats, AttentionSystem};
+pub use brain::{BrainStats, NeuromorphicBrain};
 pub use cortex::{
-    WorkingMemory, WorkingMemoryStats, PredictiveHierarchy,
-    EnhancedPredictiveHierarchy, EnhancedPredictiveStats,
+    EnhancedPredictiveHierarchy, EnhancedPredictiveStats, PredictiveHierarchy, WorkingMemory,
+    WorkingMemoryStats,
 };
-pub use attention::{AttentionSystem, AttentionStats};
-pub use memory::{Hippocampus, HippocampusStats};
-pub use language::{
-    DualStreamLanguage, DualStreamStats,
-};
-pub use brain::{NeuromorphicBrain, BrainStats};
+pub use language::{DualStreamLanguage, DualStreamStats};
+pub use memory::{EnhancedEpisodicMemory, Hippocampus, HippocampusStats, KnowledgeGraph};
 
 // Re-export new biological systems
 pub use basal_ganglia::{BasalGanglia, BasalGangliaStats, DopamineNeuron};
-pub use neuromodulation::{NeuromodulationSystem, NeuromodulationStats};
-pub use oscillations::{OscillatoryCircuit, OscillationStats};
-pub use spatial::{SpatialSystem, PlaceCell, GridCell};
-pub use semantics::{SemanticSystem, SemanticHub, EmbeddingLayer};
+pub use neuromodulation::{NeuromodulationStats, NeuromodulationSystem};
+pub use oscillations::{OscillationStats, OscillatoryCircuit};
+pub use semantics::{EmbeddingLayer, SemanticHub, SemanticSystem};
+pub use spatial::{GridCell, PlaceCell, SpatialSystem};
 
 // Re-export new neuron types
 pub use neuron::{
-    PVInterneuron, SSTInterneuron, VIPInterneuron, InterneuronCircuit,
-    DendriticNeuron, DendriticLayer,
+    DendriticLayer, DendriticNeuron, InterneuronCircuit, PVInterneuron, SSTInterneuron,
+    VIPInterneuron,
 };
 
 // Re-export new learning mechanisms
 pub use learning::{
-    HomeostaticSystem, HomeostaticStats, BCMMetaplasticity,
-    CriticalityHomeostasis,
+    BCMMetaplasticity, CriticalityHomeostasis, HomeostaticStats, HomeostaticSystem,
 };
+
+// Re-export human-limit upgrade modules (2025)
+pub use affect::{Emotion, EmotionalState, EmotionalStateMachine, EmotionalStats, MoodState};
+pub use cognition::{
+    AgentModel, BDIModel, BehavioralProfile, BeliefState, CapabilityModel, CognitiveStrategy,
+    DialogueArbiter, InnerDialogue, Metacognition, MetacognitionStats, Perspective, SelfModel,
+    TheoryOfMind,
+};
+pub use motivation::{CuriosityDrive, CuriosityStats, InformationGain};
+pub use reasoning::{AbstractReasoning, AnalogyEngine, ReasoningChain};
 
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

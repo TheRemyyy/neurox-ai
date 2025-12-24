@@ -14,42 +14,57 @@
 //! - Place/grid cells for spatial/semantic organization
 //! - Homeostatic mechanisms (BCM, synaptic scaling, criticality)
 
-pub mod cerebellum;
 pub mod amygdala;
+pub mod cerebellum;
+pub mod loader;
 pub mod superior_colliculus;
 pub mod thalamus;
-pub mod loader;
 
-pub use cerebellum::{Cerebellum, CerebellarHemisphere, CerebellarStats};
 pub use amygdala::{Amygdala, AmygdalaStats};
-pub use superior_colliculus::{SuperiorColliculus, SCStats, SCNeuron};
-pub use thalamus::{Thalamus, ThalamicNeuron, ThalamusStats, ThalamicNucleus};
+pub use cerebellum::{CerebellarHemisphere, CerebellarStats, Cerebellum};
+pub use superior_colliculus::{SCNeuron, SCStats, SuperiorColliculus};
+pub use thalamus::{ThalamicNeuron, ThalamicNucleus, Thalamus, ThalamusStats};
 
 use crate::attention::AttentionSystem;
 use crate::basal_ganglia::{BasalGanglia, BasalGangliaStats};
 use crate::connectivity::{SparseConnectivity, StructuralPlasticity, StructuralPlasticityStats};
 use crate::cortex::{
-    EnhancedPredictiveHierarchy, WorkingMemory, EnhancedPredictiveStats,
-    V1OrientationSystem, NeuromorphicCochlea, MotionProcessingSystem,
-    BarrelCortex, SleepConsolidation, SleepStats,
-    Metacognition,
+    BarrelCortex, EnhancedPredictiveHierarchy, EnhancedPredictiveStats, Metacognition,
+    MotionProcessingSystem, NeuromorphicCochlea, SleepConsolidation, SleepStats,
+    V1OrientationSystem, WorkingMemory,
 };
-use crate::cuda::{v1_kernels::GpuV1OrientationSystem, motion_kernels::GpuMotionSystem, GpuCognitiveSystem, CudaContext};
-use crate::language::{DualStreamLanguage, DualStreamStats, IFGSyntacticPlanner, Lexicon, PartOfSpeech, IntentType, AnnotatedWord};
+use crate::cuda::{
+    motion_kernels::GpuMotionSystem, v1_kernels::GpuV1OrientationSystem, CudaContext,
+    GpuCognitiveSystem,
+};
+use crate::language::{
+    AnnotatedWord, DualStreamLanguage, DualStreamStats, IFGSyntacticPlanner, IntentType, Lexicon,
+    PartOfSpeech,
+};
 use crate::learning::{
-    HomeostaticSystem, HomeostaticStats, HeterosynapticPlasticity, HeterosynapticStats,
+    HeterosynapticPlasticity, HeterosynapticStats, HomeostaticStats, HomeostaticSystem,
 };
 use crate::memory::Hippocampus;
-use crate::neuromodulation::{NeuromodulationSystem, NeuromodulationStats};
+use crate::neuromodulation::{NeuromodulationStats, NeuromodulationSystem};
 use crate::neuron::{HierarchicalBrain, InterneuronCircuit, InterneuronStats, Neuron};
-use crate::oscillations::{OscillatoryCircuit, OscillationStats};
-use crate::semantics::{SemanticSystem};
-use crate::spatial::{SpatialSystem};
+use crate::oscillations::{OscillationStats, OscillatoryCircuit};
+use crate::semantics::SemanticSystem;
+use crate::spatial::SpatialSystem;
+
+// Human-limit upgrade imports (2025)
+use crate::affect::{Emotion, EmotionalStateMachine};
+use crate::cognition::{
+    InnerDialogue, Metacognition as CognitionMetacognition, SelfModel, TheoryOfMind,
+};
+use crate::memory::{EnhancedEpisodicMemory, KnowledgeGraph};
+use crate::motivation::CuriosityDrive;
+use crate::reasoning::AbstractReasoning;
+
+use cudarc::driver::CudaDevice;
+use dashmap::DashMap;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use dashmap::DashMap;
-use cudarc::driver::CudaDevice;
-use rand::Rng;
 
 /// Complete neuromorphic brain with maximum biological accuracy
 ///
@@ -63,12 +78,12 @@ const HETEROSYNAPTIC_ASTROCYTES: usize = 100;
 /// Thalamus input vector size (neurons per nucleus × sampled inputs)
 const THALAMUS_INPUT_SIZE: usize = 100;
 /// Number of neurons generating heterosynaptic input (CAdEx + Izhikevich)
-const HETEROSYNAPTIC_NEURONS: usize = 200;  // 100 CAdEx + 100 Izhikevich
+const HETEROSYNAPTIC_NEURONS: usize = 200; // 100 CAdEx + 100 Izhikevich
 /// Synapses per neuron for heterosynaptic mapping
-const SYNAPSES_PER_NEURON: usize = HETEROSYNAPTIC_SYNAPSES / HETEROSYNAPTIC_NEURONS;  // = 50
+const SYNAPSES_PER_NEURON: usize = HETEROSYNAPTIC_SYNAPSES / HETEROSYNAPTIC_NEURONS; // = 50
 
 // Visual pattern generation constants (for fallback synthetic input)
-const VISUAL_PATTERN_BASELINE: f32 = 0.5;  // Baseline gray level
+const VISUAL_PATTERN_BASELINE: f32 = 0.5; // Baseline gray level
 const VISUAL_PATTERN_AMPLITUDE: f32 = 0.3; // Sine wave amplitude
 const VISUAL_PATTERN_FREQUENCY: f32 = 10.0; // Spatial frequency (pixels)
 
@@ -210,17 +225,17 @@ pub struct NeuromorphicBrain {
 
     /// Current behavioral state (encoding vs retrieval)
     encoding_mode: bool,
-    
+
     /// IFG Syntactic Planner - plans sentence structure word-by-word
     /// Based on 2024-2025 neuroscience research on language production
     #[serde(skip)]
     pub ifg_planner: IFGSyntacticPlanner,
-    
+
     /// Lexicon - words with POS tags and emotional valence
     /// Learned from training data, NOT hardcoded
     #[serde(skip)]
     pub lexicon: Lexicon,
-    
+
     /// Bond/Attachment level (0.0-1.0)
     /// Builds through positive interactions, decreases with negative
     /// Some words require high bond (e.g. "miluju tě" requires bond > 0.7)
@@ -235,6 +250,33 @@ pub struct NeuromorphicBrain {
     #[serde(skip)]
     pub intent_rules: Vec<(crate::language::IntentType, Vec<String>)>,
 
+    // === HUMAN-LIMIT UPGRADES (2025) ===
+    /// Emotional State Machine - affective processing with mood dynamics
+    pub emotional_state: EmotionalStateMachine,
+
+    /// Curiosity Drive - intrinsic motivation for exploration
+    pub curiosity: CuriosityDrive,
+
+    /// Theory of Mind - understanding other agents' mental states
+    pub theory_of_mind: TheoryOfMind,
+
+    /// Inner Dialogue - multi-perspective reasoning
+    pub inner_dialogue: InnerDialogue,
+
+    /// Self Model - predictive model of own behavior
+    pub self_model: SelfModel,
+
+    /// Advanced Metacognition - cognitive strategy selection
+    pub advanced_metacognition: CognitionMetacognition,
+
+    /// Abstract Reasoning - analogical and rule-based inference
+    pub abstract_reasoning: AbstractReasoning,
+
+    /// Knowledge Graph - long-term semantic memory structure
+    pub knowledge_graph: KnowledgeGraph,
+
+    /// Enhanced Episodic Memory - priority replay and consolidation
+    pub enhanced_episodic: EnhancedEpisodicMemory,
 }
 
 impl NeuromorphicBrain {
@@ -254,39 +296,43 @@ impl NeuromorphicBrain {
         // Core cortical systems
         let sensory = HierarchicalBrain::new(n_layers, base_neurons);
         let predictive = EnhancedPredictiveHierarchy::new_default();
-        let working_memory = WorkingMemory::new(7, pattern_dim, 0.5);  // Unified dimension
+        let working_memory = WorkingMemory::new(7, pattern_dim, 0.5); // Unified dimension
 
         // Subcortical systems
-        let basal_ganglia = BasalGanglia::new(500, 8, 0.05, 0.95);  // 500 striatal neurons, 8 actions
-        let hippocampus = Hippocampus::new(pattern_dim, 10, 0.05, 10000);  // Unified dimension
-        let spatial = SpatialSystem::new(200, 500.0);  // 200 place cells, 500cm environment
-        let cerebellum = Cerebellum::new();  // Dual-hemisphere motor learning
-        let amygdala = Amygdala::new(10);  // Fear conditioning and extinction (10 inputs)
-        let superior_colliculus = SuperiorColliculus::new(32, 32);  // 32×32 topographic map for saccades
-        let thalamus = Thalamus::new(100);  // 100 neurons per nucleus for sensory relay
+        let basal_ganglia = BasalGanglia::new(500, 8, 0.05, 0.95); // 500 striatal neurons, 8 actions
+        let hippocampus = Hippocampus::new(pattern_dim, 10, 0.05, 10000); // Unified dimension
+        let spatial = SpatialSystem::new(200, 500.0); // 200 place cells, 500cm environment
+        let cerebellum = Cerebellum::new(); // Dual-hemisphere motor learning
+        let amygdala = Amygdala::new(10); // Fear conditioning and extinction (10 inputs)
+        let superior_colliculus = SuperiorColliculus::new(32, 32); // 32×32 topographic map for saccades
+        let thalamus = Thalamus::new(100); // 100 neurons per nucleus for sensory relay
 
         // Interneurons and modulation
-        let interneurons = InterneuronCircuit::new(pattern_dim);  // PV:SST:VIP = 40:30:15
+        let interneurons = InterneuronCircuit::new(pattern_dim); // PV:SST:VIP = 40:30:15
         let neuromodulation = NeuromodulationSystem::new();
         let oscillations = OscillatoryCircuit::new();
 
         // Language and semantics
-        let language = DualStreamLanguage::new(vocab_size, pattern_dim);  // Unified dimension
-        let semantics = SemanticSystem::new(vocab_size, pattern_dim, 500);  // 500 concept cells
+        let language = DualStreamLanguage::new(vocab_size, pattern_dim); // Unified dimension
+        let semantics = SemanticSystem::new(vocab_size, pattern_dim, 500); // 500 concept cells
 
         // Sensory processing systems
-        let v1_orientation = V1OrientationSystem::new(128, 128, 4);  // 128×128 visual field, 4 orientations
-        let cochlea = NeuromorphicCochlea::new(64, 16000.0, 200.0, 10000.0);  // 64 channels, 16kHz sample rate, 200Hz-10kHz
-        let motion_processing = MotionProcessingSystem::new(128, 128);  // MT-MST optic flow
-        let barrel_cortex = BarrelCortex::new();  // 5×5 whisker array
+        let v1_orientation = V1OrientationSystem::new(128, 128, 4); // 128×128 visual field, 4 orientations
+        let cochlea = NeuromorphicCochlea::new(64, 16000.0, 200.0, 10000.0); // 64 channels, 16kHz sample rate, 200Hz-10kHz
+        let motion_processing = MotionProcessingSystem::new(128, 128); // MT-MST optic flow
+        let barrel_cortex = BarrelCortex::new(); // 5×5 whisker array
 
         // Homeostasis and plasticity
-        let homeostasis = HomeostaticSystem::new(5.0, -55.0);  // Target 5Hz, threshold -55mV
-        let heterosynaptic = HeterosynapticPlasticity::new(HETEROSYNAPTIC_SYNAPSES, HETEROSYNAPTIC_ASTROCYTES, 1000.0);
-        let structural_plasticity = StructuralPlasticity::new(base_neurons, 0.1, 50);  // 10% initial, 50 max/neuron
-        let etdp = crate::learning::ETDP::new(0.001);  // Voltage-dependent event-driven plasticity
-        let rstdp = crate::learning::RSTDPSystem::new(0.01);  // Reward-modulated STDP with meta-learning
-        let memristive_network = crate::synapse::MemristiveNetwork::new(base_neurons, 0.1);  // Memristive synapses with EM coupling
+        let homeostasis = HomeostaticSystem::new(5.0, -55.0); // Target 5Hz, threshold -55mV
+        let heterosynaptic = HeterosynapticPlasticity::new(
+            HETEROSYNAPTIC_SYNAPSES,
+            HETEROSYNAPTIC_ASTROCYTES,
+            1000.0,
+        );
+        let structural_plasticity = StructuralPlasticity::new(base_neurons, 0.1, 50); // 10% initial, 50 max/neuron
+        let etdp = crate::learning::ETDP::new(0.001); // Voltage-dependent event-driven plasticity
+        let rstdp = crate::learning::RSTDPSystem::new(0.01); // Reward-modulated STDP with meta-learning
+        let memristive_network = crate::synapse::MemristiveNetwork::new(base_neurons, 0.1); // Memristive synapses with EM coupling
 
         // Create CAdEx neurons (demonstration of different neuron types)
         let mut cadex_neurons = Vec::new();
@@ -308,7 +354,9 @@ impl NeuromorphicBrain {
             } else if i < 70 {
                 izhikevich_neurons.push(crate::neuron::IzhikevichNeuron::fast_spiking(i as u32));
             } else if i < 85 {
-                izhikevich_neurons.push(crate::neuron::IzhikevichNeuron::intrinsically_bursting(i as u32));
+                izhikevich_neurons.push(crate::neuron::IzhikevichNeuron::intrinsically_bursting(
+                    i as u32,
+                ));
             } else {
                 izhikevich_neurons.push(crate::neuron::IzhikevichNeuron::chattering(i as u32));
             }
@@ -318,7 +366,11 @@ impl NeuromorphicBrain {
         let mut dendritic_neurons = Vec::new();
         for i in 0..100 {
             // 5 branches per neuron, 20 synapses per branch
-            dendritic_neurons.push(crate::neuron::dendritic::DendriticNeuron::new(200 + i as u32, 5, 20));
+            dendritic_neurons.push(crate::neuron::dendritic::DendriticNeuron::new(
+                200 + i as u32,
+                5,
+                20,
+            ));
         }
 
         // Initialize vesicle pools for neurotransmitter dynamics
@@ -328,7 +380,7 @@ impl NeuromorphicBrain {
             vesicle_pools.push(crate::synapse::vesicles::VesiclePools::new(1000.0));
         }
 
-        let sleep = SleepConsolidation::new();  // Offline consolidation
+        let sleep = SleepConsolidation::new(); // Offline consolidation
 
         // Attention system
         let connectivity = Self::create_default_connectivity(pattern_dim);
@@ -440,10 +492,21 @@ impl NeuromorphicBrain {
             reward_history: Arc::new(DashMap::new()),
             encoding_mode: true,
             ifg_planner: IFGSyntacticPlanner::new(),
-            lexicon: Lexicon::empty(),  // Empty - learns from training data
+            lexicon: Lexicon::empty(), // Empty - learns from training data
             bond_level: 0.1,
             metacognition: Metacognition::new(),
             intent_rules: Vec::new(), // Initialized empty, filled by training/JSON
+
+            // Human-limit upgrades (2025)
+            emotional_state: EmotionalStateMachine::new(),
+            curiosity: CuriosityDrive::new(),
+            theory_of_mind: TheoryOfMind::new(0), // Self ID = 0
+            inner_dialogue: InnerDialogue::new(),
+            self_model: SelfModel::new(),
+            advanced_metacognition: CognitionMetacognition::new(),
+            abstract_reasoning: AbstractReasoning::new(),
+            knowledge_graph: KnowledgeGraph::new(),
+            enhanced_episodic: EnhancedEpisodicMemory::new(10000), // 10k episodes max
         }
     }
 
@@ -452,8 +515,8 @@ impl NeuromorphicBrain {
     /// Pipeline: Dual-stream language → Semantic hub → Working memory
     ///           → Hippocampus → Predictive coding → Response generation
     pub fn process_text(&mut self, text: &str) -> String {
-        let dt = 0.1;  // 0.1ms timestep
-        
+        let dt = 0.1; // 0.1ms timestep
+
         // 0. EMOTIONAL IMPACT: Words affect neuromodulators
         // "jsi blbý" decreases dopamine, "super" increases it
         self.apply_emotional_impact(text);
@@ -481,19 +544,20 @@ impl NeuromorphicBrain {
             // Flatten semantic vector for GPU
             let n_concepts = self.semantics.hub.n_cells;
             let dim = self.semantics.hub.dim;
-            
+
             // Dummy keys for now (would be memory slots)
-            let keys_flat = vec![0.5; n_concepts * dim]; 
-            
+            let keys_flat = vec![0.5; n_concepts * dim];
+
             match gpu_cog.compute_attention(&semantics, &keys_flat, n_concepts, dim) {
                 Ok(scores) => scores.iter().sum::<f32>().min(1.0), // Mock aggregate attention
-                Err(_) => 0.8
+                Err(_) => 0.8,
             }
         } else {
             0.8
         };
         let prediction_error = self.predictive.total_error();
-        self.neuromodulation.update(dt, attention_level, prediction_error, 0.3, false);
+        self.neuromodulation
+            .update(dt, attention_level, prediction_error, 0.3, false);
 
         // 5. Modulate learning rate based on ACh (encoding vs consolidation)
         let base_lr = 0.01;
@@ -507,7 +571,8 @@ impl NeuromorphicBrain {
             self.hippocampus.encode(&semantics);
 
             // Update spatial system (semantic space)
-            self.spatial.update(dt, (semantics[0], semantics.get(1).copied().unwrap_or(0.0)));
+            self.spatial
+                .update(dt, (semantics[0], semantics.get(1).copied().unwrap_or(0.0)));
         }
 
         // 8. Process through enhanced predictive hierarchy
@@ -517,7 +582,7 @@ impl NeuromorphicBrain {
 
         // 9. Apply interneuron sparse coding
         let mut activity = semantics.clone();
-        self.interneurons.apply_sparse_coding(&mut activity, 0.1);  // 10% sparsity
+        self.interneurons.apply_sparse_coding(&mut activity, 0.1); // 10% sparsity
 
         // 10. Update oscillations for theta-gamma coupling
         self.oscillations.update(dt, 0.5);
@@ -529,15 +594,80 @@ impl NeuromorphicBrain {
 
         // 12. Update homeostasis (BCM, synaptic scaling, criticality)
         let firing_rate = activity.iter().sum::<f32>() / activity.len() as f32;
-        self.homeostasis.update(dt, firing_rate, firing_rate, token_indices.len());
+        self.homeostasis
+            .update(dt, firing_rate, firing_rate, token_indices.len());
 
-            // 15. Generate response - SEMANTIC UNDERSTANDING
+        // === HUMAN-LIMIT COGNITIVE UPGRADES (2025) ===
+
+        // 13. Emotional State Processing
+        // Process text for emotional content and update state
+        self.emotional_state.process_input(text, dt);
+        self.emotional_state.update(dt);
+        let _emotional_stats = self.emotional_state.stats();
+
+        // 14. Curiosity-Driven Learning
+        let curiosity_reward = self.curiosity.process(prediction_error, &semantics);
+
+        // 15. Inner Dialogue - Multi-perspective deliberation
+        let inner_result = self.inner_dialogue.deliberate(text);
+        let inner_response = inner_result.selected_response;
+
+        // 16. Self Model - Record this interaction
+        self.self_model.record_response(text, &inner_response, None);
+
+        // 17. Knowledge Graph - Store concepts
+        for word in words.iter().take(5) {
+            // Limit to avoid overload
+            let word_embedding = self.get_word_embedding(word);
+            self.knowledge_graph
+                .add_entity(word.to_string(), word_embedding, "word".to_string());
+        }
+        self.knowledge_graph.tick(dt);
+
+        // 18. Enhanced Episodic Memory - Store episode
+        let outcome = if curiosity_reward > 0.5 {
+            vec![1.0]
+        } else {
+            vec![0.0]
+        };
+        self.enhanced_episodic.store(
+            semantics.clone(), // context
+            activity.clone(),  // content
+            outcome,           // outcome
+            attention_level,   // importance
+        );
+        self.enhanced_episodic.tick(dt);
+
+        // 19. Advanced Metacognition - Monitor cognitive process
+        let _strategy = self.advanced_metacognition.select_strategy(
+            prediction_error, // task complexity
+            10.0,             // time available
+        );
+
+        // 20. Theory of Mind - Track hypothetical other agent (self as agent 0)
+        // Observe our own "action" (the response we're about to generate)
+        self.theory_of_mind.observe_action(
+            0,                                     // self as agent
+            &semantics[..semantics.len().min(10)], // action representation
+            &activity[..activity.len().min(10)],   // context
+            self.time,
+        );
+
+        // 21. Abstract Reasoning - Add facts from current context
+        // Store relations between concepts for later inference
+        if words.len() >= 2 {
+            use crate::reasoning::abstract_reasoning::{Fact, Relation};
+            let fact = Fact::new(&words[0], Relation::Similar, &words[1]);
+            self.abstract_reasoning.add_fact(fact);
+        }
+
+        // 15. Generate response - SEMANTIC UNDERSTANDING
         let response_text = {
             // === STEP 1: Determine current MOOD from neuromodulators ===
             let dopamine = self.neuromodulation.dopamine_level;
             let serotonin = self.neuromodulation.serotonin.level;
             let norepinephrine = self.neuromodulation.norepinephrine.level;
-            
+
             let current_mood = if norepinephrine > 0.7 {
                 "angry"
             } else if serotonin < 0.3 {
@@ -549,29 +679,29 @@ impl NeuromorphicBrain {
             } else {
                 "neutral"
             };
-            
+
             // === BIOLOGICAL RESPONSE GENERATION ===
             // Using IFG (Inferior Frontal Gyrus) syntactic planner
-            
+
             // 0. Try DIRECT MEMORY retrieval first (Hippocampal path)
             // Memory is usually high confidence
             // Normalize input (remove extra spaces) to match dictionary keys
             let normalized_input = text.split_whitespace().collect::<Vec<&str>>().join(" ");
             let memory_response = self.check_direct_memory(&normalized_input);
-            
+
             let raw_thought = if let Some(resp) = memory_response {
                 resp
             } else {
                 // 1. GENERATIVE path (IFG)
                 // Detect intent from input
                 let intent = self.detect_intent(text);
-                
+
                 // Generate response using IFG planner
                 let generated = self.generate_sentence(intent);
-                
+
                 // If lexicon is empty (untrained), return simple acknowledgment based on mood
                 if generated.is_empty() {
-                     match current_mood {
+                    match current_mood {
                         "happy" => "☺".to_string(),
                         "sad" => "...".to_string(),
                         "angry" => "!".to_string(),
@@ -585,8 +715,10 @@ impl NeuromorphicBrain {
             // === METACOGNITION (System 2 Thinking) ===
             // Analyze the thought before speaking
             let context_complexity = 0.5; // Placeholder
-            let meta_state = self.metacognition.evaluate_thought(&raw_thought, context_complexity);
-            
+            let meta_state = self
+                .metacognition
+                .evaluate_thought(&raw_thought, context_complexity);
+
             // Log removed as per request (should be handled by CLI)
 
             // Refinement Logic (Phase 5)
@@ -600,12 +732,14 @@ impl NeuromorphicBrain {
         };
 
         // 14. Dorsal stream motor production (still run for learning)
-        let response_semantic = self.working_memory.retrieve(&semantics)
+        let response_semantic = self
+            .working_memory
+            .retrieve(&semantics)
             .unwrap_or_else(|| vec![0.0; self.pattern_dim]);
         let _response_motor = self.language.produce(&response_semantic, 10);
 
         // 15. Update basal ganglia with reward (basic: novelty-based)
-        let reward = prediction_error * 0.1;  // Novelty = reward
+        let reward = prediction_error * 0.1; // Novelty = reward
         let next_value = self.basal_ganglia.dopamine.value_estimate;
         self.basal_ganglia.update(reward, next_value, dt);
 
@@ -631,7 +765,13 @@ impl NeuromorphicBrain {
     ///
     /// Uses: Basal ganglia TD learning, dopamine-modulated STDP,
     ///       eligibility traces, neuromodulation, homeostasis
-    pub fn learn_from_reward(&mut self, state: &[f32], action: usize, reward: f32, next_state: &[f32]) {
+    pub fn learn_from_reward(
+        &mut self,
+        state: &[f32],
+        action: usize,
+        reward: f32,
+        next_state: &[f32],
+    ) {
         let dt = 0.1;
 
         // 1. Compute TD error via basal ganglia
@@ -639,7 +779,8 @@ impl NeuromorphicBrain {
         self.basal_ganglia.update(reward, next_value, dt);
 
         // 2. Set dopamine level in neuromodulation for opponent processing
-        self.neuromodulation.set_dopamine(self.basal_ganglia.dopamine.dopamine_level);
+        self.neuromodulation
+            .set_dopamine(self.basal_ganglia.dopamine.dopamine_level);
 
         // 3. Modulate serotonin based on outcome (patience)
         self.neuromodulation.serotonin.update(dt, reward > 0.0);
@@ -656,7 +797,8 @@ impl NeuromorphicBrain {
         self.hippocampus.encode(state);
 
         // 7. Update spatial representation
-        self.spatial.update(dt, (state[0], state.get(1).copied().unwrap_or(0.0)));
+        self.spatial
+            .update(dt, (state[0], state.get(1).copied().unwrap_or(0.0)));
     }
 
     /// Train on supervised input/output pairs with reward signal
@@ -669,14 +811,22 @@ impl NeuromorphicBrain {
 
         // 1. Add words to vocabulary
         for word in input.split_whitespace() {
-            let clean: String = word.to_lowercase().chars().filter(|c| c.is_alphanumeric()).collect();
+            let clean: String = word
+                .to_lowercase()
+                .chars()
+                .filter(|c| c.is_alphanumeric())
+                .collect();
             if !clean.is_empty() {
                 self.language.ventral.embeddings.add_word(clean);
             }
         }
         if let Some(out) = output {
             for word in out.split_whitespace() {
-                let clean: String = word.to_lowercase().chars().filter(|c| c.is_alphanumeric()).collect();
+                let clean: String = word
+                    .to_lowercase()
+                    .chars()
+                    .filter(|c| c.is_alphanumeric())
+                    .collect();
                 if !clean.is_empty() {
                     self.language.ventral.embeddings.add_word(clean);
                 }
@@ -685,9 +835,14 @@ impl NeuromorphicBrain {
 
         // 2. Process input through language system
         let input_words: Vec<&str> = input.split_whitespace().collect();
-        let input_indices: Vec<usize> = input_words.iter()
+        let input_indices: Vec<usize> = input_words
+            .iter()
             .filter_map(|w| {
-                let clean: String = w.to_lowercase().chars().filter(|c| c.is_alphanumeric()).collect();
+                let clean: String = w
+                    .to_lowercase()
+                    .chars()
+                    .filter(|c| c.is_alphanumeric())
+                    .collect();
                 self.language.get_word_idx(&clean)
             })
             .collect();
@@ -697,9 +852,14 @@ impl NeuromorphicBrain {
         // 3. If we have expected output, create associations
         if let Some(out) = output {
             let output_words: Vec<&str> = out.split_whitespace().collect();
-            let output_indices: Vec<usize> = output_words.iter()
+            let output_indices: Vec<usize> = output_words
+                .iter()
                 .filter_map(|w| {
-                    let clean: String = w.to_lowercase().chars().filter(|c| c.is_alphanumeric()).collect();
+                    let clean: String = w
+                        .to_lowercase()
+                        .chars()
+                        .filter(|c| c.is_alphanumeric())
+                        .collect();
                     self.language.get_word_idx(&clean)
                 })
                 .collect();
@@ -708,26 +868,29 @@ impl NeuromorphicBrain {
             for &in_idx in &input_indices {
                 for &out_idx in &output_indices {
                     // Reward-modulated association learning
-                    let effective_strength = reward.max(0.0) * 0.3;  // Scale reward
-                    self.language.learn_association(in_idx, out_idx, effective_strength);
+                    let effective_strength = reward.max(0.0) * 0.3; // Scale reward
+                    self.language
+                        .learn_association(in_idx, out_idx, effective_strength);
                 }
             }
 
             // Learn output semantics
             let output_semantics = self.language.comprehend(&output_indices);
-            
+
             // Store in hippocampus
             self.hippocampus.encode(&output_semantics);
-            
+
             // NOTE: Word learning now done in main.rs via lexicon.add_word()
         }
 
         // 4. Apply reward signal via dopamine system
         if reward != 0.0 {
             // Modulate dopamine based on reward
-            let da_change = reward * 0.2;  // Scale to reasonable range
-            self.neuromodulation.set_dopamine((self.basal_ganglia.dopamine.dopamine_level + da_change).clamp(0.0, 1.0));
-            
+            let da_change = reward * 0.2; // Scale to reasonable range
+            self.neuromodulation.set_dopamine(
+                (self.basal_ganglia.dopamine.dopamine_level + da_change).clamp(0.0, 1.0),
+            );
+
             // Update basal ganglia with reward
             let next_value = self.basal_ganglia.dopamine.value_estimate;
             self.basal_ganglia.update(reward, next_value, dt);
@@ -747,14 +910,22 @@ impl NeuromorphicBrain {
 
         // 1. Add words to vocabulary
         for word in input.split_whitespace() {
-            let clean: String = word.to_lowercase().chars().filter(|c| c.is_alphanumeric()).collect();
+            let clean: String = word
+                .to_lowercase()
+                .chars()
+                .filter(|c| c.is_alphanumeric())
+                .collect();
             if !clean.is_empty() {
                 self.language.ventral.embeddings.add_word(clean);
             }
         }
         if let Some(out) = output {
             for word in out.split_whitespace() {
-                let clean: String = word.to_lowercase().chars().filter(|c| c.is_alphanumeric()).collect();
+                let clean: String = word
+                    .to_lowercase()
+                    .chars()
+                    .filter(|c| c.is_alphanumeric())
+                    .collect();
                 if !clean.is_empty() {
                     self.language.ventral.embeddings.add_word(clean);
                 }
@@ -763,9 +934,14 @@ impl NeuromorphicBrain {
 
         // 2. Process input through language system
         let input_words: Vec<&str> = input.split_whitespace().collect();
-        let input_indices: Vec<usize> = input_words.iter()
+        let input_indices: Vec<usize> = input_words
+            .iter()
             .filter_map(|w| {
-                let clean: String = w.to_lowercase().chars().filter(|c| c.is_alphanumeric()).collect();
+                let clean: String = w
+                    .to_lowercase()
+                    .chars()
+                    .filter(|c| c.is_alphanumeric())
+                    .collect();
                 self.language.get_word_idx(&clean)
             })
             .collect();
@@ -775,9 +951,14 @@ impl NeuromorphicBrain {
         // 3. If we have expected output, create associations
         if let Some(out) = output {
             let output_words: Vec<&str> = out.split_whitespace().collect();
-            let output_indices: Vec<usize> = output_words.iter()
+            let output_indices: Vec<usize> = output_words
+                .iter()
                 .filter_map(|w| {
-                    let clean: String = w.to_lowercase().chars().filter(|c| c.is_alphanumeric()).collect();
+                    let clean: String = w
+                        .to_lowercase()
+                        .chars()
+                        .filter(|c| c.is_alphanumeric())
+                        .collect();
                     self.language.get_word_idx(&clean)
                 })
                 .collect();
@@ -786,14 +967,15 @@ impl NeuromorphicBrain {
             for &in_idx in &input_indices {
                 for &out_idx in &output_indices {
                     // Reward-modulated association learning
-                    let effective_strength = reward.max(0.0) * 0.3;  // Scale reward
-                    self.language.learn_association(in_idx, out_idx, effective_strength);
+                    let effective_strength = reward.max(0.0) * 0.3; // Scale reward
+                    self.language
+                        .learn_association(in_idx, out_idx, effective_strength);
                 }
             }
 
             // Learn output semantics
             let output_semantics = self.language.comprehend(&output_indices);
-            
+
             // Store in hippocampus
             self.hippocampus.encode(&output_semantics);
         }
@@ -801,9 +983,11 @@ impl NeuromorphicBrain {
         // 4. Apply reward signal via dopamine system
         if reward != 0.0 {
             // Modulate dopamine based on reward
-            let da_change = reward * 0.2;  // Scale to reasonable range
-            self.neuromodulation.set_dopamine((self.basal_ganglia.dopamine.dopamine_level + da_change).clamp(0.0, 1.0));
-            
+            let da_change = reward * 0.2; // Scale to reasonable range
+            self.neuromodulation.set_dopamine(
+                (self.basal_ganglia.dopamine.dopamine_level + da_change).clamp(0.0, 1.0),
+            );
+
             // Update basal ganglia with reward
             let next_value = self.basal_ganglia.dopamine.value_estimate;
             self.basal_ganglia.update(reward, next_value, dt);
@@ -814,11 +998,11 @@ impl NeuromorphicBrain {
 
         // NOTE: Skipped self.update(dt) for performance optimization
     }
-    
+
     /// Detect intent from input text
     pub fn detect_intent(&self, text: &str) -> IntentType {
         let lower = text.to_lowercase();
-        
+
         // 1. Check dynamic rules from JSON
         for (intent_type, keywords) in &self.intent_rules {
             for keyword in keywords {
@@ -827,34 +1011,38 @@ impl NeuromorphicBrain {
                 }
             }
         }
-        
+
         // 2. Default fallback
         IntentType::Statement
     }
-    
+
     /// Apply emotional impact from input words to neuromodulators
     /// Words affect mood: insults decrease dopamine, praise increases it
     pub fn apply_emotional_impact(&mut self, text: &str) {
         let lower = text.to_lowercase();
-        
+
         for word in lower.split_whitespace() {
             if let Some(annotated) = self.lexicon.get_by_text(word) {
                 let valence = annotated.emotional_valence;
-                
+
                 // === Apply detailed neuro_impact from JSON ===
                 if let Some(ref impacts) = annotated.neuro_impact {
                     if let Some(&val) = impacts.get("dopamine") {
-                         let new_val = (self.neuromodulation.dopamine_level + val * 0.1).clamp(0.0, 1.0);
-                         self.neuromodulation.set_dopamine(new_val);
+                        let new_val =
+                            (self.neuromodulation.dopamine_level + val * 0.1).clamp(0.0, 1.0);
+                        self.neuromodulation.set_dopamine(new_val);
                     }
                     if let Some(&val) = impacts.get("serotonin") {
-                         self.neuromodulation.serotonin.level = (self.neuromodulation.serotonin.level + val * 0.05).clamp(0.0, 1.0);
+                        self.neuromodulation.serotonin.level =
+                            (self.neuromodulation.serotonin.level + val * 0.05).clamp(0.0, 1.0);
                     }
                     if let Some(&val) = impacts.get("norepinephrine") {
-                         self.neuromodulation.norepinephrine.level = (self.neuromodulation.norepinephrine.level + val * 0.1).clamp(0.0, 1.0);
+                        self.neuromodulation.norepinephrine.level =
+                            (self.neuromodulation.norepinephrine.level + val * 0.1).clamp(0.0, 1.0);
                     }
                     if let Some(&val) = impacts.get("oxytocin") {
-                         self.neuromodulation.oxytocin.level = (self.neuromodulation.oxytocin.level + val * 0.05).clamp(0.0, 1.0);
+                        self.neuromodulation.oxytocin.level =
+                            (self.neuromodulation.oxytocin.level + val * 0.05).clamp(0.0, 1.0);
                     }
                 }
 
@@ -864,42 +1052,52 @@ impl NeuromorphicBrain {
                     let da_change = valence * 0.1;
                     let new_da = (self.neuromodulation.dopamine_level + da_change).clamp(0.0, 1.0);
                     self.neuromodulation.set_dopamine(new_da);
-                    
+
                     // Negative words decrease serotonin
                     if valence < 0.0 {
-                        self.neuromodulation.serotonin.level = 
+                        self.neuromodulation.serotonin.level =
                             (self.neuromodulation.serotonin.level + valence * 0.05).clamp(0.0, 1.0);
                         // Very negative = increase norepinephrine (anger/stress)
                         if valence < -0.3 {
-                            self.neuromodulation.norepinephrine.level = 
+                            self.neuromodulation.norepinephrine.level =
                                 (self.neuromodulation.norepinephrine.level + 0.1).clamp(0.0, 1.0);
                         }
                     }
                 }
             }
         }
-        
+
         // Also check for known negative patterns
-        let negative_patterns = ["blbý", "blbec", "debil", "idiot", "hovado", "kravina", "píčovina"];
+        let negative_patterns = [
+            "blbý",
+            "blbec",
+            "debil",
+            "idiot",
+            "hovado",
+            "kravina",
+            "píčovina",
+        ];
         for pattern in negative_patterns {
             if lower.contains(pattern) {
-                self.neuromodulation.set_dopamine((self.neuromodulation.dopamine_level - 0.2).clamp(0.0, 1.0));
-                self.neuromodulation.norepinephrine.level = 
+                self.neuromodulation
+                    .set_dopamine((self.neuromodulation.dopamine_level - 0.2).clamp(0.0, 1.0));
+                self.neuromodulation.norepinephrine.level =
                     (self.neuromodulation.norepinephrine.level + 0.15).clamp(0.0, 1.0);
             }
         }
-        
+
         let positive_patterns = ["super", "skvělé", "výborně", "díky", "děkuju", "miluju"];
         for pattern in positive_patterns {
             if lower.contains(pattern) {
-                self.neuromodulation.set_dopamine((self.neuromodulation.dopamine_level + 0.15).clamp(0.0, 1.0));
-                self.neuromodulation.serotonin.level = 
+                self.neuromodulation
+                    .set_dopamine((self.neuromodulation.dopamine_level + 0.15).clamp(0.0, 1.0));
+                self.neuromodulation.serotonin.level =
                     (self.neuromodulation.serotonin.level + 0.05).clamp(0.0, 1.0);
                 // Build bond through positive interactions
                 self.bond_level = (self.bond_level + 0.05).clamp(0.0, 1.0);
             }
         }
-        
+
         // Decrease bond for negative interactions
         for pattern in negative_patterns {
             if lower.contains(pattern) {
@@ -907,12 +1105,14 @@ impl NeuromorphicBrain {
             }
         }
     }
-    
+
     /// Generate sentence word-by-word using IFG syntactic planner
     /// Uses semantic knowledge: responds_to, context_tags, pragmatic_rules
     /// Check direct associative memory for known phrases
     fn check_direct_memory(&self, input: &str) -> Option<String> {
-        let key = input.trim().to_lowercase()
+        let key = input
+            .trim()
+            .to_lowercase()
             .replace("?", "")
             .replace("!", "")
             .replace(".", "")
@@ -923,17 +1123,18 @@ impl NeuromorphicBrain {
         if let Some(options) = self.ifg_planner.direct_memory.get(&key) {
             // Filter by bond (Oxytocin level needed for intimate responses)
             let current_bond = self.neuromodulation.oxytocin.level;
-            
-            let accessible: Vec<&String> = options.iter()
+
+            let accessible: Vec<&String> = options
+                .iter()
                 .filter(|(_, req)| current_bond >= *req)
                 .map(|(text, _)| text)
                 .collect();
-            
+
             // Pick random accessible response
             if !accessible.is_empty() {
-                 let mut rng = rand::thread_rng();
-                 let choice = rng.gen_range(0..accessible.len());
-                 return Some(accessible[choice].clone());
+                let mut rng = rand::thread_rng();
+                let choice = rng.gen_range(0..accessible.len());
+                return Some(accessible[choice].clone());
             }
         }
         None
@@ -943,7 +1144,7 @@ impl NeuromorphicBrain {
     pub fn generate_sentence(&mut self, input_intent: IntentType) -> String {
         // === STEP 1: Apply pragmatic rules to determine response intent ===
         let response_intent = self.apply_pragmatic_rules(input_intent);
-        
+
         // Convert intent to context string for matching
         let intent_context = match input_intent {
             IntentType::Greeting => "greeting",
@@ -954,7 +1155,7 @@ impl NeuromorphicBrain {
             IntentType::Farewell => "farewell",
             _ => "statement",
         };
-        
+
         let response_intent_str = match response_intent {
             IntentType::Greeting => "greeting",
             IntentType::Statement => "statement",
@@ -972,21 +1173,21 @@ impl NeuromorphicBrain {
         if let Some(responses) = self.ifg_planner.learned_responses.get(response_intent_str) {
             use rand::seq::SliceRandom;
             let mut rng = rand::thread_rng();
-            
+
             // Try up to 5 times to find a bond-apropriate response
             for _ in 0..5 {
                 if let Some(candidate) = responses.choose(&mut rng) {
                     // Check bond requirement for this phrase
                     let mut bond_ok = true;
                     for word in candidate.split_whitespace() {
-                         if let Some(annotated) = self.lexicon.get_by_text(word) {
-                             if annotated.requires_bond > self.bond_level {
-                                 bond_ok = false;
-                                 break;
-                             }
-                         }
+                        if let Some(annotated) = self.lexicon.get_by_text(word) {
+                            if annotated.requires_bond > self.bond_level {
+                                bond_ok = false;
+                                break;
+                            }
+                        }
                     }
-                    
+
                     if bond_ok {
                         return candidate.clone();
                     }
@@ -997,98 +1198,122 @@ impl NeuromorphicBrain {
         // === TRY 2: Generate word-by-word (IFG Construction) ===
         // Plan sentence structure based on response intent
         self.ifg_planner.plan_sentence(response_intent);
-        
+
         let mut rng = rand::thread_rng();
         let dopamine = self.neuromodulation.dopamine_level;
         let serotonin = self.neuromodulation.serotonin.level;
         let norepinephrine = self.neuromodulation.norepinephrine.level;
-        
+
         let is_happy = dopamine > 0.6;
         let is_sad = serotonin < 0.3;
         let is_angry = norepinephrine > 0.6;
-        
+
         // Generate word by word with INTELLIGENT selection
         while let Some(required_pos) = self.ifg_planner.next_required_pos() {
             // === STEP 2: Get words that RESPOND TO this intent ===
             // Clone all words and filter by bond level
             let current_bond = self.bond_level;
-            let all_pos_words: Vec<AnnotatedWord> = self.lexicon.get_by_pos(required_pos)
+            let all_pos_words: Vec<AnnotatedWord> = self
+                .lexicon
+                .get_by_pos(required_pos)
                 .into_iter()
                 .cloned()
                 // Filter by bond level - some words require high attachment
                 .filter(|w| w.requires_bond <= current_bond)
                 .collect();
-            
+
             // Filter by responds_to (words that make sense as response to this input)
             // PRIORITY 1: Words that explicitly respond to this intent
-            let responds_to_matching: Vec<AnnotatedWord> = all_pos_words.iter()
+            let responds_to_matching: Vec<AnnotatedWord> = all_pos_words
+                .iter()
                 .filter(|w| w.responds_to.iter().any(|r| r == intent_context))
                 .cloned()
                 .collect();
-            
+
             // PRIORITY 2: Words with matching context tag (greeting responds to greeting)
             let context_matching: Vec<AnnotatedWord> = if responds_to_matching.is_empty() {
-                all_pos_words.iter()
+                all_pos_words
+                    .iter()
                     .filter(|w| w.context_tags.iter().any(|c| c == intent_context))
                     .cloned()
                     .collect()
             } else {
                 responds_to_matching
             };
-            
+
             // === STEP 3: Apply mood filtering ===
             let candidates: Vec<AnnotatedWord> = if !context_matching.is_empty() {
                 // Use context-matching words
                 if is_happy {
-                    let positive: Vec<_> = context_matching.iter()
+                    let positive: Vec<_> = context_matching
+                        .iter()
                         .filter(|w| w.emotional_valence > 0.0)
                         .cloned()
                         .collect();
-                    if positive.is_empty() { context_matching } else { positive }
+                    if positive.is_empty() {
+                        context_matching
+                    } else {
+                        positive
+                    }
                 } else if is_sad || is_angry {
-                    let negative: Vec<_> = context_matching.iter()
+                    let negative: Vec<_> = context_matching
+                        .iter()
                         .filter(|w| w.emotional_valence < 0.0)
                         .cloned()
                         .collect();
-                    if negative.is_empty() { context_matching } else { negative }
+                    if negative.is_empty() {
+                        context_matching
+                    } else {
+                        negative
+                    }
                 } else {
                     context_matching
                 }
             } else {
                 // Fallback: just use POS matching with mood
                 if is_happy {
-                    let positive: Vec<_> = all_pos_words.iter()
+                    let positive: Vec<_> = all_pos_words
+                        .iter()
                         .filter(|w| w.emotional_valence > 0.2)
                         .cloned()
                         .collect();
-                    if positive.is_empty() { all_pos_words.clone() } else { positive }
+                    if positive.is_empty() {
+                        all_pos_words.clone()
+                    } else {
+                        positive
+                    }
                 } else if is_sad || is_angry {
-                    let negative: Vec<_> = all_pos_words.iter()
+                    let negative: Vec<_> = all_pos_words
+                        .iter()
                         .filter(|w| w.emotional_valence < -0.2)
                         .cloned()
                         .collect();
-                    if negative.is_empty() { all_pos_words.clone() } else { negative }
+                    if negative.is_empty() {
+                        all_pos_words.clone()
+                    } else {
+                        negative
+                    }
                 } else {
                     all_pos_words
                 }
             };
-            
+
             if candidates.is_empty() {
                 self.ifg_planner.current_position += 1;
                 continue;
             }
-            
+
             // Select word (with some randomness for variety)
             let mut rng = rand::thread_rng();
             let idx = rng.gen_range(0..candidates.len());
             let selected = candidates[idx].clone();
-            
+
             self.ifg_planner.add_word(selected);
         }
-        
+
         self.ifg_planner.get_sentence()
     }
-    
+
     /// Apply pragmatic rules to determine appropriate response intent
     fn apply_pragmatic_rules(&self, input_intent: IntentType) -> IntentType {
         let input_str = match input_intent {
@@ -1106,7 +1331,7 @@ impl NeuromorphicBrain {
             IntentType::Philosophy => "philosophy",
             IntentType::Clarification => "clarification",
         };
-        
+
         // Find matching pragmatic rule
         for rule in &self.ifg_planner.pragmatic_rules {
             if rule.input_intent == input_str {
@@ -1123,7 +1348,7 @@ impl NeuromorphicBrain {
                 };
             }
         }
-        
+
         // Default: respond with response intent
         IntentType::Response
     }
@@ -1135,7 +1360,7 @@ impl NeuromorphicBrain {
     pub fn consolidate(&mut self) {
         log::info!("Beginning sleep-like consolidation with full biological mechanisms...");
 
-        let dt = 1.0;  // 1ms timesteps during consolidation
+        let dt = 1.0; // 1ms timesteps during consolidation
 
         // 1. Set to consolidation mode (low ACh)
         self.neuromodulation.acetylcholine.set_encoding_mode(false);
@@ -1154,13 +1379,17 @@ impl NeuromorphicBrain {
             } else {
                 0.5
             };
-            self.sleep.store_experience(pattern.clone(), priority_scalar.abs(), vec![0]);
+            self.sleep
+                .store_experience(pattern.clone(), priority_scalar.abs(), vec![0]);
         }
 
         // 4. Run sleep consolidation (sharp-wave ripples + slow oscillations)
-        let sleep_duration = 3600.0;  // 1 hour of simulated sleep
+        let sleep_duration = 3600.0; // 1 hour of simulated sleep
         let consolidation_result = self.sleep.sleep(sleep_duration, dt);
-        log::info!("Sleep consolidation: {} replay events", consolidation_result.total_replays);
+        log::info!(
+            "Sleep consolidation: {} replay events",
+            consolidation_result.total_replays
+        );
 
         // 5. Replay with theta-gamma coupling
         for (pattern, _priority) in &replayed {
@@ -1168,7 +1397,9 @@ impl NeuromorphicBrain {
             self.oscillations.theta.update(dt);
 
             // Modulate gamma by theta phase (slow gamma for retrieval)
-            self.oscillations.gamma_slow.modulate_by_theta(self.oscillations.theta.get_phase());
+            self.oscillations
+                .gamma_slow
+                .modulate_by_theta(self.oscillations.theta.get_phase());
 
             // Process through predictive hierarchy
             let level0_size = self.predictive.levels[0].layer4.len();
@@ -1181,7 +1412,10 @@ impl NeuromorphicBrain {
 
         // 6. Apply synaptic downscaling from sleep system
         if consolidation_result.synaptic_scaling_factor > 0.0 {
-            log::info!("Applying synaptic downscaling: {:.3}", consolidation_result.synaptic_scaling_factor);
+            log::info!(
+                "Applying synaptic downscaling: {:.3}",
+                consolidation_result.synaptic_scaling_factor
+            );
             // Apply to connectivity weights
             // (In full implementation, would iterate all synapses)
         }
@@ -1203,8 +1437,12 @@ impl NeuromorphicBrain {
         self.encoding_mode = true;
         self.oscillations.set_encoding_mode(true);
 
-        log::info!("Consolidation complete. Criticality: {:.3}, Scaling: {:.3}, Sleep replays: {}",
-            stats.criticality_score, stats.scaling_factor, consolidation_result.total_replays);
+        log::info!(
+            "Consolidation complete. Criticality: {:.3}, Scaling: {:.3}, Sleep replays: {}",
+            stats.criticality_score,
+            stats.scaling_factor,
+            consolidation_result.total_replays
+        );
     }
 
     /// Update all brain dynamics (FULL biological update loop with ALL new systems)
@@ -1222,11 +1460,12 @@ impl NeuromorphicBrain {
         // 4. Update neuromodulation (ACh/NE/5-HT)
         let attention = self.attention.stats().avg_salience;
         let pred_error = self.predictive.total_error();
-        self.neuromodulation.update(dt, attention, pred_error, 0.3, false);
+        self.neuromodulation
+            .update(dt, attention, pred_error, 0.3, false);
 
         // 5. Update cerebellum (motor learning via STDP)
         // Generate motor inputs from spatial system + basal ganglia
-        let mut motor_input_left = vec![false; 246];  // 246 mossy fibers (bool spikes)
+        let mut motor_input_left = vec![false; 246]; // 246 mossy fibers (bool spikes)
         let mut motor_input_right = vec![false; 246];
 
         // Encode spatial velocity and BG value into mossy fiber patterns
@@ -1263,22 +1502,29 @@ impl NeuromorphicBrain {
             error_right[i] = pred_error * 0.2 + (prev_motor_right - bg_value).abs() * 0.1;
         }
 
-        let (left_motor_out, right_motor_out) = self.cerebellum.update(dt, &motor_input_left, &motor_input_right, &error_left, &error_right);
+        let (left_motor_out, right_motor_out) = self.cerebellum.update(
+            dt,
+            &motor_input_left,
+            &motor_input_right,
+            &error_left,
+            &error_right,
+        );
 
         // USE cerebellum output - motor corrections influence basal ganglia
-        let motor_correction = (left_motor_out.iter().sum::<f32>() + right_motor_out.iter().sum::<f32>()) /
-                               (left_motor_out.len() + right_motor_out.len()) as f32;
+        let motor_correction = (left_motor_out.iter().sum::<f32>()
+            + right_motor_out.iter().sum::<f32>())
+            / (left_motor_out.len() + right_motor_out.len()) as f32;
 
         // 6. Update amygdala (emotional processing)
         // Use active pattern count as a simple environmental context proxy
         let context = self.working_memory.active_count() as usize;
-        let cs_input = vec![attention; 10];  // Conditioned stimulus from attention
-        let us_present = if pred_error > 0.5 { 1.0 } else { 0.0 };  // Unconditioned stimulus from error
+        let cs_input = vec![attention; 10]; // Conditioned stimulus from attention
+        let us_present = if pred_error > 0.5 { 1.0 } else { 0.0 }; // Unconditioned stimulus from error
         let fear_output = self.amygdala.update(dt, &cs_input, us_present, context);
 
         // USE amygdala output - fear modulates attention and learning
-        let emotional_modulation = fear_output * 2.0;  // Fear amplifies salience
-        // Apply emotional modulation to neuromodulation (already updated above, will use in next cycle)
+        let emotional_modulation = fear_output * 2.0; // Fear amplifies salience
+                                                      // Apply emotional modulation to neuromodulation (already updated above, will use in next cycle)
 
         // 6a. Superior Colliculus and Thalamus will be updated AFTER sensory processing
         // (moved to after V1/Cochlea/Motion/Barrel for proper data flow)
@@ -1293,7 +1539,8 @@ impl NeuromorphicBrain {
         let mut post_activity = Vec::new();
 
         // Flatten working memory patterns for structural plasticity
-        for pattern in wm_activity.iter().take(10) {  // Up to 10 patterns
+        for pattern in wm_activity.iter().take(10) {
+            // Up to 10 patterns
             pre_activity.extend_from_slice(&pattern[..pattern.len().min(100)]);
         }
         // Resize to match structural plasticity neuron count to avoid out of bounds
@@ -1302,16 +1549,21 @@ impl NeuromorphicBrain {
         // Post-activity from attention-modulated patterns
         post_activity = pre_activity.iter().map(|&x| x * attention).collect();
 
-        self.structural_plasticity.update(&pre_activity, &post_activity, (self.time / 1000.0) as u32);
+        self.structural_plasticity.update(
+            &pre_activity,
+            &post_activity,
+            (self.time / 1000.0) as u32,
+        );
 
         // 9a. Update ETDP with ACTUAL voltage/spike detection
         // Collect voltage changes from CAdEx and Izhikevich neurons
         for (i, neuron) in self.cadex_neurons.iter().enumerate() {
             let voltage = neuron.voltage();
-            let voltage_change = voltage - (-70.0);  // Compare to resting potential
+            let voltage_change = voltage - (-70.0); // Compare to resting potential
 
             // Detect significant voltage events (not just spikes!)
-            if voltage_change.abs() > 5.0 {  // 5mV threshold
+            if voltage_change.abs() > 5.0 {
+                // 5mV threshold
                 self.etdp.detect_event(i, voltage_change, true);
             }
         }
@@ -1321,7 +1573,7 @@ impl NeuromorphicBrain {
             let voltage_change = voltage - (-70.0);
 
             if voltage_change.abs() > 5.0 {
-                self.etdp.detect_event(100 + i, voltage_change, true);  // Offset by 100 for unique IDs
+                self.etdp.detect_event(100 + i, voltage_change, true); // Offset by 100 for unique IDs
             }
         }
 
@@ -1331,7 +1583,7 @@ impl NeuromorphicBrain {
         // 9b. Update R-STDP with ACTUAL spike events
         // Collect spikes from CAdEx and Izhikevich neurons
         // ALSO collect for heterosynaptic plasticity (need 10k synapses)
-        let mut spike_events: Vec<(usize, bool)> = Vec::new();  // (neuron_id, spiked)
+        let mut spike_events: Vec<(usize, bool)> = Vec::new(); // (neuron_id, spiked)
 
         // Initialize spike buffers for heterosynaptic (matches const HETEROSYNAPTIC_SYNAPSES)
         let mut hetero_pre_spikes = vec![false; HETEROSYNAPTIC_SYNAPSES];
@@ -1344,17 +1596,18 @@ impl NeuromorphicBrain {
 
             // Collect voltage-based activity for heterosynaptic
             let voltage = neuron.voltage();
-            let activity = ((voltage + 70.0) / 50.0).clamp(0.0, 1.0);  // Normalize to 0-1
+            let activity = ((voltage + 70.0) / 50.0).clamp(0.0, 1.0); // Normalize to 0-1
 
             if spiked {
                 spike_events.push((i, true));
                 // For R-STDP: assume simple connectivity (each neuron connects to next 10)
-                let post_neurons: Vec<usize> = ((i+1)..(i+11).min(200)).collect();
+                let post_neurons: Vec<usize> = ((i + 1)..(i + 11).min(200)).collect();
                 self.rstdp.on_pre_spike(i, &post_neurons, dt);
 
                 // For heterosynaptic: each neuron maps to multiple synapses
                 let synapse_start = i * SYNAPSES_PER_NEURON;
-                let synapse_end = (synapse_start + SYNAPSES_PER_NEURON).min(HETEROSYNAPTIC_SYNAPSES);
+                let synapse_end =
+                    (synapse_start + SYNAPSES_PER_NEURON).min(HETEROSYNAPTIC_SYNAPSES);
                 for syn_id in synapse_start..synapse_end {
                     hetero_pre_spikes[syn_id] = true;
                     hetero_activity[syn_id] = activity;
@@ -1370,14 +1623,16 @@ impl NeuromorphicBrain {
             let activity = ((voltage + 70.0) / 50.0).clamp(0.0, 1.0);
 
             if spiked {
-                let neuron_id = 100 + i;  // Offset
+                let neuron_id = 100 + i; // Offset
                 spike_events.push((neuron_id, true));
-                let post_neurons: Vec<usize> = ((neuron_id+1)..(neuron_id+11).min(200)).collect();
+                let post_neurons: Vec<usize> =
+                    ((neuron_id + 1)..(neuron_id + 11).min(200)).collect();
                 self.rstdp.on_pre_spike(neuron_id, &post_neurons, dt);
 
                 // For heterosynaptic: continue mapping (neurons 100-199 → second half of synapses)
                 let synapse_start = HETEROSYNAPTIC_SYNAPSES / 2 + i * SYNAPSES_PER_NEURON;
-                let synapse_end = (synapse_start + SYNAPSES_PER_NEURON).min(HETEROSYNAPTIC_SYNAPSES);
+                let synapse_end =
+                    (synapse_start + SYNAPSES_PER_NEURON).min(HETEROSYNAPTIC_SYNAPSES);
                 for syn_id in synapse_start..synapse_end {
                     hetero_pre_spikes[syn_id] = true;
                     hetero_activity[syn_id] = activity;
@@ -1389,7 +1644,7 @@ impl NeuromorphicBrain {
         // Simulate sparse synaptic inputs to branches
         use rand::Rng;
         let mut rng = rand::thread_rng();
-        
+
         for neuron in &mut self.dendritic_neurons {
             // Generate random branch inputs (simulated cortical background)
             let mut branch_inputs = Vec::new();
@@ -1397,7 +1652,7 @@ impl NeuromorphicBrain {
                 let spikes: Vec<bool> = (0..20).map(|_| rng.gen::<f32>() < 0.05).collect(); // 5% active
                 branch_inputs.push(spikes);
             }
-            
+
             neuron.update(dt, &branch_inputs);
             // Dendritic neurons maintain internal calcium state automatically
         }
@@ -1411,7 +1666,7 @@ impl NeuromorphicBrain {
         }
 
         // Apply reward signal from basal ganglia dopamine
-        let reward_signal = self.basal_ganglia.dopamine.dopamine_level - 0.5;  // Normalized reward
+        let reward_signal = self.basal_ganglia.dopamine.dopamine_level - 0.5; // Normalized reward
         self.rstdp.apply_reward(reward_signal, dt);
 
         // Now weight changes are computed and ready to be applied
@@ -1420,12 +1675,18 @@ impl NeuromorphicBrain {
         // Post-synaptic spikes: assume downstream connectivity (shifted pattern)
         for i in 0..HETEROSYNAPTIC_SYNAPSES {
             if i > 0 && hetero_pre_spikes[i - 1] {
-                hetero_post_spikes[i] = true;  // Simple forward connectivity
+                hetero_post_spikes[i] = true; // Simple forward connectivity
             }
         }
 
-        let hetero_changes = self.heterosynaptic.update(&hetero_activity, &hetero_pre_spikes, &hetero_post_spikes, dt);
-        let avg_hetero_change: f32 = hetero_changes.iter().sum::<f32>() / hetero_changes.len() as f32;
+        let hetero_changes = self.heterosynaptic.update(
+            &hetero_activity,
+            &hetero_pre_spikes,
+            &hetero_post_spikes,
+            dt,
+        );
+        let avg_hetero_change: f32 =
+            hetero_changes.iter().sum::<f32>() / hetero_changes.len() as f32;
 
         // 9d. Update memristive network (EM field coupling)
         // Generate 3D positions in a cortical column layout
@@ -1434,8 +1695,8 @@ impl NeuromorphicBrain {
 
         // Dynamic grid size based on neuron count
         let grid_size = (n_neurons as f32).sqrt().ceil() as usize;
-        let spacing = 0.05;  // 50μm spacing (biological cortical columns)
-        let layers = 6;  // Cortical layers
+        let spacing = 0.05; // 50μm spacing (biological cortical columns)
+        let layers = 6; // Cortical layers
 
         for i in 0..n_neurons {
             let layer = (i * layers) / n_neurons;
@@ -1445,7 +1706,7 @@ impl NeuromorphicBrain {
             // Center the grid around origin
             let x = (grid_x as f32 - grid_size as f32 / 2.0) * spacing;
             let y = (grid_y as f32 - grid_size as f32 / 2.0) * spacing;
-            let z = layer as f32 * 0.3;  // 300μm layer spacing
+            let z = layer as f32 * 0.3; // 300μm layer spacing
 
             neuron_positions.push((x, y, z));
         }
@@ -1454,17 +1715,22 @@ impl NeuromorphicBrain {
         let mut neuron_currents = Vec::with_capacity(n_neurons);
         for neuron in self.cadex_neurons.iter().take(n_neurons / 2) {
             let voltage = neuron.voltage();
-            let current = (voltage + 70.0) / 100.0;  // Normalize to ~0-1 range
+            let current = (voltage + 70.0) / 100.0; // Normalize to ~0-1 range
             neuron_currents.push(current);
         }
-        for neuron in self.izhikevich_neurons.iter().take(n_neurons - neuron_currents.len()) {
+        for neuron in self
+            .izhikevich_neurons
+            .iter()
+            .take(n_neurons - neuron_currents.len())
+        {
             let voltage = neuron.voltage();
             let current = (voltage + 70.0) / 100.0;
             neuron_currents.push(current);
         }
-        neuron_currents.resize(neuron_positions.len(), 0.1);  // Fill remainder
+        neuron_currents.resize(neuron_positions.len(), 0.1); // Fill remainder
 
-        self.memristive_network.update_em_field(dt, &neuron_currents);
+        self.memristive_network
+            .update_em_field(dt, &neuron_currents);
 
         // 9d. Vesicle pools are integrated at the synapse level
         // They are automatically updated during synaptic transmission in various subsystems
@@ -1473,13 +1739,21 @@ impl NeuromorphicBrain {
 
         // 10. Update homeostasis continuously
         // Compute average firing rate from CAdEx and Izhikevich neurons
-        let total_spikes = self.cadex_neurons.iter().filter(|n| n.state.refractory_counter > 0).count()
-                         + self.izhikevich_neurons.iter().filter(|n| n.state.refractory_counter > 0).count();
+        let total_spikes = self
+            .cadex_neurons
+            .iter()
+            .filter(|n| n.state.refractory_counter > 0)
+            .count()
+            + self
+                .izhikevich_neurons
+                .iter()
+                .filter(|n| n.state.refractory_counter > 0)
+                .count();
         let total_neurons = self.cadex_neurons.len() + self.izhikevich_neurons.len();
         let avg_rate = if total_neurons > 0 {
-            (total_spikes as f32 / total_neurons as f32) * (1000.0 / dt)  // Convert to Hz
+            (total_spikes as f32 / total_neurons as f32) * (1000.0 / dt) // Convert to Hz
         } else {
-            5.0  // Fallback default
+            5.0 // Fallback default
         };
         self.homeostasis.update(dt, avg_rate, avg_rate, 1);
 
@@ -1507,7 +1781,9 @@ impl NeuromorphicBrain {
             let phase = (self.time * 0.01) % (2.0 * std::f32::consts::PI);
             for i in 0..v1_height {
                 for j in 0..v1_width {
-                    visual_input[i][j] = VISUAL_PATTERN_BASELINE + VISUAL_PATTERN_AMPLITUDE * ((i as f32 / VISUAL_PATTERN_FREQUENCY + phase).sin());
+                    visual_input[i][j] = VISUAL_PATTERN_BASELINE
+                        + VISUAL_PATTERN_AMPLITUDE
+                            * ((i as f32 / VISUAL_PATTERN_FREQUENCY + phase).sin());
                 }
             }
         }
@@ -1516,7 +1792,10 @@ impl NeuromorphicBrain {
         // === GPU V1 ACCELERATION (100× faster) ===
         let v1_output = if let Some(ref mut gpu_v1) = self.gpu_v1 {
             // GPU path: Flatten 2D input to 1D, process on GPU, reshape back to 3D
-            let flattened: Vec<f32> = visual_input.iter().flat_map(|row| row.iter().copied()).collect();
+            let flattened: Vec<f32> = visual_input
+                .iter()
+                .flat_map(|row| row.iter().copied())
+                .collect();
             match gpu_v1.process(&flattened) {
                 Ok(gpu_output) => {
                     // Reshape GPU output [128×128×4] back to Vec<Vec<Vec<f32>>>
@@ -1545,7 +1824,7 @@ impl NeuromorphicBrain {
         // 12b. Cochlea Audio Processing (auditory input)
         // Generate synthetic audio from theta oscillation (simulated auditory stream)
         let theta_phase = self.oscillations.theta.get_phase();
-        let audio_sample = (theta_phase * 440.0).sin() * 0.5;  // 440 Hz tone modulated by theta
+        let audio_sample = (theta_phase * 440.0).sin() * 0.5; // 440 Hz tone modulated by theta
         let cochlea_spikes = self.cochlea.process(audio_sample, dt);
         // cochlea_spikes is Vec<bool> - spike train per frequency channel
 
@@ -1555,7 +1834,8 @@ impl NeuromorphicBrain {
         // === GPU MOTION ACCELERATION (80× faster) ===
         let (motion_output, optic_flow) = if let Some(ref mut gpu_motion) = self.gpu_motion {
             // GPU path: Flatten V1 output to 1D, process on GPU
-            let flattened_v1: Vec<f32> = v1_output.iter()
+            let flattened_v1: Vec<f32> = v1_output
+                .iter()
                 .flat_map(|x| x.iter().flat_map(|y| y.iter().copied()))
                 .collect();
 
@@ -1563,7 +1843,7 @@ impl NeuromorphicBrain {
                 Ok(gpu_motion_out) => {
                     // Convert GPU output back to CPU format
                     let motion_output = crate::cortex::MotionOutput {
-                        heading_x: 0.0,  // Will be computed from flow
+                        heading_x: 0.0, // Will be computed from flow
                         heading_y: 0.0,
                         expansion_strength: gpu_motion_out.expansion_strength,
                         rotation_angle: 0.0,
@@ -1604,12 +1884,20 @@ impl NeuromorphicBrain {
         // Pattern based on spatial position (simulates object contact)
         for i in 0..5 {
             for j in 0..5 {
-                let distance = ((i as f32 - spatial_x / 10.0).powi(2) + (j as f32 - spatial_y / 10.0).powi(2)).sqrt();
-                whisker_deflections[i][j] = if distance < 2.0 { 0.8 * (1.0 - distance / 2.0) } else { 0.0 };
-                whisker_velocities[i][j] = whisker_deflections[i][j] * 0.5;  // Velocity proportional to deflection
+                let distance = ((i as f32 - spatial_x / 10.0).powi(2)
+                    + (j as f32 - spatial_y / 10.0).powi(2))
+                .sqrt();
+                whisker_deflections[i][j] = if distance < 2.0 {
+                    0.8 * (1.0 - distance / 2.0)
+                } else {
+                    0.0
+                };
+                whisker_velocities[i][j] = whisker_deflections[i][j] * 0.5; // Velocity proportional to deflection
             }
         }
-        let barrel_output = self.barrel_cortex.process(&whisker_deflections, &whisker_velocities, dt);
+        let barrel_output =
+            self.barrel_cortex
+                .process(&whisker_deflections, &whisker_velocities, dt);
         // barrel_output is Vec<Vec<f32>> - 5x5 cortical column outputs
 
         // 12e. NOW update Thalamus with REAL sensory data (proper data flow!)
@@ -1642,7 +1930,13 @@ impl NeuromorphicBrain {
         // Resize to match thalamus input, fill with prediction error signal
         cortical_feedback.resize(THALAMUS_INPUT_SIZE, pred_error * 0.1);
 
-        self.thalamus.update(&visual_thalamic, &auditory_thalamic, &somatosensory_thalamic, &cortical_feedback, dt);
+        self.thalamus.update(
+            &visual_thalamic,
+            &auditory_thalamic,
+            &somatosensory_thalamic,
+            &cortical_feedback,
+            dt,
+        );
 
         // 12f. Update Superior Colliculus with motion/attention data
         self.superior_colliculus.update(dt);
@@ -1661,14 +1955,17 @@ impl NeuromorphicBrain {
                 self.spatial.update(dt, (new_x, new_y));
 
                 // Modulate attention based on saccade activity
-                let saccade_magnitude = ((target_x - current_x).powi(2) + (target_y - current_y).powi(2)).sqrt();
+                let saccade_magnitude =
+                    ((target_x - current_x).powi(2) + (target_y - current_y).powi(2)).sqrt();
                 // Attention boost during saccade planning (larger saccades = more attention)
                 let attention_boost = (saccade_magnitude * 0.5).min(1.0);
 
                 // Apply attention boost to thalamic relay (enhance sensory processing at saccade target)
-                let visual_modality = 0;  // Visual attention
-                let boosted_attention = (self.thalamus.attention_strength + attention_boost).min(2.0);
-                self.thalamus.set_attention(visual_modality, boosted_attention);
+                let visual_modality = 0; // Visual attention
+                let boosted_attention =
+                    (self.thalamus.attention_strength + attention_boost).min(2.0);
+                self.thalamus
+                    .set_attention(visual_modality, boosted_attention);
             }
         }
 
@@ -1691,7 +1988,7 @@ impl NeuromorphicBrain {
             interneurons: self.interneurons.stats(),
             homeostasis: self.homeostasis.stats(),
             predictive: self.predictive.stats(),
-            cerebellum: cerebellum_left,  // Use left hemisphere stats
+            cerebellum: cerebellum_left, // Use left hemisphere stats
             amygdala: self.amygdala.stats(),
             structural_plasticity: self.structural_plasticity.stats(),
             heterosynaptic: self.heterosynaptic.stats(),
@@ -1759,7 +2056,8 @@ impl NeuromorphicBrain {
                 let y = (j * 128) / 10;
                 if x < v1_output.len() && y < v1_output[0].len() {
                     // Average across orientations
-                    let avg: f32 = v1_output[x][y].iter().sum::<f32>() / v1_output[x][y].len() as f32;
+                    let avg: f32 =
+                        v1_output[x][y].iter().sum::<f32>() / v1_output[x][y].len() as f32;
                     thalamic_input.push(avg);
                 }
             }
@@ -1771,7 +2069,8 @@ impl NeuromorphicBrain {
     /// Extract thalamic input from Cochlea output (MGN processing)
     fn extract_cochlea_for_thalamus(&self, cochlea_spikes: &[bool]) -> Vec<f32> {
         // Convert spike train to continuous values for thalamic relay
-        let continuous: Vec<f32> = cochlea_spikes.iter()
+        let continuous: Vec<f32> = cochlea_spikes
+            .iter()
             .map(|&spike| if spike { 1.0 } else { 0.0 })
             .collect();
 
@@ -1790,10 +2089,14 @@ impl NeuromorphicBrain {
     }
 
     /// Find salient location in motion output for attention
-    fn find_salient_location(&self, motion_output: &crate::cortex::mt_mst::MotionOutput) -> Option<(f32, f32)> {
+    fn find_salient_location(
+        &self,
+        motion_output: &crate::cortex::mt_mst::MotionOutput,
+    ) -> Option<(f32, f32)> {
         // Calculate motion energy from heading and expansion
-        let motion_energy = (motion_output.heading_x.powi(2) + motion_output.heading_y.powi(2)).sqrt()
-                          + motion_output.expansion_strength.abs();
+        let motion_energy = (motion_output.heading_x.powi(2) + motion_output.heading_y.powi(2))
+            .sqrt()
+            + motion_output.expansion_strength.abs();
 
         // If there's significant motion, return heading direction as salient location
         if motion_energy > 0.1 {
@@ -1805,10 +2108,10 @@ impl NeuromorphicBrain {
 
     fn generate_response_text(&self, semantic: &[f32], max_words: usize) -> String {
         // Generate response from LEARNED associations, not random words
-        
+
         // 1. Find words most similar to the semantic vector
         let similar_words = self.language.find_similar_words(semantic, max_words * 2);
-        
+
         if similar_words.is_empty() {
             // No learned vocabulary yet - return default message
             return "[mozek ještě nemá naučenou slovní zásobu - použij /train]".to_string();
@@ -1830,7 +2133,7 @@ impl NeuromorphicBrain {
                         if let Some(assoc_word) = self.language.get_word(assoc_idx) {
                             response_words.push(assoc_word.to_string());
                             used_indices.insert(assoc_idx);
-                            
+
                             if response_words.len() >= max_words {
                                 break;
                             }
@@ -1887,6 +2190,77 @@ impl NeuromorphicBrain {
             n_neurons,
         }
     }
+
+    // === COGNITIVE UPGRADE HELPER METHODS (2025) ===
+
+    /// Compute sentiment from semantic vector
+    fn compute_sentiment(&self, semantics: &[f32]) -> f32 {
+        // Simple sentiment: average of first few dimensions weighted
+        // Positive values = positive sentiment, negative = negative
+        let sum: f32 = semantics.iter().take(10).sum();
+        let avg = sum / 10.0;
+
+        // Normalize to [-1, 1] range
+        (avg * 2.0).clamp(-1.0, 1.0)
+    }
+
+    /// Get embedding for a word from the language system
+    fn get_word_embedding(&self, word: &str) -> Vec<f32> {
+        // Try to get from learned embeddings
+        if let Some(idx) = self.language.get_word_idx(word) {
+            if let Some(embedding) = self.language.ventral.embeddings.get_embedding_by_idx(idx) {
+                return embedding.to_vec();
+            }
+        }
+
+        // Fallback: generate simple hash-based embedding
+        let mut embedding = vec![0.0; self.pattern_dim.min(64)];
+        let hash = word
+            .bytes()
+            .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
+        for (i, e) in embedding.iter_mut().enumerate() {
+            *e = ((hash.wrapping_shr(i as u32) & 0xFF) as f32 / 255.0) - 0.5;
+        }
+        embedding
+    }
+
+    /// Get statistics for cognitive upgrades
+    pub fn cognitive_stats(&self) -> CognitiveUpgradeStats {
+        CognitiveUpgradeStats {
+            emotional_valence: self.emotional_state.current_state.valence,
+            emotional_arousal: self.emotional_state.current_state.arousal,
+            curiosity_level: self.curiosity.curiosity_level,
+            exploration_rate: self.curiosity.exploration_rate,
+            theory_of_mind_agents: self.theory_of_mind.agent_models.len(),
+            self_model_capability: self.self_model.capabilities.overall(),
+            knowledge_graph_entities: self.knowledge_graph.entities.len(),
+            enhanced_episodic_count: self.enhanced_episodic.stats().num_episodes,
+            metacognition_load: self.advanced_metacognition.cognitive_load,
+        }
+    }
+}
+
+/// Statistics for cognitive upgrade systems (2025)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CognitiveUpgradeStats {
+    /// Current emotional valence (-1 to 1)
+    pub emotional_valence: f32,
+    /// Current emotional arousal (0 to 1)
+    pub emotional_arousal: f32,
+    /// Curiosity level (0 to 1)
+    pub curiosity_level: f32,
+    /// Exploration rate (0 to 1)
+    pub exploration_rate: f32,
+    /// Number of agents tracked by Theory of Mind
+    pub theory_of_mind_agents: usize,
+    /// Overall self-model capability score (0 to 1)
+    pub self_model_capability: f32,
+    /// Number of entities in knowledge graph
+    pub knowledge_graph_entities: usize,
+    /// Number of episodes in enhanced episodic memory
+    pub enhanced_episodic_count: usize,
+    /// Current metacognitive load (0 to 1)
+    pub metacognition_load: f32,
 }
 
 /// Complete brain statistics with ALL biological systems
@@ -1929,7 +2303,7 @@ mod tests {
         // Verify all systems are created
         assert!(brain.basal_ganglia.n_striatum > 0);
         assert!(brain.interneurons.pv_neurons.len() > 0);
-        assert_eq!(brain.predictive.n_levels, 5);  // Enhanced hierarchy
+        assert_eq!(brain.predictive.n_levels, 5); // Enhanced hierarchy
     }
 
     #[test]
@@ -1977,8 +2351,8 @@ mod tests {
 
         // Verify consolidation effects
         let stats = brain.stats();
-        assert!(stats.neuromodulation.ach_encoding_mode);  // Should return to encoding mode after consolidation
-        assert!(stats.homeostasis.criticality_score > 0.0);  // Criticality should be restored
+        assert!(stats.neuromodulation.ach_encoding_mode); // Should return to encoding mode after consolidation
+        assert!(stats.homeostasis.criticality_score > 0.0); // Criticality should be restored
     }
 
     #[test]
@@ -2025,7 +2399,10 @@ mod tests {
         println!("📍 PHASE 1: Brain Initialization");
         let mut brain = NeuromorphicBrain::new(3, 100, 5000, 512);
 
-        println!("  ✓ Brain created: vocab={}, patterns={}", brain.vocab_size, brain.pattern_dim);
+        println!(
+            "  ✓ Brain created: vocab={}, patterns={}",
+            brain.vocab_size, brain.pattern_dim
+        );
 
         // Baseline warmup
         for _ in 0..100 {
@@ -2033,8 +2410,10 @@ mod tests {
         }
 
         let baseline = brain.stats();
-        println!("  ✓ Baseline: theta={:.1}Hz, criticality={:.2}",
-                 baseline.oscillations.theta_freq, baseline.homeostasis.criticality_score);
+        println!(
+            "  ✓ Baseline: theta={:.1}Hz, criticality={:.2}",
+            baseline.oscillations.theta_freq, baseline.homeostasis.criticality_score
+        );
         assert!(baseline.homeostasis.is_critical, "Should reach criticality");
 
         // ========== PHASE 2: LANGUAGE PROCESSING ==========
@@ -2052,8 +2431,10 @@ mod tests {
         assert!(!response2.is_empty(), "Should generate response");
 
         let lang_stats = brain.stats();
-        println!("  ✓ Language: ventral_concepts={}, dorsal_plans={}",
-                 lang_stats.language.ventral_concepts, lang_stats.language.dorsal_plans);
+        println!(
+            "  ✓ Language: ventral_concepts={}, dorsal_plans={}",
+            lang_stats.language.ventral_concepts, lang_stats.language.dorsal_plans
+        );
 
         // ========== PHASE 3: REINFORCEMENT LEARNING ==========
         println!("\n📍 PHASE 3: Reinforcement Learning");
@@ -2077,15 +2458,21 @@ mod tests {
 
         let rl_stats = brain.stats();
         println!("  ✓ Total reward: {:.1}", total_reward);
-        println!("  ✓ Dopamine: {:.3} → {:.3}", initial_da, rl_stats.basal_ganglia.dopamine_level);
+        println!(
+            "  ✓ Dopamine: {:.3} → {:.3}",
+            initial_da, rl_stats.basal_ganglia.dopamine_level
+        );
         println!("  ✓ TD error: {:.3}", rl_stats.basal_ganglia.avg_td_error);
 
-        assert!(total_reward > 0.0, "Should accumulate some positive rewards");
+        assert!(
+            total_reward > 0.0,
+            "Should accumulate some positive rewards"
+        );
 
         // ========== PHASE 4: HIPPOCAMPAL MEMORY ==========
         println!("\n📍 PHASE 4: Hippocampal Memory");
 
-        let hc_dim = brain.pattern_dim;  // Use unified dimension
+        let hc_dim = brain.pattern_dim; // Use unified dimension
         let mut memory_patterns = Vec::new();
         for i in 0..30 {
             let pattern = vec![i as f32 / 30.0; hc_dim];
@@ -2095,11 +2482,16 @@ mod tests {
 
         let mem_stats = brain.stats();
         println!("  ✓ Encoded {} memories", mem_stats.hippocampus.buffer_size);
-        println!("  ✓ DG sparsity: {:.2}%", mem_stats.hippocampus.dg_sparsity * 100.0);
+        println!(
+            "  ✓ DG sparsity: {:.2}%",
+            mem_stats.hippocampus.dg_sparsity * 100.0
+        );
 
         // Test recall
-        let partial_len = (hc_dim / 5).max(10);  // Use 20% of pattern or at least 10 elements
-        let recalled = brain.hippocampus.recall(&memory_patterns[0].1[0..partial_len]);
+        let partial_len = (hc_dim / 5).max(10); // Use 20% of pattern or at least 10 elements
+        let recalled = brain
+            .hippocampus
+            .recall(&memory_patterns[0].1[0..partial_len]);
         println!("  ✓ Recall successful: {} values", recalled.len());
         assert_eq!(recalled.len(), hc_dim, "Should recall full pattern");
 
@@ -2114,9 +2506,14 @@ mod tests {
         }
 
         let wm_stats = brain.stats();
-        println!("  ✓ Stored patterns: {}/{}", wm_stats.working_memory.stored_patterns,
-                 wm_stats.working_memory.capacity);
-        println!("  ✓ Utilization: {:.1}%", wm_stats.working_memory.utilization * 100.0);
+        println!(
+            "  ✓ Stored patterns: {}/{}",
+            wm_stats.working_memory.stored_patterns, wm_stats.working_memory.capacity
+        );
+        println!(
+            "  ✓ Utilization: {:.1}%",
+            wm_stats.working_memory.utilization * 100.0
+        );
 
         // Test retrieval
         let query = vec![0.0; wm_dim];
@@ -2139,20 +2536,30 @@ mod tests {
             let error_left = vec![0.5 * ((trial as f32 / 10.0).sin()); 96];
             let error_right = vec![0.5 * ((trial as f32 / 10.0).cos()); 96];
 
-            brain.cerebellum.update(1.0, &left_input, &right_input, &error_left, &error_right);
+            brain
+                .cerebellum
+                .update(1.0, &left_input, &right_input, &error_left, &error_right);
             brain.update(1.0);
         }
 
         let (final_left_stats, final_right_stats) = brain.cerebellum.stats();
-        println!("  ✓ Left hemisphere: {} active Purkinje cells", final_left_stats.active_purkinje_cells);
-        println!("  ✓ Right hemisphere: {} active Purkinje cells", final_right_stats.active_purkinje_cells);
-        println!("  ✓ Weight change: {:.4} → {:.4}",
-                 initial_weight, final_left_stats.avg_parallel_fiber_weight);
+        println!(
+            "  ✓ Left hemisphere: {} active Purkinje cells",
+            final_left_stats.active_purkinje_cells
+        );
+        println!(
+            "  ✓ Right hemisphere: {} active Purkinje cells",
+            final_right_stats.active_purkinje_cells
+        );
+        println!(
+            "  ✓ Weight change: {:.4} → {:.4}",
+            initial_weight, final_left_stats.avg_parallel_fiber_weight
+        );
 
         // ========== PHASE 7: EMOTIONAL PROCESSING (AMYGDALA) ==========
         println!("\n📍 PHASE 7: Emotional Processing (Amygdala)");
 
-        let amyg_dim = brain.pattern_dim;  // Amygdala uses pattern_dim
+        let amyg_dim = brain.pattern_dim; // Amygdala uses pattern_dim
         for trial in 0..20 {
             // CS (conditioned stimulus)
             let cs = vec![0.8; amyg_dim];
@@ -2170,11 +2577,23 @@ mod tests {
         }
 
         let amyg_stats = brain.stats();
-        println!("  ✓ LA neurons active: {}", amyg_stats.amygdala.la_active_neurons);
-        println!("  ✓ BLA neurons active: {}", amyg_stats.amygdala.bla_active_neurons);
-        println!("  ✓ Avg thalamic weight: {:.3}", amyg_stats.amygdala.avg_thalamic_weight);
+        println!(
+            "  ✓ LA neurons active: {}",
+            amyg_stats.amygdala.la_active_neurons
+        );
+        println!(
+            "  ✓ BLA neurons active: {}",
+            amyg_stats.amygdala.bla_active_neurons
+        );
+        println!(
+            "  ✓ Avg thalamic weight: {:.3}",
+            amyg_stats.amygdala.avg_thalamic_weight
+        );
 
-        assert!(amyg_stats.amygdala.la_active_neurons > 0, "LA should be active after conditioning");
+        assert!(
+            amyg_stats.amygdala.la_active_neurons > 0,
+            "LA should be active after conditioning"
+        );
 
         // ========== PHASE 8: CONSOLIDATION ==========
         println!("\n📍 PHASE 8: Memory Consolidation");
@@ -2193,9 +2612,15 @@ mod tests {
 
         let sleep_stats = brain.stats();
         println!("  ✓ Sleep stage: {:?}", sleep_stats.sleep.current_stage);
-        println!("  ✓ Total sleep time: {:.1}s", sleep_stats.sleep.total_sleep_time / 1000.0);
+        println!(
+            "  ✓ Total sleep time: {:.1}s",
+            sleep_stats.sleep.total_sleep_time / 1000.0
+        );
         println!("  ✓ Replays: {}", sleep_stats.sleep.total_replays);
-        println!("  ✓ Consolidations: {}", sleep_stats.sleep.total_consolidations);
+        println!(
+            "  ✓ Consolidations: {}",
+            sleep_stats.sleep.total_consolidations
+        );
 
         // ========== PHASE 9: OSCILLATIONS & SYNCHRONY ==========
         println!("\n📍 PHASE 9: Neural Oscillations");
@@ -2205,13 +2630,22 @@ mod tests {
         }
 
         let osc_stats = brain.stats();
-        println!("  ✓ Theta: {:.1}Hz (phase={:.2})",
-                 osc_stats.oscillations.theta_freq, osc_stats.oscillations.theta_phase);
-        println!("  ✓ Gamma: {:.1}Hz (type={:?})",
-                 osc_stats.oscillations.gamma_freq, osc_stats.oscillations.gamma_type);
-        println!("  ✓ Theta-gamma coupling: {:.2}", osc_stats.oscillations.theta_gamma_coupling);
+        println!(
+            "  ✓ Theta: {:.1}Hz (phase={:.2})",
+            osc_stats.oscillations.theta_freq, osc_stats.oscillations.theta_phase
+        );
+        println!(
+            "  ✓ Gamma: {:.1}Hz (type={:?})",
+            osc_stats.oscillations.gamma_freq, osc_stats.oscillations.gamma_type
+        );
+        println!(
+            "  ✓ Theta-gamma coupling: {:.2}",
+            osc_stats.oscillations.theta_gamma_coupling
+        );
 
-        assert!(osc_stats.oscillations.theta_freq >= 4.0 && osc_stats.oscillations.theta_freq <= 8.0);
+        assert!(
+            osc_stats.oscillations.theta_freq >= 4.0 && osc_stats.oscillations.theta_freq <= 8.0
+        );
         assert!(osc_stats.oscillations.gamma_freq >= 30.0);
 
         // ========== PHASE 10: STRUCTURAL PLASTICITY ==========
@@ -2224,11 +2658,22 @@ mod tests {
         }
 
         let struct_stats = brain.stats();
-        println!("  ✓ Active synapses: {} → {}",
-                 initial_synapses, struct_stats.structural_plasticity.active_synapses);
-        println!("  ✓ Total formations: {}", struct_stats.structural_plasticity.total_formations);
-        println!("  ✓ Total removals: {}", struct_stats.structural_plasticity.total_removals);
-        println!("  ✓ Avg weight: {:.3}", struct_stats.structural_plasticity.avg_weight);
+        println!(
+            "  ✓ Active synapses: {} → {}",
+            initial_synapses, struct_stats.structural_plasticity.active_synapses
+        );
+        println!(
+            "  ✓ Total formations: {}",
+            struct_stats.structural_plasticity.total_formations
+        );
+        println!(
+            "  ✓ Total removals: {}",
+            struct_stats.structural_plasticity.total_removals
+        );
+        println!(
+            "  ✓ Avg weight: {:.3}",
+            struct_stats.structural_plasticity.avg_weight
+        );
 
         // ========== FINAL VERIFICATION ==========
         println!("\n📍 FINAL VERIFICATION");
@@ -2236,19 +2681,34 @@ mod tests {
         let final_stats = brain.stats();
 
         let checks = vec![
-            ("Working Memory", final_stats.working_memory.stored_patterns > 0),
+            (
+                "Working Memory",
+                final_stats.working_memory.stored_patterns > 0,
+            ),
             ("Hippocampus", final_stats.hippocampus.buffer_size > 0),
             ("Basal Ganglia", final_stats.basal_ganglia.n_striatum > 0),
             ("Amygdala", final_stats.amygdala.total_neurons > 0),
             ("Cerebellum", final_stats.cerebellum.total_synapses > 0),
             ("Oscillations", final_stats.oscillations.theta_freq > 0.0),
-            ("Neuromodulation", final_stats.neuromodulation.ach_level >= 0.0),
+            (
+                "Neuromodulation",
+                final_stats.neuromodulation.ach_level >= 0.0,
+            ),
             ("Homeostasis", final_stats.homeostasis.is_critical),
             ("Sleep", final_stats.sleep.total_sleep_time > 0.0),
             ("RSTDP", final_stats.rstdp.num_synapses > 0),
-            ("ETDP", final_stats.etdp.num_pre_events > 0 || final_stats.etdp.num_post_events > 0),
-            ("Heterosynaptic", final_stats.heterosynaptic.total_no_events > 0),
-            ("Structural", final_stats.structural_plasticity.active_synapses > 0),
+            (
+                "ETDP",
+                final_stats.etdp.num_pre_events > 0 || final_stats.etdp.num_post_events > 0,
+            ),
+            (
+                "Heterosynaptic",
+                final_stats.heterosynaptic.total_no_events > 0,
+            ),
+            (
+                "Structural",
+                final_stats.structural_plasticity.active_synapses > 0,
+            ),
             ("Predictive", final_stats.predictive.n_levels > 0),
             ("Language", final_stats.language.ventral_concepts > 0),
         ];
@@ -2282,7 +2742,7 @@ mod tests {
         // ASCII graf helper
         fn print_bar(label: &str, value: f32, max_val: f32, width: usize) {
             let filled = ((value / max_val) * width as f32) as usize;
-            let filled = filled.min(width);  // Clamp to prevent overflow
+            let filled = filled.min(width); // Clamp to prevent overflow
             let bar: String = "█".repeat(filled) + &"░".repeat(width - filled);
             println!("  {} {:.3} {}", label, value, bar);
         }
@@ -2291,15 +2751,24 @@ mod tests {
         let s0 = brain.stats();
         println!("  Theta oscillation: {:.2} Hz", s0.oscillations.theta_freq);
         println!("  Criticality: {:.3}", s0.homeostasis.criticality_score);
-        println!("  Active synapses: {}/{}", s0.structural_plasticity.active_synapses, s0.structural_plasticity.max_synapses);
+        println!(
+            "  Active synapses: {}/{}",
+            s0.structural_plasticity.active_synapses, s0.structural_plasticity.max_synapses
+        );
 
         // === PHASE 1: LANGUAGE LEARNING (0-200 steps) ===
         println!("\n📖 PHASE 1: LANGUAGE LEARNING (steps 0-200)");
 
         let sentences = vec![
-            "hello world", "learning language", "neural networks",
-            "brain simulation", "cognitive science", "artificial intelligence",
-            "pattern recognition", "memory formation", "synaptic plasticity"
+            "hello world",
+            "learning language",
+            "neural networks",
+            "brain simulation",
+            "cognitive science",
+            "artificial intelligence",
+            "pattern recognition",
+            "memory formation",
+            "synaptic plasticity",
         ];
 
         for step in 0..200 {
@@ -2313,8 +2782,12 @@ mod tests {
                 print_bar("Theta ", s.oscillations.theta_freq, 10.0, 30);
                 print_bar("Gamma ", s.oscillations.gamma_freq, 100.0, 30);
                 print_bar("WM util", s.working_memory.utilization, 1.0, 30);
-                println!("  HC memories: {}/{}", s.hippocampus.buffer_size, s.hippocampus.max_buffer);
-                println!("  Synapses: {} (+{} -{})  ",
+                println!(
+                    "  HC memories: {}/{}",
+                    s.hippocampus.buffer_size, s.hippocampus.max_buffer
+                );
+                println!(
+                    "  Synapses: {} (+{} -{})  ",
                     s.structural_plasticity.active_synapses,
                     s.structural_plasticity.total_formations,
                     s.structural_plasticity.removals_this_step
@@ -2335,7 +2808,7 @@ mod tests {
 
             // Reward structure: action 1 = good, others = bad
             let reward = if action == 1 {
-                1.0 + (step as f32 / 500.0) * 0.5  // Increasing reward
+                1.0 + (step as f32 / 500.0) * 0.5 // Increasing reward
             } else {
                 -0.2
             };
@@ -2353,8 +2826,14 @@ mod tests {
                 print_bar("Dopamine", s.basal_ganglia.dopamine_level, 3.0, 30);
                 print_bar("TD error", s.basal_ganglia.avg_td_error.abs(), 2.0, 30);
                 print_bar("Cum.reward", total_reward, 100.0, 30);
-                println!("  BG firing: {:.1} Hz", s.basal_ganglia.dopamine_firing_rate);
-                println!("  Exploration: {:.1}%", (1.0 - (step as f32 / 500.0) * 0.5) * 100.0);
+                println!(
+                    "  BG firing: {:.1} Hz",
+                    s.basal_ganglia.dopamine_firing_rate
+                );
+                println!(
+                    "  Exploration: {:.1}%",
+                    (1.0 - (step as f32 / 500.0) * 0.5) * 100.0
+                );
             }
         }
 
@@ -2372,7 +2851,9 @@ mod tests {
             let error_left = vec![error_magnitude * phase.abs(); 96];
             let error_right = vec![error_magnitude * (-phase).abs(); 96];
 
-            brain.cerebellum.update(1.0, &left_input, &right_input, &error_left, &error_right);
+            brain
+                .cerebellum
+                .update(1.0, &left_input, &right_input, &error_left, &error_right);
             brain.update(1.0);
 
             if step % 50 == 49 {
@@ -2380,7 +2861,10 @@ mod tests {
                 println!("\n  ⏱ Step {}", step + 1);
                 print_bar("Avg PF wt", s.cerebellum.avg_parallel_fiber_weight, 1.0, 30);
                 print_bar("Error", error_magnitude, 1.0, 30);
-                println!("  L Purkinje: {} neurons", s.cerebellum.active_purkinje_cells);
+                println!(
+                    "  L Purkinje: {} neurons",
+                    s.cerebellum.active_purkinje_cells
+                );
                 println!("  Total syn: {}", s.cerebellum.total_synapses);
             }
         }
@@ -2405,8 +2889,18 @@ mod tests {
                 println!("\n  ⏱ Step {}", step + 1);
                 print_bar("Fear out", fear, 1.0, 30);
                 print_bar("Thal wt", s.amygdala.avg_thalamic_weight, 1.0, 30);
-                println!("  LA active: {}/{}", s.amygdala.la_active_neurons, s.amygdala.total_neurons);
-                println!("  US: {}", if us_present > 0.5 { "PRESENT" } else { "absent" });
+                println!(
+                    "  LA active: {}/{}",
+                    s.amygdala.la_active_neurons, s.amygdala.total_neurons
+                );
+                println!(
+                    "  US: {}",
+                    if us_present > 0.5 {
+                        "PRESENT"
+                    } else {
+                        "absent"
+                    }
+                );
             }
         }
 
@@ -2418,7 +2912,9 @@ mod tests {
         let sleep_dim = brain.pattern_dim;
         for i in 0..30 {
             let pattern = vec![(i as f32 / 30.0).cos(); sleep_dim];
-            brain.sleep.store_experience(pattern, 0.5 + (i as f32 / 60.0), vec![i]);
+            brain
+                .sleep
+                .store_experience(pattern, 0.5 + (i as f32 / 60.0), vec![i]);
         }
 
         for step in 1000..1200 {
@@ -2447,23 +2943,59 @@ mod tests {
 
         println!("\n🔷 LEARNING & MEMORY");
         println!("  Cumulative reward: {:.1}", total_reward);
-        println!("  HC memories: {}/{}", final_stats.hippocampus.buffer_size, final_stats.hippocampus.max_buffer);
-        println!("  WM patterns: {}/{}", final_stats.working_memory.stored_patterns, final_stats.working_memory.capacity);
+        println!(
+            "  HC memories: {}/{}",
+            final_stats.hippocampus.buffer_size, final_stats.hippocampus.max_buffer
+        );
+        println!(
+            "  WM patterns: {}/{}",
+            final_stats.working_memory.stored_patterns, final_stats.working_memory.capacity
+        );
         println!("  Sleep replays: {}", final_stats.sleep.total_replays);
 
         println!("\n🔷 STRUCTURAL CHANGES");
-        println!("  Total synapses: {} → {}", s0.structural_plasticity.active_synapses, final_stats.structural_plasticity.active_synapses);
-        println!("  Formations: {}", final_stats.structural_plasticity.total_formations);
-        println!("  Eliminations: {}", final_stats.structural_plasticity.removals_this_step);
-        println!("  Turnover rate: {:.2}%", (final_stats.structural_plasticity.formations_this_step + final_stats.structural_plasticity.removals_this_step) as f32 * 100.0 / final_stats.structural_plasticity.active_synapses as f32);
+        println!(
+            "  Total synapses: {} → {}",
+            s0.structural_plasticity.active_synapses,
+            final_stats.structural_plasticity.active_synapses
+        );
+        println!(
+            "  Formations: {}",
+            final_stats.structural_plasticity.total_formations
+        );
+        println!(
+            "  Eliminations: {}",
+            final_stats.structural_plasticity.removals_this_step
+        );
+        println!(
+            "  Turnover rate: {:.2}%",
+            (final_stats.structural_plasticity.formations_this_step
+                + final_stats.structural_plasticity.removals_this_step) as f32
+                * 100.0
+                / final_stats.structural_plasticity.active_synapses as f32
+        );
 
         println!("\n🔷 HOMEOSTASIS");
-        print_bar("Criticality", final_stats.homeostasis.criticality_score, 2.0, 40);
+        print_bar(
+            "Criticality",
+            final_stats.homeostasis.criticality_score,
+            2.0,
+            40,
+        );
 
         println!("\n🔷 NEUROMODULATION");
-        println!("  Dopamine: {:.3}", final_stats.neuromodulation.dopamine_level);
-        println!("  Acetylcholine: {:.3}", final_stats.neuromodulation.ach_level);
-        println!("  Norepinephrine: {:.3}", final_stats.neuromodulation.ne_level);
+        println!(
+            "  Dopamine: {:.3}",
+            final_stats.neuromodulation.dopamine_level
+        );
+        println!(
+            "  Acetylcholine: {:.3}",
+            final_stats.neuromodulation.ach_level
+        );
+        println!(
+            "  Norepinephrine: {:.3}",
+            final_stats.neuromodulation.ne_level
+        );
 
         println!("\n✅ BRAIN DEVELOPMENT COMPLETE");
         println!("   Total steps: 1200");
