@@ -116,11 +116,13 @@ impl EmbeddingLayer {
             None => return Vec::new(),
         };
 
-        let mut similarities: Vec<(String, f32)> = self.idx_to_word
+        let mut similarities: Vec<(String, f32)> = self
+            .idx_to_word
             .iter()
             .filter(|w| w.as_str() != word)
             .map(|w| {
-                let sim = self.get_embedding(w)
+                let sim = self
+                    .get_embedding(w)
                     .map(|emb| Self::cosine_similarity(query_emb, emb))
                     .unwrap_or(0.0);
                 (w.clone(), sim)
@@ -150,7 +152,7 @@ impl EmbeddingLayer {
         ) {
             // Predict context from center
             let dot: f32 = center.iter().zip(context.iter()).map(|(a, b)| a * b).sum();
-            let prob = 1.0 / (1.0 + (-dot).exp());  // Sigmoid
+            let prob = 1.0 / (1.0 + (-dot).exp()); // Sigmoid
 
             // Gradient: (prob - 1) * context for center word
             let gradient: Vec<f32> = context.iter().map(|&c| (prob - 1.0) * c).collect();
@@ -211,7 +213,7 @@ impl ConceptCell {
         self.activation = if similarity > self.threshold {
             similarity
         } else {
-            0.0  // Highly selective - only activate above threshold
+            0.0 // Highly selective - only activate above threshold
         };
     }
 
@@ -222,7 +224,12 @@ impl ConceptCell {
         }
 
         // Normalize
-        let norm: f32 = self.concept_vector.iter().map(|x| x * x).sum::<f32>().sqrt();
+        let norm: f32 = self
+            .concept_vector
+            .iter()
+            .map(|x| x * x)
+            .sum::<f32>()
+            .sqrt();
         if norm > 0.0 {
             for c in &mut self.concept_vector {
                 *c /= norm;
@@ -234,7 +241,11 @@ impl ConceptCell {
         let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
         let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
         let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
-        if norm_a == 0.0 || norm_b == 0.0 { 0.0 } else { dot / (norm_a * norm_b) }
+        if norm_a == 0.0 || norm_b == 0.0 {
+            0.0
+        } else {
+            dot / (norm_a * norm_b)
+        }
     }
 }
 
@@ -258,7 +269,7 @@ pub struct SemanticHub {
 
 impl SemanticHub {
     pub fn new(n_cells: usize, dim: usize, sparsity: f32) -> Self {
-        let threshold = 0.7;  // High threshold for selectivity
+        let threshold = 0.7; // High threshold for selectivity
 
         let concept_cells = (0..n_cells)
             .map(|i| ConceptCell::new(i, dim, threshold))
@@ -321,7 +332,8 @@ impl SemanticHub {
 
     /// Apply winner-take-all for sparsity
     fn apply_sparsity(&mut self, k: usize) {
-        let mut indexed: Vec<(usize, f32)> = self.concept_cells
+        let mut indexed: Vec<(usize, f32)> = self
+            .concept_cells
             .iter()
             .enumerate()
             .map(|(i, c)| (i, c.activation))
@@ -442,7 +454,7 @@ mod tests {
         hub.encode(&features);
 
         let active = hub.active_concepts();
-        assert!(active.len() <= 2);  // 2% sparsity of 100 = 2 cells
+        assert!(active.len() <= 2); // 2% sparsity of 100 = 2 cells
     }
 
     #[test]
@@ -454,5 +466,312 @@ mod tests {
 
         let processed = system.process_word("cat");
         assert!(processed.is_some());
+    }
+}
+
+// ============================================================================
+// Paraphrase Detection and Intent Clustering (Fáze 3)
+// ============================================================================
+
+/// Paraphrase detector for recognizing semantically similar inputs
+#[derive(Debug, Clone)]
+pub struct ParaphraseDetector {
+    /// Paraphrase groups: each group contains semantically equivalent phrases
+    paraphrase_groups: Vec<ParaphraseGroup>,
+    /// Similarity threshold for paraphrase detection
+    threshold: f32,
+}
+
+/// A group of paraphrases that mean the same thing
+#[derive(Debug, Clone)]
+pub struct ParaphraseGroup {
+    /// Canonical form (primary phrase)
+    pub canonical: String,
+    /// Alternative phrasings
+    pub alternatives: Vec<String>,
+    /// Associated intent
+    pub intent: String,
+}
+
+impl ParaphraseDetector {
+    pub fn new(threshold: f32) -> Self {
+        Self {
+            paraphrase_groups: Vec::new(),
+            threshold,
+        }
+    }
+
+    /// Add a paraphrase group
+    pub fn add_group(&mut self, canonical: String, alternatives: Vec<String>, intent: String) {
+        self.paraphrase_groups.push(ParaphraseGroup {
+            canonical,
+            alternatives,
+            intent,
+        });
+    }
+
+    /// Load paraphrases from training data (keywords field)
+    pub fn load_from_keywords(&mut self, input: &str, keywords: &[String], intent: &str) {
+        if !keywords.is_empty() {
+            let mut all_alternatives: Vec<String> = keywords.iter().cloned().collect();
+            // Remove canonical from alternatives if present
+            all_alternatives.retain(|k| k != input);
+            self.add_group(input.to_string(), all_alternatives, intent.to_string());
+        }
+    }
+
+    /// Find the canonical form for a given input
+    pub fn find_canonical(&self, input: &str) -> Option<&str> {
+        let input_lower = input.to_lowercase().trim().to_string();
+
+        for group in &self.paraphrase_groups {
+            // Check canonical
+            if group.canonical.to_lowercase() == input_lower {
+                return Some(&group.canonical);
+            }
+            // Check alternatives
+            for alt in &group.alternatives {
+                if alt.to_lowercase() == input_lower {
+                    return Some(&group.canonical);
+                }
+            }
+        }
+        None
+    }
+
+    /// Find matching group by similarity (uses embeddings if available)
+    pub fn find_similar(
+        &self,
+        input: &str,
+        embeddings: Option<&EmbeddingLayer>,
+    ) -> Option<&ParaphraseGroup> {
+        let input_lower = input.to_lowercase();
+
+        // First try exact match
+        for group in &self.paraphrase_groups {
+            if group.canonical.to_lowercase() == input_lower {
+                return Some(group);
+            }
+            for alt in &group.alternatives {
+                if alt.to_lowercase() == input_lower {
+                    return Some(group);
+                }
+            }
+        }
+
+        // If we have embeddings, try semantic similarity
+        if let Some(emb) = embeddings {
+            let mut best_group: Option<&ParaphraseGroup> = None;
+            let mut best_sim = self.threshold;
+
+            for group in &self.paraphrase_groups {
+                // Check similarity with canonical
+                let sim = emb.similarity(input, &group.canonical);
+                if sim > best_sim {
+                    best_sim = sim;
+                    best_group = Some(group);
+                }
+                // Check alternatives
+                for alt in &group.alternatives {
+                    let sim = emb.similarity(input, alt);
+                    if sim > best_sim {
+                        best_sim = sim;
+                        best_group = Some(group);
+                    }
+                }
+            }
+            return best_group;
+        }
+
+        None
+    }
+
+    /// Get intent for input
+    pub fn get_intent(&self, input: &str) -> Option<&str> {
+        self.find_similar(input, None).map(|g| g.intent.as_str())
+    }
+
+    /// Get number of paraphrase groups
+    pub fn len(&self) -> usize {
+        self.paraphrase_groups.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.paraphrase_groups.is_empty()
+    }
+}
+
+/// Intent cluster for grouping similar intents
+#[derive(Debug, Clone)]
+pub struct IntentCluster {
+    /// Cluster name/label
+    pub name: String,
+    /// Keywords that trigger this intent
+    pub keywords: Vec<String>,
+    /// Example phrases
+    pub examples: Vec<String>,
+    /// Centroid embedding (average of all examples)
+    pub centroid: Option<Vec<f32>>,
+}
+
+impl IntentCluster {
+    pub fn new(name: String) -> Self {
+        Self {
+            name,
+            keywords: Vec::new(),
+            examples: Vec::new(),
+            centroid: None,
+        }
+    }
+
+    pub fn add_keyword(&mut self, keyword: String) {
+        if !self.keywords.contains(&keyword) {
+            self.keywords.push(keyword);
+        }
+    }
+
+    pub fn add_example(&mut self, example: String) {
+        if !self.examples.contains(&example) {
+            self.examples.push(example);
+        }
+    }
+
+    /// Check if input matches this cluster (keyword match)
+    pub fn matches(&self, input: &str) -> bool {
+        let input_lower = input.to_lowercase();
+        self.keywords
+            .iter()
+            .any(|k| input_lower.contains(&k.to_lowercase()))
+    }
+
+    /// Compute centroid from examples using embeddings
+    pub fn compute_centroid(&mut self, embeddings: &EmbeddingLayer) {
+        if self.examples.is_empty() {
+            return;
+        }
+
+        let dim = embeddings.embedding_dim;
+        let mut centroid = vec![0.0f32; dim];
+        let mut count = 0;
+
+        for example in &self.examples {
+            // Get average embedding for all words in example
+            let words: Vec<&str> = example.split_whitespace().collect();
+            for word in words {
+                if let Some(emb) = embeddings.get_embedding(word) {
+                    for (c, e) in centroid.iter_mut().zip(emb.iter()) {
+                        *c += e;
+                    }
+                    count += 1;
+                }
+            }
+        }
+
+        if count > 0 {
+            for c in &mut centroid {
+                *c /= count as f32;
+            }
+            self.centroid = Some(centroid);
+        }
+    }
+}
+
+/// Intent clustering system
+#[derive(Debug, Clone)]
+pub struct IntentClusteringSystem {
+    /// All intent clusters
+    pub clusters: Vec<IntentCluster>,
+}
+
+impl IntentClusteringSystem {
+    pub fn new() -> Self {
+        Self {
+            clusters: Vec::new(),
+        }
+    }
+
+    /// Add or get cluster by name
+    pub fn get_or_create_cluster(&mut self, name: &str) -> &mut IntentCluster {
+        if let Some(idx) = self.clusters.iter().position(|c| c.name == name) {
+            &mut self.clusters[idx]
+        } else {
+            self.clusters.push(IntentCluster::new(name.to_string()));
+            self.clusters.last_mut().unwrap()
+        }
+    }
+
+    /// Classify input to best matching cluster
+    pub fn classify(&self, input: &str) -> Option<&IntentCluster> {
+        // First try keyword match
+        for cluster in &self.clusters {
+            if cluster.matches(input) {
+                return Some(cluster);
+            }
+        }
+        None
+    }
+
+    /// Classify using embeddings (semantic similarity)
+    pub fn classify_semantic(
+        &self,
+        input: &str,
+        embeddings: &EmbeddingLayer,
+    ) -> Option<&IntentCluster> {
+        let mut best_cluster: Option<&IntentCluster> = None;
+        let mut best_score = 0.0f32;
+
+        // Get input embedding (average of words)
+        let words: Vec<&str> = input.split_whitespace().collect();
+        let mut input_emb = vec![0.0f32; embeddings.embedding_dim];
+        let mut count = 0;
+
+        for word in words {
+            if let Some(emb) = embeddings.get_embedding(word) {
+                for (i, e) in input_emb.iter_mut().zip(emb.iter()) {
+                    *i += e;
+                }
+                count += 1;
+            }
+        }
+
+        if count == 0 {
+            return self.classify(input); // Fallback to keyword match
+        }
+
+        for i in &mut input_emb {
+            *i /= count as f32;
+        }
+
+        // Compare with cluster centroids
+        for cluster in &self.clusters {
+            if let Some(centroid) = &cluster.centroid {
+                let sim = EmbeddingLayer::cosine_similarity(&input_emb, centroid);
+                if sim > best_score {
+                    best_score = sim;
+                    best_cluster = Some(cluster);
+                }
+            }
+        }
+
+        if best_score > 0.5 {
+            best_cluster
+        } else {
+            self.classify(input) // Fallback
+        }
+    }
+
+    /// Get number of clusters
+    pub fn len(&self) -> usize {
+        self.clusters.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.clusters.is_empty()
+    }
+}
+
+impl Default for IntentClusteringSystem {
+    fn default() -> Self {
+        Self::new()
     }
 }
