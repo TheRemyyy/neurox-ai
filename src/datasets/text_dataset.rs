@@ -5,41 +5,41 @@
 //! - Skip-gram style window-based sampling
 //! - JSON supervised learning format with input/output/reward
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
 use std::path::Path;
-use serde::{Deserialize, Serialize};
 
 /// Supervised learning pair for JSON training
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SupervisedPair {
     /// Input text/prompt
     pub input: String,
-    
+
     /// Expected output/response (None = no response expected)
     pub output: Option<String>,
-    
+
     /// Reward signal: positive = good, negative = bad, 0 = neutral
     #[serde(default)]
     pub reward: f32,
-    
+
     /// Optional category/tag for the pair
     #[serde(default)]
     pub category: Option<String>,
-    
+
     /// Keywords for flexible matching (any of these words trigger this response)
     #[serde(default)]
     pub keywords: Option<Vec<String>>,
-    
+
     /// Alternative responses (randomly selected or based on context)
     #[serde(default)]
     pub alternatives: Option<Vec<String>>,
-    
+
     /// Required context/mood for this response (happy, sad, angry, neutral, etc.)
     #[serde(default)]
     pub context: Option<String>,
-    
+
     /// Explanation of why this is the correct response (for learning)
     #[serde(default)]
     pub explanation: Option<String>,
@@ -58,10 +58,10 @@ pub struct SupervisedPair {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VocabWord {
     pub word: String,
-    pub pos: String,  // "noun", "verb", "adjective", etc.
+    pub pos: String, // "noun", "verb", "adjective", etc.
     #[serde(default)]
-    pub valence: f32,  // -1.0 to 1.0
-    
+    pub valence: f32, // -1.0 to 1.0
+
     // === SEMANTIC KNOWLEDGE ===
     #[serde(default)]
     pub definition: Option<String>,
@@ -70,13 +70,13 @@ pub struct VocabWord {
     #[serde(default)]
     pub antonyms: Vec<String>,
     #[serde(default)]
-    pub context: Vec<String>,  // "informal", "formal", "greeting", etc.
+    pub context: Vec<String>, // "informal", "formal", "greeting", etc.
     #[serde(default)]
-    pub responds_to: Vec<String>,  // what intents this word responds to
+    pub responds_to: Vec<String>, // what intents this word responds to
     #[serde(default)]
-    pub triggers_mood: Option<String>,  // what mood this word triggers
+    pub triggers_mood: Option<String>, // what mood this word triggers
     #[serde(default)]
-    pub requires_bond: f32,  // minimum bond level to use this word (0.0-1.0)
+    pub requires_bond: f32, // minimum bond level to use this word (0.0-1.0)
     #[serde(default)]
     pub neuro_impact: Option<HashMap<String, f32>>, // Direct neurotransmitter impact
 }
@@ -84,8 +84,8 @@ pub struct VocabWord {
 /// Sentence template from JSON training data
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SentenceTemplateJson {
-    pub structure: Vec<String>,  // ["pronoun", "verb", "noun"]
-    pub intent: String,  // "greeting", "statement", "question"
+    pub structure: Vec<String>, // ["pronoun", "verb", "noun"]
+    pub intent: String,         // "greeting", "statement", "question"
 }
 
 /// Pragmatic rule from JSON training data
@@ -111,20 +111,64 @@ pub struct IntentRuleJson {
     pub keywords: Vec<String>,
 }
 
+/// Category of sentiment patterns (positive, negative, greeting, etc.)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SentimentPatternCategory {
+    /// Keywords that trigger this sentiment
+    pub keywords: Vec<String>,
+    /// Effect on dopamine level
+    #[serde(default)]
+    pub dopamine_effect: f32,
+    /// Effect on serotonin level
+    #[serde(default)]
+    pub serotonin_effect: f32,
+    /// Effect on norepinephrine level
+    #[serde(default)]
+    pub norepinephrine_effect: f32,
+    /// Effect on bond level
+    #[serde(default)]
+    pub bond_effect: f32,
+}
+
+/// Sentiment patterns organized by category
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct SentimentPatterns {
+    #[serde(default)]
+    pub positive: Option<SentimentPatternCategory>,
+    #[serde(default)]
+    pub negative: Option<SentimentPatternCategory>,
+    #[serde(default)]
+    pub greeting: Option<SentimentPatternCategory>,
+    #[serde(default)]
+    pub farewell: Option<SentimentPatternCategory>,
+}
+
+/// Emotion trigger rule from JSON
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmotionTriggerJson {
+    /// Target emotion (joy, anger, fear, etc.)
+    pub emotion: String,
+    /// Patterns that trigger this emotion
+    pub trigger_patterns: Vec<String>,
+    /// Intensity of the emotion (0.0 to 1.0)
+    #[serde(default)]
+    pub intensity: f32,
+}
+
 /// JSON training dataset format
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JsonDataset {
     /// Supervised learning pairs
     pub pairs: Vec<SupervisedPair>,
-    
+
     /// Vocabulary with POS tags and valence
     #[serde(default)]
     pub vocabulary: Vec<VocabWord>,
-    
+
     /// Sentence templates for IFG planner
     #[serde(default)]
     pub sentence_templates: Vec<SentenceTemplateJson>,
-    
+
     /// Pragmatic rules: how to respond to different intents
     #[serde(default)]
     pub pragmatic_rules: Vec<PragmaticRuleJson>,
@@ -132,11 +176,11 @@ pub struct JsonDataset {
     /// Intent detection rules (loaded from JSON)
     #[serde(default)]
     pub intent_rules: Vec<IntentRuleJson>,
-    
+
     /// Optional metadata
     #[serde(default)]
     pub name: Option<String>,
-    
+
     /// Optional description
     #[serde(default)]
     pub description: Option<String>,
@@ -144,6 +188,14 @@ pub struct JsonDataset {
     /// Metacognition settings (System 2)
     #[serde(default)]
     pub metacognition_markers: Option<MetacognitionConfigJson>,
+
+    /// Sentiment patterns for emotional processing (positive/negative words)
+    #[serde(default)]
+    pub sentiment_patterns: Option<SentimentPatterns>,
+
+    /// Emotion triggers for emotional state machine
+    #[serde(default)]
+    pub emotion_triggers: Vec<EmotionTriggerJson>,
 }
 
 impl JsonDataset {
@@ -152,11 +204,11 @@ impl JsonDataset {
         let mut file = File::open(path)?;
         let mut contents = String::new();
         file.read_to_string(&mut contents)?;
-        
+
         serde_json::from_str(&contents)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
     }
-    
+
     /// Create empty dataset
     pub fn new() -> Self {
         Self {
@@ -168,9 +220,11 @@ impl JsonDataset {
             name: None,
             description: None,
             metacognition_markers: None,
+            sentiment_patterns: None,
+            emotion_triggers: Vec::new(),
         }
     }
-    
+
     /// Add a supervised pair
     pub fn add_pair(&mut self, input: &str, output: Option<&str>, reward: f32) {
         self.pairs.push(SupervisedPair {
@@ -186,37 +240,37 @@ impl JsonDataset {
             neuro_impact: None,
         });
     }
-    
+
     /// Get all positive pairs (reward > 0)
     pub fn positive_pairs(&self) -> Vec<&SupervisedPair> {
         self.pairs.iter().filter(|p| p.reward > 0.0).collect()
     }
-    
+
     /// Get all negative pairs (reward < 0)  
     pub fn negative_pairs(&self) -> Vec<&SupervisedPair> {
         self.pairs.iter().filter(|p| p.reward < 0.0).collect()
     }
-    
+
     /// Convert to TextDataset for embedding training
     pub fn to_text_dataset(&self, window_size: usize) -> TextDataset {
         let mut dataset = TextDataset::new(window_size);
-        
+
         for pair in &self.pairs {
             dataset.add_sentence(&pair.input);
             if let Some(ref output) = pair.output {
                 dataset.add_sentence(output);
             }
         }
-        
+
         dataset
     }
-    
+
     /// Get statistics
     pub fn stats(&self) -> JsonDatasetStats {
         let positive = self.pairs.iter().filter(|p| p.reward > 0.0).count();
         let negative = self.pairs.iter().filter(|p| p.reward < 0.0).count();
         let neutral = self.pairs.len() - positive - negative;
-        
+
         JsonDatasetStats {
             total_pairs: self.pairs.len(),
             positive_pairs: positive,
@@ -275,13 +329,13 @@ impl TextDataset {
     /// Load dataset from text file (one sentence per line)
     pub fn from_file<P: AsRef<Path>>(path: P, window_size: usize) -> std::io::Result<Self> {
         let path_ref = path.as_ref();
-        
+
         // Check if it's a JSON file
         if path_ref.extension().map(|e| e == "json").unwrap_or(false) {
             let json_dataset = JsonDataset::from_file(path_ref)?;
             return Ok(json_dataset.to_text_dataset(window_size));
         }
-        
+
         // Otherwise treat as plain text
         let file = File::open(path)?;
         let reader = BufReader::new(file);
@@ -303,7 +357,11 @@ impl TextDataset {
         let words: Vec<String> = text
             .to_lowercase()
             .split_whitespace()
-            .map(|w| w.chars().filter(|c| c.is_alphanumeric()).collect::<String>())
+            .map(|w| {
+                w.chars()
+                    .filter(|c| c.is_alphanumeric())
+                    .collect::<String>()
+            })
             .filter(|w| !w.is_empty())
             .collect();
 
@@ -441,7 +499,7 @@ mod tests {
         dataset.add_sentence("a b c");
 
         let pairs = dataset.generate_skipgram_pairs();
-        
+
         // With window=1: (a,b), (b,a), (b,c), (c,b)
         assert_eq!(pairs.len(), 4);
     }
@@ -452,7 +510,7 @@ mod tests {
         dataset.add_sentence("jedna dva tři čtyři pět");
 
         let sequences = dataset.generate_sequences(3);
-        
+
         // 5 words, window 3: [1,2,3], [2,3,4], [3,4,5]
         assert_eq!(sequences.len(), 3);
     }

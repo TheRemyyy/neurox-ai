@@ -250,6 +250,10 @@ pub struct NeuromorphicBrain {
     #[serde(skip)]
     pub intent_rules: Vec<(crate::language::IntentType, Vec<String>)>,
 
+    /// Sentiment patterns loaded from training data (replaces hardcoded positive/negative words)
+    #[serde(skip)]
+    pub sentiment_patterns: Option<crate::datasets::SentimentPatterns>,
+
     // === HUMAN-LIMIT UPGRADES (2025) ===
     /// Emotional State Machine - affective processing with mood dynamics
     pub emotional_state: EmotionalStateMachine,
@@ -496,6 +500,7 @@ impl NeuromorphicBrain {
             bond_level: 0.1,
             metacognition: Metacognition::new(),
             intent_rules: Vec::new(), // Initialized empty, filled by training/JSON
+            sentiment_patterns: None, // Loaded from JSON training data
 
             // Human-limit upgrades (2025)
             emotional_state: EmotionalStateMachine::new(),
@@ -517,8 +522,7 @@ impl NeuromorphicBrain {
     pub fn process_text(&mut self, text: &str) -> String {
         let dt = 0.1; // 0.1ms timestep
 
-        // 0. EMOTIONAL IMPACT: Words affect neuromodulators
-        // "jsi blbý" decreases dopamine, "super" increases it
+        // 0. EMOTIONAL IMPACT: Words affect neuromodulators (loaded from training data)
         self.apply_emotional_impact(text);
 
         // 1. Tokenize with learned embeddings (not hash!)
@@ -1067,43 +1071,44 @@ impl NeuromorphicBrain {
             }
         }
 
-        // Also check for known negative patterns
-        let negative_patterns = [
-            "blbý",
-            "blbec",
-            "debil",
-            "idiot",
-            "hovado",
-            "kravina",
-            "píčovina",
-        ];
-        for pattern in negative_patterns {
-            if lower.contains(pattern) {
-                self.neuromodulation
-                    .set_dopamine((self.neuromodulation.dopamine_level - 0.2).clamp(0.0, 1.0));
-                self.neuromodulation.norepinephrine.level =
-                    (self.neuromodulation.norepinephrine.level + 0.15).clamp(0.0, 1.0);
+        // === DYNAMIC SENTIMENT PATTERNS (from training data) ===
+        if let Some(ref patterns) = self.sentiment_patterns {
+            // Process negative patterns
+            if let Some(ref negative) = patterns.negative {
+                for keyword in &negative.keywords {
+                    if lower.contains(keyword) {
+                        self.neuromodulation.set_dopamine(
+                            (self.neuromodulation.dopamine_level + negative.dopamine_effect)
+                                .clamp(0.0, 1.0),
+                        );
+                        self.neuromodulation.norepinephrine.level =
+                            (self.neuromodulation.norepinephrine.level
+                                + negative.norepinephrine_effect)
+                                .clamp(0.0, 1.0);
+                        self.bond_level = (self.bond_level + negative.bond_effect).clamp(0.0, 1.0);
+                        break; // Only apply once per message
+                    }
+                }
             }
-        }
 
-        let positive_patterns = ["super", "skvělé", "výborně", "díky", "děkuju", "miluju"];
-        for pattern in positive_patterns {
-            if lower.contains(pattern) {
-                self.neuromodulation
-                    .set_dopamine((self.neuromodulation.dopamine_level + 0.15).clamp(0.0, 1.0));
-                self.neuromodulation.serotonin.level =
-                    (self.neuromodulation.serotonin.level + 0.05).clamp(0.0, 1.0);
-                // Build bond through positive interactions
-                self.bond_level = (self.bond_level + 0.05).clamp(0.0, 1.0);
+            // Process positive patterns
+            if let Some(ref positive) = patterns.positive {
+                for keyword in &positive.keywords {
+                    if lower.contains(keyword) {
+                        self.neuromodulation.set_dopamine(
+                            (self.neuromodulation.dopamine_level + positive.dopamine_effect)
+                                .clamp(0.0, 1.0),
+                        );
+                        self.neuromodulation.serotonin.level =
+                            (self.neuromodulation.serotonin.level + positive.serotonin_effect)
+                                .clamp(0.0, 1.0);
+                        self.bond_level = (self.bond_level + positive.bond_effect).clamp(0.0, 1.0);
+                        break; // Only apply once per message
+                    }
+                }
             }
         }
-
-        // Decrease bond for negative interactions
-        for pattern in negative_patterns {
-            if lower.contains(pattern) {
-                self.bond_level = (self.bond_level - 0.1).clamp(0.0, 1.0);
-            }
-        }
+        // NOTE: No fallback - patterns must be loaded from training data
     }
 
     /// Generate sentence word-by-word using IFG syntactic planner

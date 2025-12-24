@@ -145,6 +145,56 @@ impl BrainLoader {
             brain.intent_rules.push((intent, rule.keywords.clone()));
         }
 
+        // === STEP 4.5: Load Sentiment Patterns ===
+        if let Some(ref patterns) = dataset.sentiment_patterns {
+            let negative_count = patterns
+                .negative
+                .as_ref()
+                .map(|n| n.keywords.len())
+                .unwrap_or(0);
+            let positive_count = patterns
+                .positive
+                .as_ref()
+                .map(|p| p.keywords.len())
+                .unwrap_or(0);
+            println!(
+                "  Loading sentiment patterns: {} negative, {} positive keywords",
+                negative_count, positive_count
+            );
+            brain.sentiment_patterns = Some(patterns.clone());
+        }
+
+        // === STEP 4.6: Load Emotion Triggers ===
+        if !dataset.emotion_triggers.is_empty() {
+            println!(
+                "  Loading emotion triggers: {} rules",
+                dataset.emotion_triggers.len()
+            );
+            for trigger in &dataset.emotion_triggers {
+                let emotion = match trigger.emotion.as_str() {
+                    "joy" => crate::affect::Emotion::Joy,
+                    "sadness" => crate::affect::Emotion::Sadness,
+                    "fear" => crate::affect::Emotion::Fear,
+                    "anger" => crate::affect::Emotion::Anger,
+                    "surprise" => crate::affect::Emotion::Surprise,
+                    "disgust" => crate::affect::Emotion::Disgust,
+                    "trust" => crate::affect::Emotion::Trust,
+                    "anticipation" => crate::affect::Emotion::Anticipation,
+                    "love" => crate::affect::Emotion::Love,
+                    _ => crate::affect::Emotion::Neutral,
+                };
+                brain
+                    .emotional_state
+                    .add_transition(crate::affect::EmotionTransition {
+                        trigger_threshold: 0.5,
+                        from_emotion: None,
+                        to_emotion: emotion,
+                        intensity: trigger.intensity,
+                        trigger_patterns: trigger.trigger_patterns.clone(),
+                    });
+            }
+        }
+
         // === STEP 5: Train supervised pairs for semantic learning ===
         let total = dataset.pairs.len();
         let bar_width = 30;

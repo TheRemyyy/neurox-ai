@@ -3,5 +3,9 @@
 pub mod mnist;
 pub mod text_dataset;
 
-pub use mnist::{MNISTDataset, MNISTImage, load_mnist_synthetic};
-pub use text_dataset::{TextDataset, TextDatasetStats, JsonDataset, JsonDatasetStats, SupervisedPair, VocabWord, SentenceTemplateJson, PragmaticRuleJson, MetacognitionConfigJson, IntentRuleJson};
+pub use mnist::{load_mnist_synthetic, MNISTDataset, MNISTImage};
+pub use text_dataset::{
+    EmotionTriggerJson, IntentRuleJson, JsonDataset, JsonDatasetStats, MetacognitionConfigJson,
+    PragmaticRuleJson, SentenceTemplateJson, SentimentPatternCategory, SentimentPatterns,
+    SupervisedPair, TextDataset, TextDatasetStats, VocabWord,
+};

@@ -458,89 +458,21 @@ impl EmotionalStateMachine {
         }
     }
 
-    /// Default emotion transition rules (Czech/general)
+    /// Default emotion transition rules - empty, loaded from training data
+    /// Use `load_transitions()` to populate from JSON training data
     fn default_transitions() -> Vec<EmotionTransition> {
-        vec![
-            // Greetings → Joy
-            EmotionTransition {
-                trigger_threshold: 0.5,
-                from_emotion: None,
-                to_emotion: Emotion::Joy,
-                intensity: 0.3,
-                trigger_patterns: vec![
-                    "ahoj".into(),
-                    "čau".into(),
-                    "zdravím".into(),
-                    "nazdar".into(),
-                    "dobrý den".into(),
-                ],
-            },
-            // Insults → Anger/Sadness
-            EmotionTransition {
-                trigger_threshold: 0.5,
-                from_emotion: None,
-                to_emotion: Emotion::Anger,
-                intensity: 0.5,
-                trigger_patterns: vec![
-                    "blbý".into(),
-                    "hloupý".into(),
-                    "debil".into(),
-                    "idiot".into(),
-                    "kretén".into(),
-                ],
-            },
-            // Compliments → Joy + Trust
-            EmotionTransition {
-                trigger_threshold: 0.5,
-                from_emotion: None,
-                to_emotion: Emotion::Joy,
-                intensity: 0.4,
-                trigger_patterns: vec![
-                    "super".into(),
-                    "skvělý".into(),
-                    "dobrý".into(),
-                    "výborně".into(),
-                    "perfektní".into(),
-                    "líbí".into(),
-                ],
-            },
-            // Questions → Anticipation
-            EmotionTransition {
-                trigger_threshold: 0.3,
-                from_emotion: None,
-                to_emotion: Emotion::Anticipation,
-                intensity: 0.2,
-                trigger_patterns: vec!["?".into(), "proč".into(), "jak".into(), "co".into()],
-            },
-            // Affection → Love
-            EmotionTransition {
-                trigger_threshold: 0.5,
-                from_emotion: None,
-                to_emotion: Emotion::Love,
-                intensity: 0.3,
-                trigger_patterns: vec![
-                    "miluju".into(),
-                    "láska".into(),
-                    "rád".into(),
-                    "ráda".into(),
-                    "mám tě rád".into(),
-                ],
-            },
-            // Surprise expressions
-            EmotionTransition {
-                trigger_threshold: 0.5,
-                from_emotion: None,
-                to_emotion: Emotion::Surprise,
-                intensity: 0.4,
-                trigger_patterns: vec![
-                    "wow".into(),
-                    "!".into(),
-                    "vážně".into(),
-                    "opravdu".into(),
-                    "nemůžu".into(),
-                ],
-            },
-        ]
+        // No hardcoded patterns - all loaded from training data (emotion_triggers in JSON)
+        Vec::new()
+    }
+
+    /// Load emotion transitions from training data
+    pub fn load_transitions(&mut self, transitions: Vec<EmotionTransition>) {
+        self.transitions = transitions;
+    }
+
+    /// Add a single emotion transition
+    pub fn add_transition(&mut self, transition: EmotionTransition) {
+        self.transitions.push(transition);
     }
 
     /// Process input text and update emotional state

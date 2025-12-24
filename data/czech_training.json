@@ -1,6 +1,115 @@
 {
     "name": "Neurox Czech Training",
     "description": "Kompletní trénink mozku: sémantika, gramatika, pragmatika, emoce",
+    "sentiment_patterns": {
+        "negative": {
+            "keywords": [
+                "blbý", "blbec", "blbost",
+                "debil", "debilní",
+                "idiot", "idiote", "idiotský",
+                "kretén", "kreténský",
+                "hovado", "hovadina",
+                "kravina", "kravinec",
+                "píčovina", "píčoviny",
+                "vůl", "vole",
+                "pitomec", "pitomý",
+                "hloupý", "hlupák",
+                "kokot", "kokotina",
+                "magor", "magore",
+                "hajzl", "hajzle",
+                "sračka", "sračky",
+                "hovno", "do háje",
+                "nesnáším", "nenávidím",
+                "odporne", "odporný", "hnusný",
+                "k ničemu", "nepoužitelný",
+                "trapný", "trapné", "trapnej"
+            ],
+            "dopamine_effect": -0.2,
+            "norepinephrine_effect": 0.15,
+            "bond_effect": -0.1
+        },
+        "positive": {
+            "keywords": [
+                "super", "super!",
+                "skvělé", "skvělý", "skvěle",
+                "výborně", "výborný", "výborná",
+                "díky", "děkuju", "děkuji", "dík",
+                "miluju", "miluju tě", "miluji",
+                "mám tě rád", "mám tě ráda",
+                "perfektní", "perfektní!",
+                "úžasné", "úžasný", "úžasně",
+                "báječné", "báječný",
+                "nádherné", "nádherný",
+                "fantastické", "fantastický",
+                "parádní", "paráda",
+                "hustý", "hustej",
+                "boží", "božský",
+                "pecka", "bomba",
+                "jsi nejlepší", "jseš nejlepší",
+                "dobře", "dobrý", "dobře!",
+                "líbí se mi", "líbíš se mi",
+                "moc hezké", "moc hezký",
+                "prima", "prima!"
+            ],
+            "dopamine_effect": 0.15,
+            "serotonin_effect": 0.05,
+            "bond_effect": 0.05
+        },
+        "greeting": {
+            "keywords": [
+                "ahoj", "čau", "nazdar",
+                "zdravím", "dobrý den",
+                "dobré ráno", "dobrý večer",
+                "zdar", "čus", "hej",
+                "haló", "halóó"
+            ],
+            "dopamine_effect": 0.1,
+            "bond_effect": 0.02
+        },
+        "farewell": {
+            "keywords": [
+                "ahoj", "čau", "zatím",
+                "tak zatím", "pa", "papa",
+                "měj se", "tak se měj",
+                "nashle", "na shledanou",
+                "dobrou", "dobrou noc"
+            ],
+            "dopamine_effect": 0.0,
+            "bond_effect": 0.0
+        }
+    },
+    "emotion_triggers": [
+        {
+            "emotion": "joy",
+            "trigger_patterns": ["ahoj", "čau", "zdravím", "nazdar", "dobrý den"],
+            "intensity": 0.3
+        },
+        {
+            "emotion": "anger",
+            "trigger_patterns": ["blbý", "hloupý", "debil", "idiot", "kretén"],
+            "intensity": 0.5
+        },
+        {
+            "emotion": "joy",
+            "trigger_patterns": ["super", "skvělý", "dobrý", "výborně", "perfektní", "líbí"],
+            "intensity": 0.4
+        },
+        {
+            "emotion": "anticipation",
+            "trigger_patterns": ["?", "proč", "jak", "co"],
+            "intensity": 0.2
+        },
+        {
+            "emotion": "love",
+            "trigger_patterns": ["miluju", "láska", "rád", "ráda", "mám tě rád"],
+            "intensity": 0.3
+        },
+        {
+            "emotion": "surprise",
+            "trigger_patterns": ["wow", "!", "vážně", "opravdu", "nemůžu"],
+            "intensity": 0.4
+        }
+    ],
     "pragmatic_rules": [
         {
             "input_intent": "greeting",
