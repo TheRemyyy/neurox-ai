@@ -27,8 +27,10 @@ NeuroxAI is a high-performance neuromorphic computing platform that simulates bi
 - **🔬 Advanced Plasticity** — Triplet STDP, BCM metaplasticity, homeostatic regulation
 - **🌊 Neural Oscillations** — Theta-gamma coupling, sleep consolidation cycles
 - **💬 Language Processing** — Dual-stream architecture (ventral/dorsal pathways)
+- **🗣️ Conversational AI** — Sequence generation, context windows, paraphrase detection
 - **🎯 Cognitive Architecture** — Working memory, attention, hippocampal memory systems
 - **⚡ Neuromodulation** — Dopamine, serotonin, norepinephrine dynamics
+- **📊 Training System** — JSON-based supervised learning with emotional patterns
 
 ## Requirements
 
@@ -85,9 +87,11 @@ neurox-ai/
 │   ├── brain/               # Whole-brain architecture
 │   ├── cortex/              # Cortical processing (V1, working memory, etc.)
 │   ├── cuda/                # GPU kernels and context
-│   ├── language/            # Dual-stream language processing
+│   ├── language/            # Dual-stream language + sequence generation
 │   ├── learning/            # STDP, metaplasticity, homeostasis
 │   ├── memory/              # Hippocampal memory systems
+│   ├── semantics/           # Embeddings, paraphrase detection, intent clustering
+│   ├── affect/              # Emotional states and transitions
 │   ├── neuron/              # Neuron models (LIF, dendritic, interneurons)
 │   ├── neuromodulation/     # Dopamine, serotonin, norepinephrine
 │   ├── oscillations/        # Neural rhythms and coupling
@@ -117,6 +121,14 @@ neurox-ai/
 - Hippocampal pattern separation (DG) and completion (CA3/CA1)
 - Working memory with capacity limits
 - Sleep-dependent consolidation
+
+### Conversational AI
+
+- **Sequence Generator** — Beam search with temperature control
+- **Context Window** — Maintains conversation history for coherent dialogue
+- **Paraphrase Detection** — Recognizes semantically similar inputs
+- **Intent Clustering** — Groups related intents with semantic similarity
+- **Emotional Responses** — Sentiment patterns and emotion transitions
 
 ## <a id="performance"></a>Performance
 
