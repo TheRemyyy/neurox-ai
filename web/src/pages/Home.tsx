@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Brain, Zap, Shield, Cpu, Activity, ArrowRight, MessageSquare, Dna, Compass, GitMerge } from 'lucide-react';
+import { Cpu, Activity, ArrowRight, MessageSquare, Dna, Compass, GitMerge } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export default function Home() {
@@ -8,7 +8,7 @@ export default function Home() {
       {/* Hero Section */}
       <section className="relative pt-10">
         <div className="absolute -top-24 -left-24 w-96 h-96 bg-accent/10 rounded-full blur-3xl pointer-events-none" />
-        
+
         <div className="relative space-y-8">
           <motion.div
             initial={{ opacity: 0, y: 10 }}
@@ -35,7 +35,7 @@ export default function Home() {
             transition={{ delay: 0.2 }}
             className="text-xl text-text-secondary max-w-2xl leading-relaxed"
           >
-            NeuroxAI is a hyper-realistic neuromorphic platform built in Rust. 
+            NeuroxAI is a hyper-realistic neuromorphic platform built in Rust.
             From ion-channel dynamics to high-level metacognition—we're rebuilding the brain in silicon.
           </motion.p>
 
@@ -65,7 +65,7 @@ export default function Home() {
                 Most "AI" today is just linear algebra disguised as intelligence. **NeuroxAI is different.** We strictly adhere to biological constraints because we believe that General Intelligence is an emergent property of complex, evolutionarily conserved systems.
               </p>
               <p>
-                <span className="text-text-primary border-b-2 border-accent/30">63 hours of intensive development</span> have resulted in a platform that simulates distinct brain organs—the Cortex, Basal Ganglia, Hippocampus, and Cerebellum—all working in a synchronized temporal loop.
+                <span className="text-text-primary border-b-2 border-accent/30">437 hours of intensive development</span> have resulted in a platform that simulates distinct brain organs—the Cortex, Basal Ganglia, Hippocampus, and Cerebellum—all working in a synchronized temporal loop.
               </p>
               <p>
                 By utilizing **Triplet STDP** and **Neuromodulation**, NeuroxAI doesn't just process data; it *learns* and *feels* through simulated chemical states.
@@ -88,34 +88,34 @@ export default function Home() {
           <p className="text-text-secondary max-w-xl mx-auto">A complete cognitive stack, from hardware to consciousness.</p>
         </div>
         <div className="grid md:grid-cols-3 gap-8">
-          <ModuleCard 
-            icon={Cpu} 
-            title="Laminar Cortex" 
+          <ModuleCard
+            icon={Cpu}
+            title="Laminar Cortex"
             desc="6-layer microcircuitry implementing predictive coding. Minimizing free energy across 5 hierarchical levels."
           />
-          <ModuleCard 
-            icon={Activity} 
-            title="Dopaminergic RL" 
+          <ModuleCard
+            icon={Activity}
+            title="Dopaminergic RL"
             desc="Basal ganglia loops for action selection. Real-time TD-learning modulated by dopamine bursts and pauses."
           />
-          <ModuleCard 
-            icon={MessageSquare} 
-            title="Dual-Stream Language" 
+          <ModuleCard
+            icon={MessageSquare}
+            title="Dual-Stream Language"
             desc="Ventral and dorsal pathways for sound-to-meaning and sound-to-articulation mapping. GPT-1.0 capability in SNN."
           />
-          <ModuleCard 
-            icon={GitMerge} 
-            title="Synaptic Plasticity" 
+          <ModuleCard
+            icon={GitMerge}
+            title="Synaptic Plasticity"
             desc="Triplet STDP, BCM theory, and homeostatic scaling. The network physically rewires itself based on activity."
           />
-          <ModuleCard 
-            icon={Compass} 
-            title="Cognitive Maps" 
+          <ModuleCard
+            icon={Compass}
+            title="Cognitive Maps"
             desc="Grid cells and place cells provide a metric coordinate system for both spatial navigation and abstract reasoning."
           />
-          <ModuleCard 
-            icon={Dna} 
-            title="Active Dendrites" 
+          <ModuleCard
+            icon={Dna}
+            title="Active Dendrites"
             desc="NMDA plateau potentials turn single neurons into 2-layer networks, boosting computational capacity by 5x."
           />
         </div>
