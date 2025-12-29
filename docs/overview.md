@@ -32,6 +32,12 @@ We move beyond simple "layers" to simulate distinct brain organs:
 *   **CUDA Acceleration**: Custom GPU kernels for V1 visual processing and massive matrix operations, achieving **100x speedups** over CPU execution.
 *   **Sparse Computing**: Optimized data structures for handling the <1% sparsity of biological neural activity.
 
+### 🧬 The Semantic Genome
+NeuroxAI is not trained on raw text noise. It uses a structured **Semantic Genome** (`data/czech_training.json`) that maps words directly to:
+*   **Neuro-Impacts**: How words affect Dopamine, Oxytocin, and Stress levels.
+*   **Pragmatics**: Rules for social interaction and logical flow.
+*   **Emotional Triggers**: Patterns that elicit Joy, Anger, or Anticipation.
+
 ## Use Cases
 
 *   **Neuromorphic Research**: Testing hypotheses about brain function in silicon.
