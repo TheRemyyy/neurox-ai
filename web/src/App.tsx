@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, useLocation, Link } from 'react
 import { Sidebar } from './components/Sidebar';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Brain, ChevronLeft, ChevronRight, Menu } from 'lucide-react';
-import { Analytics } from "@vercel/analytics/react"
+import { Analytics } from '@vercel/analytics/react';
 
 const MarkdownViewer = lazy(() => import('./components/MarkdownViewer').then(module => ({ default: module.MarkdownViewer })));
 

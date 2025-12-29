@@ -24,13 +24,11 @@ export default defineConfig({
     },
     rollupOptions: {
       output: {
-        manualChunks: (id) => {
-          if (id.includes('node_modules')) {
-            if (id.includes('react')) return 'vendor-react';
-            if (id.includes('lucide')) return 'vendor-icons';
-            if (id.includes('highlight')) return 'vendor-hljs';
-            return 'vendor';
-          }
+        // Safer chunking strategy to prevent "createContext of undefined"
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-utils': ['framer-motion', 'lucide-react'],
+          'vendor-hljs': ['highlight.js'],
         },
       },
     },
