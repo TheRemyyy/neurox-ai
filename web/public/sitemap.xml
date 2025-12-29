@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://neurox-ai.vercel.app/</loc><priority>1.0</priority></url>
+  <url><loc>https://neurox-ai.vercel.app/docs/architecture/system_overview.md</loc><priority>0.8</priority></url>
+  <url><loc>https://neurox-ai.vercel.app/docs/modules/cortical_hierarchy.md</loc><priority>0.7</priority></url>
+  <url><loc>https://neurox-ai.vercel.app/docs/modules/subcortical_systems.md</loc><priority>0.7</priority></url>
+  <url><loc>https://neurox-ai.vercel.app/docs/modules/spatial_navigation.md</loc><priority>0.7</priority></url>
+  <url><loc>https://neurox-ai.vercel.app/docs/modules/neuron_models.md</loc><priority>0.7</priority></url>
+  <url><loc>https://neurox-ai.vercel.app/docs/modules/cognitive_upgrades.md</loc><priority>0.7</priority></url>
+  <url><loc>https://neurox-ai.vercel.app/docs/modules/reasoning_motivation.md</loc><priority>0.7</priority></url>
+  <url><loc>https://neurox-ai.vercel.app/docs/internals/plasticity.md</loc><priority>0.6</priority></url>
+  <url><loc>https://neurox-ai.vercel.app/docs/internals/neuromodulation.md</loc><priority>0.6</priority></url>
+  <url><loc>https://neurox-ai.vercel.app/docs/internals/gpu_acceleration.md</loc><priority>0.6</priority></url>
+  <url><loc>https://neurox-ai.vercel.app/docs/internals/language_cognition.md</loc><priority>0.6</priority></url>
+  <url><loc>https://neurox-ai.vercel.app/docs/internals/data_training.md</loc><priority>0.6</priority></url>
+</urlset>

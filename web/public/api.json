@@ -1,0 +1,15 @@
+{
+  "name": "NeuroxAI API",
+  "version": "0.1.0",
+  "description": "Neuromorphic Brain Simulation Data Interface",
+  "endpoints": {
+    "docs": "/docs",
+    "metrics": "/metrics (simulated)",
+    "chat": "/chat (SNN-based)"
+  },
+  "architecture": {
+    "type": "SNN",
+    "learning": ["Triplet STDP", "R-STDP", "BCM"],
+    "hardware": "CUDA 12.6"
+  }
+}
