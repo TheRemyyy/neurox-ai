@@ -65,7 +65,7 @@ export default function Home() {
                 Most "AI" today is just linear algebra disguised as intelligence. <span className="font-semibold text-text-primary">NeuroxAI is different.</span> We strictly adhere to biological constraints because we believe that General Intelligence is an emergent property of complex, evolutionarily conserved systems.
               </p>
               <p>
-                <span className="text-text-primary border-b-2 border-accent/30">63 hours of intensive development</span> have resulted in a platform that simulates distinct brain organs—the Cortex, Basal Ganglia, Hippocampus, and Cerebellum—all working in a synchronized temporal loop.
+                <span className="text-text-primary border-b-2 border-accent/30">210 hours of intensive development</span> have resulted in a platform that simulates distinct brain organs—the Cortex, Basal Ganglia, Hippocampus, and Cerebellum—all working in a synchronized temporal loop.
               </p>
               <p>
                 By utilizing <span className="font-semibold text-text-primary">Triplet STDP</span> and <span className="font-semibold text-text-primary">Neuromodulation</span>, NeuroxAI doesn't just process data; it *learns* and *feels* through simulated chemical states.
