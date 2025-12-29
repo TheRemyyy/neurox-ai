@@ -10,7 +10,7 @@
 
 *Biologically-inspired spiking neural networks targeting 1-10M neurons with real-time performance*
 
-[Overview](#overview) • [Installation](#installation) • [Usage](#usage) • [Architecture](#architecture) • [Performance](#performance)
+[Overview](#overview) • [Installation](#installation) • [Usage](#usage) • [Architecture](#architecture) • [Performance](#performance) • [Documentation](#documentation)
 
 </div>
 
@@ -138,6 +138,19 @@ Optimized for NVIDIA RTX GPUs with:
 - Parallel neuron updates
 - Efficient spike propagation
 - Memory-optimized data layouts
+
+## Documentation
+
+Comprehensive documentation is available in the `docs/` directory:
+
+- [**General Overview**](docs/overview.md) — Philosophy and high-level goals
+- [**System Architecture**](docs/architecture/system_overview.md) — Detailed data flow and brain loops
+- [**Cognitive Modules**](docs/modules/cognitive_upgrades.md) — Theory of Mind, Inner Dialogue, and 2025 upgrades
+- [**Changelog**](CHANGELOG.md) — Version history and updates
+
+## Contributing
+
+Contributions are welcome! Whether you're fixing a bug, improving biological accuracy, or optimizing CUDA kernels, please read our [Contributing Guidelines](CONTRIBUTING.md) first.
 
 ## License
 
