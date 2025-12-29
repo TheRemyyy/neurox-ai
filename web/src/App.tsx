@@ -4,7 +4,9 @@ import { Sidebar } from './components/Sidebar';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Brain, ChevronLeft, ChevronRight, Menu } from 'lucide-react';
 import { Analytics } from '@vercel/analytics/react';
+import Home from './pages/Home';
 
+// Lazy load the heavy components
 const MarkdownViewer = lazy(() => import('./components/MarkdownViewer').then(module => ({ default: module.MarkdownViewer })));
 
 const allPages = [
@@ -121,7 +123,7 @@ function App() {
         <main className="flex-1 overflow-y-auto pt-14 lg:pt-0">
           <AnimatePresence mode="wait">
             <Routes>
-              <Route path="/" element={<DocsPage />} />
+              <Route path="/" element={<PageWrapper><Home /></PageWrapper>} />
               <Route path="/docs/*" element={<DocsPage />} />
             </Routes>
           </AnimatePresence>
