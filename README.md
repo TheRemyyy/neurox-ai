@@ -4,6 +4,7 @@
 
 **GPU-Accelerated Neuromorphic Computing Platform**
 
+[![Website](https://img.shields.io/badge/Website-neuroxai.vercel.app-a5b4fc?style=flat-square&logo=vercel)](https://neuroxai.vercel.app/)
 [![Rust](https://img.shields.io/badge/Rust-1.75+-orange.svg)](https://www.rust-lang.org/)
 [![CUDA](https://img.shields.io/badge/CUDA-12.6+-green.svg)](https://developer.nvidia.com/cuda-toolkit)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
