@@ -1107,8 +1107,8 @@ impl NeuromorphicBrain {
 
     /// Generate sentence word-by-word using IFG syntactic planner
     /// Uses semantic knowledge: responds_to, context_tags, pragmatic_rules
-    /// Check direct associative memory for known phrases
-    fn check_direct_memory(&self, input: &str) -> Option<String> {
+    /// Check direct associative memory for known phrases, with semantic similarity fallback
+    fn check_direct_memory(&mut self, input: &str) -> Option<String> {
         let key = input
             .trim()
             .to_lowercase()
@@ -1119,6 +1119,7 @@ impl NeuromorphicBrain {
             .trim()
             .to_string();
 
+        // === STEP 1: Try exact match (fast path) ===
         if let Some(options) = self.ifg_planner.direct_memory.get(&key) {
             // Filter by bond (Oxytocin level needed for intimate responses)
             let current_bond = self.neuromodulation.oxytocin.level;
@@ -1136,7 +1137,72 @@ impl NeuromorphicBrain {
                 return Some(accessible[choice].clone());
             }
         }
-        None
+
+        // === STEP 2: Semantic similarity matching (slower, but more flexible) ===
+        if self.ifg_planner.semantic_memory.is_empty() {
+            return None;
+        }
+
+        // Compute input embedding
+        let input_indices: Vec<usize> = input
+            .split_whitespace()
+            .filter_map(|word| {
+                let clean: String = word
+                    .to_lowercase()
+                    .chars()
+                    .filter(|c| c.is_alphanumeric())
+                    .collect();
+                if clean.is_empty() {
+                    None
+                } else {
+                    self.language.get_word_idx(&clean)
+                }
+            })
+            .collect();
+
+        if input_indices.is_empty() {
+            return None;
+        }
+
+        let input_embedding = self.language.comprehend(&input_indices);
+        let current_bond = self.neuromodulation.oxytocin.level;
+
+        // Find best semantic match using cosine similarity
+        let mut best_match: Option<&String> = None;
+        let mut best_score: f32 = 0.5; // Minimum threshold for relevance
+
+        for (stored_emb, response, bond_req) in &self.ifg_planner.semantic_memory {
+            // Skip if bond requirement not met
+            if *bond_req > current_bond {
+                continue;
+            }
+
+            // Compute cosine similarity
+            let score = Self::cosine_similarity(&input_embedding, stored_emb);
+            if score > best_score {
+                best_score = score;
+                best_match = Some(response);
+            }
+        }
+
+        best_match.cloned()
+    }
+
+    /// Compute cosine similarity between two vectors
+    fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
+        if a.len() != b.len() || a.is_empty() {
+            return 0.0;
+        }
+
+        let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
+        let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
+        let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
+
+        if norm_a == 0.0 || norm_b == 0.0 {
+            0.0
+        } else {
+            dot / (norm_a * norm_b)
+        }
     }
 
     /// Generate a sentence based on intent using IFG templates

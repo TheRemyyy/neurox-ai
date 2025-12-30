@@ -298,6 +298,34 @@ impl BrainLoader {
                             .or_default()
                             .push((output.clone(), pair.requires_bond));
                     }
+
+                    // Store input embedding for semantic similarity matching
+                    // This enables finding contextually similar responses
+                    let input_indices: Vec<usize> = pair
+                        .input
+                        .split_whitespace()
+                        .filter_map(|word| {
+                            let clean: String = word
+                                .to_lowercase()
+                                .chars()
+                                .filter(|c| c.is_alphanumeric())
+                                .collect();
+                            if clean.is_empty() {
+                                None
+                            } else {
+                                brain.language.get_word_idx(&clean)
+                            }
+                        })
+                        .collect();
+
+                    if !input_indices.is_empty() {
+                        let embedding = brain.language.comprehend(&input_indices);
+                        brain.ifg_planner.semantic_memory.push((
+                            embedding,
+                            output.clone(),
+                            pair.requires_bond,
+                        ));
+                    }
                 }
             }
             progress_bar.inc(1);
