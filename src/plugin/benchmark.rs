@@ -2,12 +2,12 @@
 //!
 //! MNIST benchmark with quantization support.
 
-use crate::config::BenchmarkConfig;
 use crate::brain::datasets::{download_mnist, MNISTDataset};
 use crate::brain::learning::quantization::QuantizedWeights;
 use crate::brain::learning::STDPConfig;
 use crate::brain::simulation::Simulator;
 use crate::brain::training::{MNISTTrainer, TrainingConfig};
+use crate::config::BenchmarkConfig;
 use crate::{CudaContext, ProceduralConnectivity, SparseConnectivity};
 use std::sync::Arc;
 
@@ -247,20 +247,19 @@ impl BenchmarkPlugin {
 
         if !std::path::Path::new(&train_path).exists() {
             println!(
-                "{}Error:{} MNIST files not found at {}",
-                COLOR_WHITE, COLOR_RESET, data_dir
+                "{}MNIST files not found at {}. Downloading...{}",
+                COLOR_WHITE, data_dir, COLOR_RESET
             );
-            println!();
-            println!("Expected files:");
-            println!("  - train-images-idx3-ubyte");
-            println!("  - train-labels-idx1-ubyte");
-            println!("  - t10k-images-idx3-ubyte");
-            println!("  - t10k-labels-idx1-ubyte");
-            println!();
-            println!("Options:");
-            println!("  neurox-ai benchmark --data-dir auto  (auto-download MNIST)");
-            println!("  neurox-ai benchmark                  (synthetic data demo)");
-            return Ok(());
+
+            if let Err(e) = download_mnist(data_dir) {
+                println!(
+                    "{}Error downloading MNIST: {}{}",
+                    COLOR_WHITE, e, COLOR_RESET
+                );
+                return Err(e);
+            }
+
+            println!("{}Download complete.{}", COLOR_GRAY, COLOR_RESET);
         }
 
         let train_dataset = MNISTDataset::load(&train_path, &train_labels_path)?;

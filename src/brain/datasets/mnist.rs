@@ -353,35 +353,10 @@ impl MNISTDataset {
 
 /// Simple in-memory MNIST loader (for testing without files)
 pub fn load_mnist_synthetic(n_train: usize, n_test: usize) -> MNISTDataset {
-    use rand::Rng;
-    let mut rng = rand::thread_rng();
+    let train_images = MNISTDataset::generate_synthetic(n_train);
+    let test_images = MNISTDataset::generate_synthetic(n_test);
 
-    let mut train_images = Vec::with_capacity(n_train);
-    let mut test_images = Vec::with_capacity(n_test);
-
-    // Generate synthetic MNIST-like data
-    for _ in 0..n_train {
-        let label = rng.gen_range(0..10);
-        let pixels = (0..784).map(|_| rng.gen_range(0..255)).collect();
-        train_images.push(MNISTImage {
-            pixels,
-            label,
-            width: 28,
-            height: 28,
-        });
-    }
-
-    for _ in 0..n_test {
-        let label = rng.gen_range(0..10);
-        let pixels = (0..784).map(|_| rng.gen_range(0..255)).collect();
-        test_images.push(MNISTImage {
-            pixels,
-            label,
-            width: 28,
-            height: 28,
-        });
-    }
-
+    // Clone training images for the 'images' field (legacy compatibility)
     let images = train_images.clone();
 
     MNISTDataset {
