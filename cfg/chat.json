@@ -1,0 +1,17 @@
+{
+    "vocab": 10000,
+    "pattern_dim": 512,
+    "neurons": 10000,
+    "context": 128,
+    "sensitivity": 1.0,
+    "brain_update_dt": 0.1,
+    "warmup_iterations": 10,
+    "post_processing_iterations": 3,
+    "history_size": 20,
+    "sleep_consolidation_iterations": 20,
+    "sleep_update_dt": 1.0,
+    "sleep_delay_ms": 50,
+    "ne_spike_value": 100.0,
+    "dopamine_reward_state_size": 512,
+    "dopamine_reward_value": 1.0
+}

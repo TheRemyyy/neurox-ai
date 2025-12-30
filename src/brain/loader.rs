@@ -1,6 +1,6 @@
 use crate::brain::NeuromorphicBrain;
-use crate::datasets::{JsonDataset, TextDataset};
-use crate::language::{IntentType, PartOfSpeech, PragmaticRule, SentenceTemplate};
+use crate::brain::datasets::{JsonDataset, TextDataset};
+use crate::brain::language::{IntentType, PartOfSpeech, PragmaticRule, SentenceTemplate};
 use std::error::Error;
 use std::io::{stdout, Write};
 
@@ -55,7 +55,7 @@ impl BrainLoader {
         );
         for vocab_word in &dataset.vocabulary {
             let pos = pos_from_string(&vocab_word.pos);
-            let mut annotated = crate::language::AnnotatedWord::new(&vocab_word.word, pos)
+            let mut annotated = crate::brain::language::AnnotatedWord::new(&vocab_word.word, pos)
                 .with_valence(vocab_word.valence);
 
             // Load semantic knowledge
@@ -168,20 +168,20 @@ impl BrainLoader {
             );
             for trigger in &dataset.emotion_triggers {
                 let emotion = match trigger.emotion.as_str() {
-                    "joy" => crate::affect::Emotion::Joy,
-                    "sadness" => crate::affect::Emotion::Sadness,
-                    "fear" => crate::affect::Emotion::Fear,
-                    "anger" => crate::affect::Emotion::Anger,
-                    "surprise" => crate::affect::Emotion::Surprise,
-                    "disgust" => crate::affect::Emotion::Disgust,
-                    "trust" => crate::affect::Emotion::Trust,
-                    "anticipation" => crate::affect::Emotion::Anticipation,
-                    "love" => crate::affect::Emotion::Love,
-                    _ => crate::affect::Emotion::Neutral,
+                    "joy" => crate::brain::affect::Emotion::Joy,
+                    "sadness" => crate::brain::affect::Emotion::Sadness,
+                    "fear" => crate::brain::affect::Emotion::Fear,
+                    "anger" => crate::brain::affect::Emotion::Anger,
+                    "surprise" => crate::brain::affect::Emotion::Surprise,
+                    "disgust" => crate::brain::affect::Emotion::Disgust,
+                    "trust" => crate::brain::affect::Emotion::Trust,
+                    "anticipation" => crate::brain::affect::Emotion::Anticipation,
+                    "love" => crate::brain::affect::Emotion::Love,
+                    _ => crate::brain::affect::Emotion::Neutral,
                 };
                 brain
                     .emotional_state
-                    .add_transition(crate::affect::EmotionTransition {
+                    .add_transition(crate::brain::affect::EmotionTransition {
                         trigger_threshold: 0.5,
                         from_emotion: None,
                         to_emotion: emotion,
@@ -218,7 +218,7 @@ impl BrainLoader {
                         .filter(|c| c.is_alphanumeric())
                         .collect();
                     if !clean.is_empty() && brain.lexicon.get_by_text(&clean).is_none() {
-                        brain.lexicon.add_word(crate::language::AnnotatedWord::new(
+                        brain.lexicon.add_word(crate::brain::language::AnnotatedWord::new(
                             &clean,
                             PartOfSpeech::Unknown,
                         ));

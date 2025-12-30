@@ -21,7 +21,7 @@
 //! - Context-dependent renewal
 //! - Stimulus generalization
 
-use crate::neuron::{LIFNeuron, Neuron};
+use crate::brain::neuron::{LIFNeuron, Neuron};
 use serde::{Deserialize, Serialize};
 
 /// Complete amygdala system with all nuclei

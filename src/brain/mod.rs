@@ -14,50 +14,122 @@
 //! - Place/grid cells for spatial/semantic organization
 //! - Homeostatic mechanisms (BCM, synaptic scaling, criticality)
 
+// Brain internal modules (files in this directory)
 pub mod amygdala;
 pub mod cerebellum;
 pub mod loader;
 pub mod superior_colliculus;
 pub mod thalamus;
 
+// Brain submodules (directories moved here)
+pub mod affect;
+pub mod attention;
+pub mod basal_ganglia;
+pub mod cognition;
+pub mod connectivity;
+pub mod cortex;
+pub mod cuda;
+pub mod datasets;
+pub mod language;
+pub mod learning;
+pub mod memory;
+pub mod motivation;
+pub mod neuromodulation;
+pub mod neuron;
+pub mod oscillations;
+pub mod reasoning;
+pub mod semantics;
+pub mod serialization;
+pub mod simulation;
+pub mod spatial;
+pub mod synapse;
+pub mod training;
+pub mod utils;
+
 pub use amygdala::{Amygdala, AmygdalaStats};
 pub use cerebellum::{CerebellarHemisphere, CerebellarStats, Cerebellum};
 pub use superior_colliculus::{SCNeuron, SCStats, SuperiorColliculus};
 pub use thalamus::{ThalamicNeuron, ThalamicNucleus, Thalamus, ThalamusStats};
 
-use crate::attention::AttentionSystem;
-use crate::basal_ganglia::{BasalGanglia, BasalGangliaStats};
-use crate::connectivity::{SparseConnectivity, StructuralPlasticity, StructuralPlasticityStats};
-use crate::cortex::{
+use self::attention::AttentionSystem;
+use self::basal_ganglia::{BasalGanglia, BasalGangliaStats};
+use self::connectivity::{SparseConnectivity, StructuralPlasticity, StructuralPlasticityStats};
+use self::cortex::{
     BarrelCortex, EnhancedPredictiveHierarchy, EnhancedPredictiveStats, Metacognition,
     MotionProcessingSystem, NeuromorphicCochlea, SleepConsolidation, SleepStats,
     V1OrientationSystem, WorkingMemory,
 };
-use crate::cuda::{
-    motion_kernels::GpuMotionSystem, v1_kernels::GpuV1OrientationSystem, CudaContext,
-    GpuCognitiveSystem,
+use self::cuda::{
+    motion_kernels::GpuMotionSystem, v1_kernels::GpuV1OrientationSystem, GpuCognitiveSystem,
 };
-use crate::language::{
+use self::language::{
     AnnotatedWord, DualStreamLanguage, DualStreamStats, IFGSyntacticPlanner, IntentType, Lexicon,
 };
-use crate::learning::{
+use self::learning::{
     HeterosynapticPlasticity, HeterosynapticStats, HomeostaticStats, HomeostaticSystem,
 };
-use crate::memory::Hippocampus;
-use crate::neuromodulation::{NeuromodulationStats, NeuromodulationSystem};
-use crate::neuron::{HierarchicalBrain, InterneuronCircuit, InterneuronStats, Neuron};
-use crate::oscillations::{OscillationStats, OscillatoryCircuit};
-use crate::semantics::SemanticSystem;
-use crate::spatial::SpatialSystem;
+use self::memory::Hippocampus;
+use self::neuromodulation::{NeuromodulationStats, NeuromodulationSystem};
+use self::neuron::{HierarchicalBrain, InterneuronCircuit, InterneuronStats, Neuron};
+use self::oscillations::{OscillationStats, OscillatoryCircuit};
+use self::semantics::SemanticSystem;
+use self::spatial::SpatialSystem;
 
 // Human-limit upgrade imports (2025)
-use crate::affect::EmotionalStateMachine;
-use crate::cognition::{
+use self::affect::EmotionalStateMachine;
+use self::cognition::{
     InnerDialogue, Metacognition as CognitionMetacognition, SelfModel, TheoryOfMind,
 };
-use crate::memory::{EnhancedEpisodicMemory, KnowledgeGraph};
-use crate::motivation::CuriosityDrive;
-use crate::reasoning::AbstractReasoning;
+use self::memory::{EnhancedEpisodicMemory, KnowledgeGraph};
+use self::motivation::CuriosityDrive;
+use self::reasoning::AbstractReasoning;
+
+// Public re-exports for lib.rs access
+pub use self::affect::{
+    Emotion, EmotionalState, EmotionalStateMachine as ESM, EmotionalStats, MoodState,
+};
+pub use self::attention::{AttentionStats, AttentionSystem as AttSystem};
+pub use self::basal_ganglia::{BasalGanglia as BG, BasalGangliaStats as BGStats, DopamineNeuron};
+pub use self::cognition::{
+    AgentModel, BDIModel, BehavioralProfile, BeliefState, CapabilityModel, CognitiveStrategy,
+    DialogueArbiter, InnerDialogue as InDia, Metacognition as Meta, MetacognitionStats,
+    Perspective, SelfModel as SM, TheoryOfMind as ToM,
+};
+pub use self::connectivity::{
+    ConnectivityType, ProceduralConnectivity, SparseConnectivity as SparseConn,
+};
+pub use self::cortex::{
+    EnhancedPredictiveHierarchy as EPH, EnhancedPredictiveStats as EPStats, PredictiveHierarchy,
+    WorkingMemory as WM, WorkingMemoryStats,
+};
+pub use self::cuda::CudaContext;
+pub use self::datasets::{download_mnist, MNISTDataset, MNISTImage};
+pub use self::language::{DualStreamLanguage as DSL, DualStreamStats as DSStats};
+pub use self::learning::{
+    BCMMetaplasticity, CriticalityHomeostasis, HomeostaticStats as HStats,
+    HomeostaticSystem as HSystem, STDPConfig,
+};
+pub use self::memory::{
+    EnhancedEpisodicMemory as EEM, Hippocampus as Hippo, HippocampusStats, KnowledgeGraph as KG,
+};
+pub use self::motivation::{CuriosityDrive as CD, CuriosityStats, InformationGain};
+pub use self::neuromodulation::{
+    NeuromodulationStats as NMStats, NeuromodulationSystem as NMSystem,
+};
+pub use self::neuron::{
+    DendriticLayer, DendriticNeuron, InterneuronCircuit as IntCircuit, PVInterneuron,
+    SSTInterneuron, VIPInterneuron,
+};
+pub use self::neuron::{LIFNeuron, NeuronState};
+pub use self::oscillations::{OscillationStats as OscStats, OscillatoryCircuit as OscCircuit};
+pub use self::reasoning::{AbstractReasoning as AR, AnalogyEngine, ReasoningChain};
+pub use self::semantics::{EmbeddingLayer, SemanticHub, SemanticSystem as SemSystem};
+pub use self::serialization::{
+    ModelMetadata, NeuromorphicModel, NeuronParameters, PlasticityState,
+};
+pub use self::simulation::{OptimizationStats, Simulator};
+pub use self::spatial::{GridCell, PlaceCell, SpatialSystem as SpatSystem};
+pub use self::training::{train_mnist, MNISTTrainer, TrainingConfig};
 
 use cudarc::driver::CudaDevice;
 use dashmap::DashMap;
@@ -161,29 +233,29 @@ pub struct NeuromorphicBrain {
     pub structural_plasticity: StructuralPlasticity,
 
     /// ETDP (Event-driven timing-dependent plasticity)
-    pub etdp: crate::learning::ETDP,
+    pub etdp: crate::brain::learning::ETDP,
 
     /// R-STDP (Reward-modulated STDP with meta-learning)
-    pub rstdp: crate::learning::RSTDPSystem,
+    pub rstdp: crate::brain::learning::RSTDPSystem,
 
     /// Memristive synaptic network
-    pub memristive_network: crate::synapse::MemristiveNetwork,
+    pub memristive_network: crate::brain::synapse::MemristiveNetwork,
 
     /// CAdEx neurons (demonstration of conductance-based adaptive neurons)
     /// These replace some LIF neurons for more biologically realistic adaptation
-    pub cadex_neurons: Vec<crate::neuron::CAdExNeuron>,
+    pub cadex_neurons: Vec<crate::brain::neuron::CAdExNeuron>,
 
     /// Izhikevich neurons (demonstration of rich spiking dynamics)
     /// Support 20+ biological firing patterns
-    pub izhikevich_neurons: Vec<crate::neuron::IzhikevichNeuron>,
+    pub izhikevich_neurons: Vec<crate::brain::neuron::IzhikevichNeuron>,
 
     /// Dendritic neurons (active dendrites, NMDA spikes)
     /// 2-5x capacity boost via nonlinear integration
-    pub dendritic_neurons: Vec<crate::neuron::dendritic::DendriticNeuron>,
+    pub dendritic_neurons: Vec<crate::brain::neuron::dendritic::DendriticNeuron>,
 
     /// Synaptic vesicle pools (RRP, Recycling, Reserve)
     /// Simulation of neurotransmitter depletion and recovery
-    pub vesicle_pools: Vec<crate::synapse::vesicles::VesiclePools>,
+    pub vesicle_pools: Vec<crate::brain::synapse::vesicles::VesiclePools>,
 
     /// Sleep consolidation (offline replay)
     pub sleep: SleepConsolidation,
@@ -247,11 +319,11 @@ pub struct NeuromorphicBrain {
     /// Dynamic Intent Classification Rules (Loaded from JSON)
     /// Replaces hardcoded intent detection
     #[serde(skip)]
-    pub intent_rules: Vec<(crate::language::IntentType, Vec<String>)>,
+    pub intent_rules: Vec<(crate::brain::language::IntentType, Vec<String>)>,
 
     /// Sentiment patterns loaded from training data (replaces hardcoded positive/negative words)
     #[serde(skip)]
-    pub sentiment_patterns: Option<crate::datasets::SentimentPatterns>,
+    pub sentiment_patterns: Option<crate::brain::datasets::SentimentPatterns>,
 
     // === HUMAN-LIMIT UPGRADES (2025) ===
     /// Emotional State Machine - affective processing with mood dynamics
@@ -333,19 +405,19 @@ impl NeuromorphicBrain {
             1000.0,
         );
         let structural_plasticity = StructuralPlasticity::new(base_neurons, 0.1, 50); // 10% initial, 50 max/neuron
-        let etdp = crate::learning::ETDP::new(0.001); // Voltage-dependent event-driven plasticity
-        let rstdp = crate::learning::RSTDPSystem::new(0.01); // Reward-modulated STDP with meta-learning
-        let memristive_network = crate::synapse::MemristiveNetwork::new(base_neurons, 0.1); // Memristive synapses with EM coupling
+        let etdp = crate::brain::learning::ETDP::new(0.001); // Voltage-dependent event-driven plasticity
+        let rstdp = crate::brain::learning::RSTDPSystem::new(0.01); // Reward-modulated STDP with meta-learning
+        let memristive_network = crate::brain::synapse::MemristiveNetwork::new(base_neurons, 0.1); // Memristive synapses with EM coupling
 
         // Create CAdEx neurons (demonstration of different neuron types)
         let mut cadex_neurons = Vec::new();
         for i in 0..100 {
             if i < 70 {
-                cadex_neurons.push(crate::neuron::CAdExNeuron::regular_spiking(i as u32));
+                cadex_neurons.push(crate::brain::neuron::CAdExNeuron::regular_spiking(i as u32));
             } else if i < 85 {
-                cadex_neurons.push(crate::neuron::CAdExNeuron::fast_spiking(i as u32));
+                cadex_neurons.push(crate::brain::neuron::CAdExNeuron::fast_spiking(i as u32));
             } else {
-                cadex_neurons.push(crate::neuron::CAdExNeuron::adapting(i as u32));
+                cadex_neurons.push(crate::brain::neuron::CAdExNeuron::adapting(i as u32));
             }
         }
 
@@ -353,15 +425,19 @@ impl NeuromorphicBrain {
         let mut izhikevich_neurons = Vec::new();
         for i in 0..100 {
             if i < 50 {
-                izhikevich_neurons.push(crate::neuron::IzhikevichNeuron::regular_spiking(i as u32));
-            } else if i < 70 {
-                izhikevich_neurons.push(crate::neuron::IzhikevichNeuron::fast_spiking(i as u32));
-            } else if i < 85 {
-                izhikevich_neurons.push(crate::neuron::IzhikevichNeuron::intrinsically_bursting(
+                izhikevich_neurons.push(crate::brain::neuron::IzhikevichNeuron::regular_spiking(
                     i as u32,
                 ));
+            } else if i < 70 {
+                izhikevich_neurons.push(crate::brain::neuron::IzhikevichNeuron::fast_spiking(
+                    i as u32,
+                ));
+            } else if i < 85 {
+                izhikevich_neurons
+                    .push(crate::brain::neuron::IzhikevichNeuron::intrinsically_bursting(i as u32));
             } else {
-                izhikevich_neurons.push(crate::neuron::IzhikevichNeuron::chattering(i as u32));
+                izhikevich_neurons
+                    .push(crate::brain::neuron::IzhikevichNeuron::chattering(i as u32));
             }
         }
 
@@ -369,7 +445,7 @@ impl NeuromorphicBrain {
         let mut dendritic_neurons = Vec::new();
         for i in 0..100 {
             // 5 branches per neuron, 20 synapses per branch
-            dendritic_neurons.push(crate::neuron::dendritic::DendriticNeuron::new(
+            dendritic_neurons.push(crate::brain::neuron::dendritic::DendriticNeuron::new(
                 200 + i as u32,
                 5,
                 20,
@@ -380,7 +456,7 @@ impl NeuromorphicBrain {
         let mut vesicle_pools = Vec::new();
         for _ in 0..10 {
             // 1000 vesicles total per pool
-            vesicle_pools.push(crate::synapse::vesicles::VesiclePools::new(1000.0));
+            vesicle_pools.push(crate::brain::synapse::vesicles::VesiclePools::new(1000.0));
         }
 
         let sleep = SleepConsolidation::new(); // Offline consolidation
@@ -659,7 +735,7 @@ impl NeuromorphicBrain {
         // 21. Abstract Reasoning - Add facts from current context
         // Store relations between concepts for later inference
         if words.len() >= 2 {
-            use crate::reasoning::abstract_reasoning::{Fact, Relation};
+            use crate::brain::reasoning::abstract_reasoning::{Fact, Relation};
             let fact = Fact::new(&words[0], Relation::Similar, &words[1]);
             self.abstract_reasoning.add_fact(fact);
         }
@@ -1906,7 +1982,7 @@ impl NeuromorphicBrain {
             match gpu_motion.process(&flattened_v1, dt) {
                 Ok(gpu_motion_out) => {
                     // Convert GPU output back to CPU format
-                    let motion_output = crate::cortex::MotionOutput {
+                    let motion_output = crate::brain::cortex::MotionOutput {
                         heading_x: 0.0, // Will be computed from flow
                         heading_y: 0.0,
                         expansion_strength: gpu_motion_out.expansion_strength,
@@ -1926,7 +2002,7 @@ impl NeuromorphicBrain {
                         }
                     }
 
-                    let optic_flow = crate::cortex::OpticFlow { flow_x, flow_y };
+                    let optic_flow = crate::brain::cortex::OpticFlow { flow_x, flow_y };
                     (motion_output, optic_flow)
                 }
                 Err(e) => {
@@ -2155,7 +2231,7 @@ impl NeuromorphicBrain {
     /// Find salient location in motion output for attention
     fn find_salient_location(
         &self,
-        motion_output: &crate::cortex::mt_mst::MotionOutput,
+        motion_output: &crate::brain::cortex::mt_mst::MotionOutput,
     ) -> Option<(f32, f32)> {
         // Calculate motion energy from heading and expansion
         let motion_energy = (motion_output.heading_x.powi(2) + motion_output.heading_y.powi(2))
@@ -2330,9 +2406,9 @@ pub struct CognitiveUpgradeStats {
 /// Complete brain statistics with ALL biological systems
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BrainStats {
-    pub working_memory: crate::cortex::WorkingMemoryStats,
-    pub hippocampus: crate::memory::HippocampusStats,
-    pub attention: crate::attention::AttentionStats,
+    pub working_memory: crate::brain::cortex::WorkingMemoryStats,
+    pub hippocampus: crate::brain::memory::HippocampusStats,
+    pub attention: crate::brain::attention::AttentionStats,
     pub language: DualStreamStats,
     pub basal_ganglia: BasalGangliaStats,
     pub neuromodulation: NeuromodulationStats,
@@ -2347,8 +2423,8 @@ pub struct BrainStats {
     pub sleep: SleepStats,
     pub superior_colliculus: crate::brain::superior_colliculus::SCStats,
     pub thalamus: crate::brain::thalamus::ThalamusStats,
-    pub etdp: crate::learning::ETDPStats,
-    pub rstdp: crate::learning::RSTDPStats,
+    pub etdp: crate::brain::learning::ETDPStats,
+    pub rstdp: crate::brain::learning::RSTDPStats,
     pub total_error: f32,
     pub time: f32,
 }

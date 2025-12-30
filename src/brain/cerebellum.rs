@@ -20,7 +20,7 @@
 //! # Performance
 //! Real-time operation at 1ms timesteps validated on motor control tasks
 
-use crate::neuron::{LIFNeuron, Neuron};
+use crate::brain::neuron::{LIFNeuron, Neuron};
 use serde::{Deserialize, Serialize};
 
 /// Cerebellar hemisphere with full microarchitecture

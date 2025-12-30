@@ -6,84 +6,64 @@
 #![warn(clippy::all)]
 #![allow(clippy::too_many_arguments)]
 
-pub mod connectivity;
-pub mod cuda;
-pub mod datasets;
-pub mod learning;
-pub mod neuron;
-pub mod serialization;
-pub mod simulation;
-pub mod synapse;
-pub mod training;
-pub mod utils;
-
-// Cognitive architecture modules
-pub mod attention;
+// Brain module - contains all neural/cognitive systems
 pub mod brain;
-pub mod cortex;
-pub mod language;
-pub mod memory;
 
-// New biological systems
-pub mod basal_ganglia;
-pub mod neuromodulation;
-pub mod oscillations;
-pub mod semantics;
-pub mod spatial;
+// Controller modules (CLI, plugins, config)
+pub mod commands;
+pub mod config;
+pub mod plugin;
 
-// Human-limit upgrade modules (2025)
-pub mod affect;
-pub mod cognition;
-pub mod motivation;
-pub mod reasoning;
-pub mod solve;
+// Re-export key types directly from brain submodules
+pub use brain::connectivity::{ConnectivityType, ProceduralConnectivity, SparseConnectivity};
+pub use brain::cuda::CudaContext;
+pub use brain::datasets::{download_mnist, MNISTDataset, MNISTImage};
+pub use brain::neuron::{LIFNeuron, NeuronState};
+pub use brain::serialization::{
+    ModelMetadata, NeuromorphicModel, NeuronParameters, PlasticityState,
+};
+pub use brain::simulation::{OptimizationStats, Simulator};
+pub use brain::training::{train_mnist, MNISTTrainer, TrainingConfig};
 
-// Re-export key types
-pub use connectivity::{ConnectivityType, ProceduralConnectivity, SparseConnectivity};
-pub use cuda::CudaContext;
-pub use datasets::{MNISTDataset, MNISTImage};
-pub use neuron::{LIFNeuron, NeuronState};
-pub use serialization::{ModelMetadata, NeuromorphicModel, NeuronParameters, PlasticityState};
-pub use simulation::{OptimizationStats, Simulator};
-pub use training::{train_mnist, MNISTTrainer, TrainingConfig};
-
-// Re-export cognitive modules
-pub use attention::{AttentionStats, AttentionSystem};
-pub use brain::{BrainStats, NeuromorphicBrain};
-pub use cortex::{
+// Re-export cognitive modules from brain
+pub use brain::attention::{AttentionStats, AttentionSystem};
+pub use brain::cortex::{
     EnhancedPredictiveHierarchy, EnhancedPredictiveStats, PredictiveHierarchy, WorkingMemory,
     WorkingMemoryStats,
 };
-pub use language::{DualStreamLanguage, DualStreamStats};
-pub use memory::{EnhancedEpisodicMemory, Hippocampus, HippocampusStats, KnowledgeGraph};
+pub use brain::language::{DualStreamLanguage, DualStreamStats};
+pub use brain::memory::{EnhancedEpisodicMemory, Hippocampus, HippocampusStats, KnowledgeGraph};
+pub use brain::{BrainStats, NeuromorphicBrain};
 
-// Re-export new biological systems
-pub use basal_ganglia::{BasalGanglia, BasalGangliaStats, DopamineNeuron};
-pub use neuromodulation::{NeuromodulationStats, NeuromodulationSystem};
-pub use oscillations::{OscillationStats, OscillatoryCircuit};
-pub use semantics::{EmbeddingLayer, SemanticHub, SemanticSystem};
-pub use spatial::{GridCell, PlaceCell, SpatialSystem};
+// Re-export biological systems from brain
+pub use brain::basal_ganglia::{BasalGanglia, BasalGangliaStats, DopamineNeuron};
+pub use brain::neuromodulation::{NeuromodulationStats, NeuromodulationSystem};
+pub use brain::oscillations::{OscillationStats, OscillatoryCircuit};
+pub use brain::semantics::{EmbeddingLayer, SemanticHub, SemanticSystem};
+pub use brain::spatial::{GridCell, PlaceCell, SpatialSystem};
 
-// Re-export new neuron types
-pub use neuron::{
+// Re-export neuron types from brain
+pub use brain::neuron::{
     DendriticLayer, DendriticNeuron, InterneuronCircuit, PVInterneuron, SSTInterneuron,
     VIPInterneuron,
 };
 
-// Re-export new learning mechanisms
-pub use learning::{
-    BCMMetaplasticity, CriticalityHomeostasis, HomeostaticStats, HomeostaticSystem,
+// Re-export learning mechanisms from brain
+pub use brain::learning::{
+    BCMMetaplasticity, CriticalityHomeostasis, HomeostaticStats, HomeostaticSystem, STDPConfig,
 };
 
-// Re-export human-limit upgrade modules (2025)
-pub use affect::{Emotion, EmotionalState, EmotionalStateMachine, EmotionalStats, MoodState};
-pub use cognition::{
+// Re-export affect, cognition, motivation, reasoning from brain
+pub use brain::affect::{
+    Emotion, EmotionalState, EmotionalStateMachine, EmotionalStats, MoodState,
+};
+pub use brain::cognition::{
     AgentModel, BDIModel, BehavioralProfile, BeliefState, CapabilityModel, CognitiveStrategy,
     DialogueArbiter, InnerDialogue, Metacognition, MetacognitionStats, Perspective, SelfModel,
     TheoryOfMind,
 };
-pub use motivation::{CuriosityDrive, CuriosityStats, InformationGain};
-pub use reasoning::{AbstractReasoning, AnalogyEngine, ReasoningChain};
+pub use brain::motivation::{CuriosityDrive, CuriosityStats, InformationGain};
+pub use brain::reasoning::{AbstractReasoning, AnalogyEngine, ReasoningChain};
 
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
