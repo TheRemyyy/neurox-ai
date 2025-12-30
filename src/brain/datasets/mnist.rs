@@ -196,49 +196,108 @@ impl MNISTDataset {
 
             match label {
                 0 => {
-                    // Circle
+                    // Circle (Center)
                     for y in 0..28 {
                         for x in 0..28 {
                             let dx = (x as i32 - center_x) as f32;
                             let dy = (y as i32 - center_y) as f32;
                             let dist = (dx * dx + dy * dy).sqrt();
-                            if (dist - 8.0).abs() < 3.0 {
-                                pixels[y * 28 + x] = 200 + rng.gen_range(0..55);
+                            if (dist - 8.0).abs() < 2.0 {
+                                pixels[y * 28 + x] = 255;
                             }
                         }
                     }
                 }
                 1 => {
-                    // Vertical line
+                    // Vertical Line (Center)
                     for y in 4..24 {
-                        for x in 12..16 {
-                            pixels[y * 28 + x] = 200 + rng.gen_range(0..55);
+                        for x in 13..15 {
+                            pixels[y * 28 + x] = 255;
                         }
                     }
                 }
-                2..=9 => {
-                    // Various patterns for other digits
-                    let n_strokes = 2 + (label as usize % 3);
-                    for _ in 0..n_strokes {
-                        let start_x = rng.gen_range(5..23);
-                        let start_y = rng.gen_range(5..23);
-                        let dx: i32 = rng.gen_range(-1..=1);
-                        let dy: i32 = rng.gen_range(-1..=1);
-
-                        let mut x = start_x as i32;
-                        let mut y = start_y as i32;
-
-                        for _ in 0..12 {
-                            if x >= 0 && x < 28 && y >= 0 && y < 28 {
-                                let idx = (y * 28 + x) as usize;
-                                pixels[idx] = 200 + rng.gen_range(0..55);
-                                // Add some thickness
-                                if x + 1 < 28 {
-                                    pixels[(y * 28 + x + 1) as usize] = 150 + rng.gen_range(0..55);
-                                }
+                2 => {
+                    // Horizontal Line (Center)
+                    for y in 13..15 {
+                        for x in 4..24 {
+                            pixels[y * 28 + x] = 255;
+                        }
+                    }
+                }
+                3 => {
+                    // Diagonal /
+                    for i in 4..24 {
+                        let x = i;
+                        let y = 27 - i;
+                        if x < 28 && y < 28 {
+                            pixels[y * 28 + x] = 255;
+                            pixels[y * 28 + x + 1] = 255;
+                        }
+                    }
+                }
+                4 => {
+                    // Diagonal \
+                    for i in 4..24 {
+                        let x = i;
+                        let y = i;
+                        if x < 28 && y < 28 {
+                            pixels[y * 28 + x] = 255;
+                            pixels[y * 28 + x + 1] = 255;
+                        }
+                    }
+                }
+                5 => {
+                    // Cross +
+                    for i in 4..24 {
+                        // V
+                        pixels[i * 28 + 14] = 255;
+                        pixels[i * 28 + 15] = 255;
+                        // H
+                        pixels[14 * 28 + i] = 255;
+                        pixels[15 * 28 + i] = 255;
+                    }
+                }
+                6 => {
+                    // Square Box
+                    for y in 8..20 {
+                        for x in 8..20 {
+                            if x == 8 || x == 19 || y == 8 || y == 19 {
+                                pixels[y * 28 + x] = 255;
                             }
-                            x += dx;
-                            y += dy;
+                        }
+                    }
+                }
+                7 => {
+                    // Triangle (Up)
+                    // (14, 4) to (4, 24) and (24, 24)
+                    for y in 4..24 {
+                        let target_x1 = 14 - (y - 4) / 2;
+                        let target_x2 = 14 + (y - 4) / 2;
+                        if target_x1 < 28 {
+                            pixels[y * 28 + target_x1] = 255;
+                        }
+                        if target_x2 < 28 {
+                            pixels[y * 28 + target_x2] = 255;
+                        }
+                        if y == 23 {
+                            for x in 4..25 {
+                                pixels[y * 28 + x] = 255;
+                            }
+                        }
+                    }
+                }
+                8 => {
+                    // X Shape (Cross) - Distinct from +
+                    for i in 4..24 {
+                        pixels[i * 28 + i] = 255; // \
+                        pixels[(27 - i) * 28 + i] = 255; // /
+                    }
+                }
+                9 => {
+                    // Solid Block (Fill)
+                    for y in 10..18 {
+                        for x in 10..18 {
+                            pixels[y * 28 + x] = 255;
                         }
                     }
                 }
@@ -247,7 +306,7 @@ impl MNISTDataset {
 
             // Add some noise
             for p in pixels.iter_mut() {
-                if *p == 0 && rng.gen::<f32>() < 0.02 {
+                if *p == 0 && rng.gen::<f32>() < 0.05 {
                     *p = rng.gen_range(20..80);
                 }
             }

@@ -2,9 +2,9 @@
     "data_dir": "synthetic",
     "epochs": 10,
     "bits": 4,
-    "neurons": 400,
+    "neurons": 320,
     "presentation_duration": 350.0,
-    "isi": 150.0,
+    "isi": 100.0,
     "batch_size": 100,
     "lr_decay": 0.95,
     "wta_strength": 18.0,
@@ -21,8 +21,8 @@
     "real_train_eval_size": 1000,
     "real_consolidation_samples": 200,
     "stdp": {
-        "lr_pre": 0.005,
-        "lr_post": 0.05,
+        "lr_pre": 0.08,
+        "lr_post": 0.015,
         "tau_pre": 20.0,
         "tau_post": 20.0,
         "w_min": 0.0,
@@ -30,7 +30,7 @@
     },
     "connectivity": {
         "seed": 42,
-        "density": 0.1,
+        "density": 0.12,
         "exc_ratio": 0.5,
         "inh_ratio": 0.1
     }

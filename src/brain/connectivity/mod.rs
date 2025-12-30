@@ -4,13 +4,15 @@
 //! and structural plasticity optimized for neuromorphic computing
 //! with biological realism.
 
+pub mod layered;
 pub mod structural;
 
-pub use structural::{StructuralPlasticity, Synapse, StructuralPlasticityStats};
+pub use layered::{Layer, LayeredConnectivity};
+pub use structural::{StructuralPlasticity, StructuralPlasticityStats, Synapse};
 
-use serde::{Deserialize, Serialize};
 use rand::{Rng, SeedableRng};
 use rand_distr::{Distribution, Normal};
+use serde::{Deserialize, Serialize};
 
 /// Connectivity topology type
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -152,7 +154,8 @@ impl ProceduralConnectivity {
                 // Gaussian probability based on distance
                 for target_id in target_range.clone() {
                     if target_id != source_id {
-                        let distance = (target_id as f32 - source_id as f32).abs() / n_targets as f32;
+                        let distance =
+                            (target_id as f32 - source_id as f32).abs() / n_targets as f32;
                         let prob = (-distance * distance / (2.0 * sigma * sigma)).exp();
                         if rng.gen::<f64>() < prob as f64 {
                             let mut weight = weight_dist.sample(&mut rng);
@@ -220,11 +223,11 @@ impl SparseConnectivity {
     }
 
     /// Build sparse matrix from procedural connectivity
-    pub fn from_procedural(
-        n_neurons: usize,
-        proc_conn: &ProceduralConnectivity,
-    ) -> Self {
-        log::info!("Building sparse connectivity matrix for {} neurons", n_neurons);
+    pub fn from_procedural(n_neurons: usize, proc_conn: &ProceduralConnectivity) -> Self {
+        log::info!(
+            "Building sparse connectivity matrix for {} neurons",
+            n_neurons
+        );
         log::info!("Topology: {:?}", proc_conn.topology);
 
         let estimated_nnz = proc_conn.estimate_synapses(n_neurons);
@@ -248,15 +251,18 @@ impl SparseConnectivity {
             row_ptr[source_id + 1] = current_ptr;
 
             if source_id % 10000 == 0 && source_id > 0 {
-                log::info!("  Generated {} / {} neurons ({:.1}%)",
-                    source_id, n_neurons,
+                log::info!(
+                    "  Generated {} / {} neurons ({:.1}%)",
+                    source_id,
+                    n_neurons,
                     100.0 * source_id as f64 / n_neurons as f64
                 );
             }
         }
 
         let nnz = col_idx.len();
-        log::info!("Sparse matrix built: {} synapses ({:.2}% sparsity)",
+        log::info!(
+            "Sparse matrix built: {} synapses ({:.2}% sparsity)",
             nnz,
             100.0 * (1.0 - nnz as f64 / (n_neurons * n_neurons) as f64)
         );
@@ -331,7 +337,7 @@ mod tests {
         assert_eq!(proc_conn.connection_prob, 0.1);
         assert_eq!(proc_conn.exc_ratio, 0.8);
         match proc_conn.topology {
-            ConnectivityType::SmallWorld { .. } => {},
+            ConnectivityType::SmallWorld { .. } => {}
             _ => panic!("Expected SmallWorld topology for cortical"),
         }
     }
@@ -497,11 +503,13 @@ mod tests {
         let connections = proc_conn.generate_connections(50, 0..100);
 
         // Should favor nearby neurons
-        let nearby_count = connections.iter()
+        let nearby_count = connections
+            .iter()
             .filter(|(target, _)| (*target as i32 - 50).abs() < 10)
             .count();
 
-        let far_count = connections.iter()
+        let far_count = connections
+            .iter()
             .filter(|(target, _)| (*target as i32 - 50).abs() > 40)
             .count();
 
@@ -571,8 +579,11 @@ mod tests {
         let exc_ratio = total_exc as f32 / total as f32;
 
         // Should be around 80% excitatory
-        assert!(exc_ratio > 0.7 && exc_ratio < 0.9,
-            "Excitatory ratio should be ~80%, got {}", exc_ratio);
+        assert!(
+            exc_ratio > 0.7 && exc_ratio < 0.9,
+            "Excitatory ratio should be ~80%, got {}",
+            exc_ratio
+        );
     }
 
     #[test]

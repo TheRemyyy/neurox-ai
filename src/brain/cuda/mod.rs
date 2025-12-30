@@ -10,11 +10,12 @@ pub mod kernels;
 pub mod motion_kernels;
 pub mod quantization;
 pub mod sparse_kernels;
+pub mod spiking_conv_kernels;
 pub mod v1_kernels;
 
 pub use cognitive_system::GpuCognitiveSystem;
 pub use context::CudaContext;
-
+pub use spiking_conv_kernels::{GpuSpikeMaxPool, GpuSpikingConv2D};
 
 use cudarc::driver::LaunchConfig;
 

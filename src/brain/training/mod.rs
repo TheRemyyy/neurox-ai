@@ -296,7 +296,7 @@ impl MNISTTrainer {
                         // 2. LTD: Update outgoing connections (Pre-spike -> Post trace)
                         // Neuron ID is PRE. Post ID is POST.
                         // If Post trace is high, it spiked BEFORE us (acausal) -> We weaken
-                        let lr_neg = 0.02; // self.stdp.config.lr_pre; // Explicit LTD rate
+                        let lr_neg = self.stdp.config.lr_pre; // Use configured LTD rate
                         for &(post_id, w_idx) in &map.outgoing[neuron_id] {
                             let trace_post = self.stdp.post_traces_1[post_id];
                             let dw = -trace_post * lr_neg;
@@ -364,6 +364,28 @@ impl MNISTTrainer {
         // Only upload if something changed
         if changed_count > 0 {
             self.simulator.set_weights(&weights)?;
+
+            // DEBUG: Print weight stats occasionally to diagnose saturation
+            // Calculate mean weight
+            let sum_w: f32 = weights.iter().sum();
+            let mean_w = sum_w / weights.len() as f32;
+            let saturated_max = weights.iter().filter(|&&w| w > 0.95).count();
+            let saturated_min = weights.iter().filter(|&&w| w < 0.05).count();
+
+            // Print only if very significant changes or periodically?
+            // Printing every image (batch) is too much.
+            // But we don't have access to "epoch" here easily without passing it.
+            // Let's just print max_dw if it's large, or mean_w.
+            // Actually, let's print this info every ~100 calls?
+            // Static counter? No, let's just use random chance or assume this IS the debug step.
+            // USER requested "smart", so let's check for pathology.
+
+            if mean_w < 0.01 || mean_w > 0.99 {
+                println!(
+                    "WARNING: Weight saturation detected! Mean: {:.3}, Min%: {}, Max%: {}",
+                    mean_w, saturated_min, saturated_max
+                );
+            }
         }
 
         Ok(())

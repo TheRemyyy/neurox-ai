@@ -87,6 +87,7 @@ impl BenchmarkPlugin {
         let n_output = self.config.n_output;
         let n_neurons = n_input + n_hidden + n_output;
 
+        // GPU-based benchmark (synthetic or real MNIST)
         if actual_data_dir == "synthetic" {
             self.run_synthetic_benchmark(epochs, bits, neurons, duration, isi, n_neurons)?;
         } else {
@@ -134,14 +135,34 @@ impl BenchmarkPlugin {
         println!("  {}", device_name);
         println!();
 
-        // Create sparse connectivity using procedural generator
-        let proc_conn = ProceduralConnectivity::new(
-            self.config.connectivity.seed,
-            self.config.connectivity.density as f64,
-            self.config.connectivity.exc_ratio,
-            self.config.connectivity.inh_ratio,
+        // Create LAYERED connectivity (feedforward structure)
+        use crate::brain::connectivity::LayeredConnectivity;
+
+        // Architecture: Input(784) -> Hidden1(320) -> Output(10)
+        let layer_sizes = vec![self.config.n_input, _neurons, self.config.n_output];
+        let layered_conn =
+            LayeredConnectivity::from_layer_sizes(&layer_sizes, self.config.connectivity.seed);
+        let n_neurons = layered_conn.n_neurons;
+
+        println!(
+            "{}Note:{} Using LAYERED architecture for proper learning",
+            COLOR_GRAY, COLOR_RESET
         );
-        let connectivity = SparseConnectivity::from_procedural(n_neurons, &proc_conn);
+        println!("  Layers: {:?}", layer_sizes);
+        println!("  Total synapses: {}", layered_conn.total_weights());
+        println!();
+
+        // Convert to CSR for GPU
+        let (row_ptr, col_idx, weights_vec) = layered_conn.to_sparse_csr();
+
+        // Create SparseConnectivity from CSR data
+        let connectivity = SparseConnectivity {
+            row_ptr: row_ptr.clone(),
+            col_idx: col_idx.clone(),
+            weights: weights_vec.clone(),
+            n_neurons,
+            nnz: col_idx.len(),
+        };
 
         // Create simulator
         let simulator = Simulator::with_connectivity(
@@ -276,13 +297,29 @@ impl BenchmarkPlugin {
         println!("  {}", device_name);
         println!();
 
-        let proc_conn = ProceduralConnectivity::new(
-            self.config.connectivity.seed,
-            self.config.connectivity.density as f64,
-            self.config.connectivity.exc_ratio,
-            self.config.connectivity.inh_ratio,
+        // Create LAYERED connectivity (feedforward structure) - same as synthetic
+        use crate::brain::connectivity::LayeredConnectivity;
+
+        let layer_sizes = vec![self.config.n_input, _neurons, self.config.n_output];
+        let layered_conn =
+            LayeredConnectivity::from_layer_sizes(&layer_sizes, self.config.connectivity.seed);
+        let n_neurons = layered_conn.n_neurons;
+
+        println!(
+            "{}Note:{} Using LAYERED architecture for proper learning",
+            COLOR_GRAY, COLOR_RESET
         );
-        let connectivity = SparseConnectivity::from_procedural(n_neurons, &proc_conn);
+        println!("  Layers: {:?}", layer_sizes);
+        println!();
+
+        let (row_ptr, col_idx, weights_vec) = layered_conn.to_sparse_csr();
+        let connectivity = SparseConnectivity {
+            row_ptr,
+            col_idx: col_idx.clone(),
+            weights: weights_vec,
+            n_neurons,
+            nnz: col_idx.len(),
+        };
 
         let simulator = Simulator::with_connectivity(
             n_neurons,
