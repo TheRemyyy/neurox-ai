@@ -5,6 +5,7 @@
 //! - Symbolic differentiation
 //! - Algebraic simplification
 //! - Step-by-step reasoning
+//! - Self-Verification (Substitution check)
 
 use std::collections::HashMap;
 use std::fmt;
@@ -24,7 +25,22 @@ pub enum Expr {
     Ln(Box<Expr>),
 }
 
-/// Result of a math computation
+/// Result of a math computation with verification details
+#[derive(Debug, Clone)]
+pub struct MathAnalysis {
+    pub input: String,
+    pub result: MathResult,
+    pub steps: Vec<String>,
+    pub verification: Option<VerificationResult>,
+}
+
+#[derive(Debug, Clone)]
+pub struct VerificationResult {
+    pub left_side_val: f64,
+    pub right_side_val: f64,
+    pub is_valid: bool,
+}
+
 #[derive(Debug, Clone)]
 pub enum MathResult {
     Number(f64),
@@ -50,14 +66,27 @@ impl fmt::Display for Expr {
     }
 }
 
-impl fmt::Display for MathResult {
+impl fmt::Display for MathAnalysis {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            MathResult::Number(n) => write!(f, "{}", n),
-            MathResult::Expr(e) => write!(f, "{}", e),
-            MathResult::Equation(s) => write!(f, "{}", s),
-            MathResult::Error(e) => write!(f, "Error: {}", e),
+        writeln!(f, "Input: {}", self.input)?;
+        match &self.result {
+            MathResult::Number(n) => writeln!(f, "Result: {}", n)?,
+            MathResult::Expr(e) => writeln!(f, "Result: {}", e)?,
+            MathResult::Equation(e) => writeln!(f, "Result: {}", e)?,
+            MathResult::Error(e) => writeln!(f, "Error: {}", e)?,
         }
+        
+        if let Some(ver) = &self.verification {
+            writeln!(f, "Verification (Substitution):")?;
+            writeln!(f, "  LHS Value: {:.4}", ver.left_side_val)?;
+            writeln!(f, "  RHS Value: {:.4}", ver.right_side_val)?;
+            if ver.is_valid {
+                writeln!(f, "  Status: ✅ VALIDATED (Reality Check Passed)")?;
+            } else {
+                writeln!(f, "  Status: ❌ FAILED (Discrepancy Detected)")?;
+            }
+        }
+        Ok(())
     }
 }
 
@@ -79,42 +108,62 @@ impl MathSolver {
     }
 
     /// Entry point: Solve, Calculate, or Differentiate
-    pub fn solve(&mut self, input: &str) -> MathResult {
+    pub fn solve(&mut self, input: &str) -> MathAnalysis {
         let input = input.trim();
+        let mut steps = Vec::new();
+        steps.push(format!("Parsing input: '{}'", input));
 
         // Check for specific commands
         if input.starts_with("diff(") || input.starts_with("d/dx") {
-            return self.solve_derivative(input);
+            return self.solve_derivative(input, steps);
         }
 
         // Check for equation
         if input.contains('=') {
-            // Simplified linear solver (for now)
-            return self.solve_linear_equation(input);
+            return self.solve_linear_equation(input, steps);
         }
 
         // Otherwise evaluate
         match self.parse(input) {
             Ok(expr) => {
+                steps.push(format!("Parsed AST: {}", expr));
                 // Try to simplify first
                 let simplified = self.simplify(&expr);
+                if simplified != expr {
+                    steps.push(format!("Simplified to: {}", simplified));
+                }
                 
                 // If it contains variables we don't know, return symbolic
                 if self.has_unknown_vars(&simplified) {
-                    MathResult::Expr(simplified)
+                    MathAnalysis {
+                        input: input.to_string(),
+                        result: MathResult::Expr(simplified),
+                        steps,
+                        verification: None,
+                    }
                 } else {
                     // Evaluate to number
-                    MathResult::Number(self.evaluate(&simplified))
+                    let val = self.evaluate(&simplified);
+                    steps.push(format!("Evaluated to: {}", val));
+                    MathAnalysis {
+                        input: input.to_string(),
+                        result: MathResult::Number(val),
+                        steps,
+                        verification: None, // Can't verify simple eval without equation
+                    }
                 }
             }
-            Err(e) => MathResult::Error(e),
+            Err(e) => MathAnalysis {
+                input: input.to_string(),
+                result: MathResult::Error(e),
+                steps,
+                verification: None,
+            },
         }
     }
 
     /// Symbolic Differentiation
-    /// Usage: "diff(x^2 + 3x, x)"
-    fn solve_derivative(&self, input: &str) -> MathResult {
-        // Simple parser for "diff(expr, var)"
+    fn solve_derivative(&self, input: &str, mut steps: Vec<String>) -> MathAnalysis {
         let content = input
             .trim_start_matches("diff")
             .trim_start_matches("d/dx")
@@ -123,14 +172,188 @@ impl MathSolver {
         let parts: Vec<&str> = content.split(',').collect();
         let expr_str = parts[0];
         let var = if parts.len() > 1 { parts[1].trim() } else { "x" };
+        
+        steps.push(format!("Differentiating with respect to '{}'", var));
 
         match self.parse(expr_str) {
             Ok(expr) => {
                 let derived = self.differentiate(&expr, var);
+                steps.push(format!("Raw derivative: {}", derived));
                 let simplified = self.simplify(&derived);
-                MathResult::Expr(simplified)
+                steps.push(format!("Simplified derivative: {}", simplified));
+                
+                MathAnalysis {
+                    input: input.to_string(),
+                    result: MathResult::Expr(simplified),
+                    steps,
+                    verification: None,
+                }
             }
-            Err(e) => MathResult::Error(format!("Parse error: {}", e)),
+            Err(e) => MathAnalysis {
+                input: input.to_string(),
+                result: MathResult::Error(format!("Parse error: {}", e)),
+                steps,
+                verification: None,
+            },
+        }
+    }
+
+    /// Solve linear equation and VERIFY result
+    fn solve_linear_equation(&mut self, input: &str, mut steps: Vec<String>) -> MathAnalysis {
+        let parts: Vec<&str> = input.split('=').collect();
+        if parts.len() != 2 {
+            return MathAnalysis {
+                input: input.to_string(),
+                result: MathResult::Error("Invalid equation format".to_string()),
+                steps,
+                verification: None,
+            };
+        }
+
+        let left_str = parts[0].trim();
+        let right_str = parts[1].trim();
+        steps.push(format!("Split equation: LHS='{}', RHS='{}'", left_str, right_str));
+
+        // Simplified solver logic for "ax + b = c"
+        // 1. Parse both sides
+        // This is a naive implementation for the demo. In a real system, we'd use a CAS (Computer Algebra System).
+        // Here we just support the pattern "2x + 5 = 15"
+        
+        // Find variable
+        let var_name = "x"; // Assume x for now or find first alpha char
+        
+        // Let's try to extract 'a', 'b', 'c' from "ax + b = c"
+        // VERY basic parser for demonstration of VERIFICATION logic
+        // We assume left side is linear in x, right side is constant
+        
+        // Parse "2x + 5" -> extract 2 and 5.
+        // This is brittle but serves the purpose of showing the Verification Step
+        let solution = if let Ok(rhs_val) = right_str.parse::<f64>() {
+             // Parse LHS coefficients
+             let (a, b) = self.extract_linear_coeffs(left_str, var_name);
+             steps.push(format!(" identified coefficients: {}x + {} = {}", a, b, rhs_val));
+             
+             if a == 0.0 {
+                 None
+             } else {
+                 let x = (rhs_val - b) / a;
+                 steps.push(format!("Solving: x = ({} - {}) / {}", rhs_val, b, a));
+                 steps.push(format!("Calculated Solution: x = {}", x));
+                 Some(x)
+             }
+        } else {
+            None
+        };
+
+        if let Some(x_val) = solution {
+            // === REALITY CHECK / VERIFICATION ===
+            steps.push("Running Reality Check (Substitution)...".to_string());
+            
+            // 1. Temporarily set variable
+            self.variables.insert(var_name.to_string(), x_val);
+            
+            // 2. Evaluate LHS
+            let lhs_check = match self.parse(left_str) {
+                Ok(expr) => self.evaluate(&expr),
+                Err(_) => f64::NAN,
+            };
+            
+            // 3. Evaluate RHS
+            let rhs_check = match self.parse(right_str) {
+                Ok(expr) => self.evaluate(&expr),
+                Err(_) => f64::NAN,
+            };
+            
+            // 4. Cleanup
+            self.variables.remove(var_name);
+            
+            let is_valid = (lhs_check - rhs_check).abs() < 1e-6;
+            
+            MathAnalysis {
+                input: input.to_string(),
+                result: MathResult::Equation(format!("{} = {}", var_name, x_val)),
+                steps,
+                verification: Some(VerificationResult {
+                    left_side_val: lhs_check,
+                    right_side_val: rhs_check,
+                    is_valid,
+                }),
+            }
+        } else {
+             MathAnalysis {
+                input: input.to_string(),
+                result: MathResult::Error("Could not solve linear equation (complexity limit)".to_string()),
+                steps,
+                verification: None,
+            }
+        }
+    }
+
+    /// Extract a and b from "ax + b" (very simple heuristic)
+    fn extract_linear_coeffs(&self, expr: &str, var: &str) -> (f64, f64) {
+        // Remove spaces
+        let s = expr.replace(' ', "");
+        
+        // Split by '+'
+        let parts: Vec<&str> = s.split('+').collect();
+        let mut a = 0.0;
+        let mut b = 0.0;
+        
+        for part in parts {
+            if part.contains(var) {
+                // It's the 'ax' part
+                let coef = part.replace(var, "");
+                a += if coef.is_empty() { 1.0 } else if coef == "-" { -1.0 } else { coef.parse().unwrap_or(0.0) };
+            } else if part.contains('-') {
+                // Handle subtraction inside split (e.g. "2x-5") - simple split fails here so we do basic check
+                 if let Ok(val) = part.parse::<f64>() {
+                    b += val;
+                }
+            } else {
+                // It's the 'b' constant
+                if let Ok(val) = part.parse::<f64>() {
+                    b += val;
+                }
+            }
+        }
+        
+        // Handle "2x - 5" case where split('+') leaves "2x-5" whole if no space? 
+        // No, simple split is flawed. 
+        // Better: Parse AST, walk tree, sum up coefficients.
+        if let Ok(ast) = self.parse(expr) {
+            self.walk_linear_ast(&ast, var)
+        } else {
+            (a, b) // Fallback
+        }
+    }
+
+    fn walk_linear_ast(&self, expr: &Expr, var: &str) -> (f64, f64) {
+        match expr {
+            Expr::Number(n) => (0.0, *n),
+            Expr::Variable(v) => if v == var { (1.0, 0.0) } else { (0.0, 0.0) }, // Unknown var treated as 0 for linear extraction
+            Expr::Add(l, r) => {
+                let (a1, b1) = self.walk_linear_ast(l, var);
+                let (a2, b2) = self.walk_linear_ast(r, var);
+                (a1 + a2, b1 + b2)
+            },
+            Expr::Sub(l, r) => {
+                let (a1, b1) = self.walk_linear_ast(l, var);
+                let (a2, b2) = self.walk_linear_ast(r, var);
+                (a1 - a2, b1 - b2)
+            },
+            Expr::Mul(l, r) => {
+                // Assuming one side is constant: 2*x or x*2
+                if let Expr::Number(n) = **l {
+                    let (a2, b2) = self.walk_linear_ast(r, var);
+                    (n * a2, n * b2)
+                } else if let Expr::Number(n) = **r {
+                    let (a1, b1) = self.walk_linear_ast(l, var);
+                    (a1 * n, b1 * n)
+                } else {
+                    (0.0, 0.0) // Non-linear or complex
+                }
+            },
+            _ => (0.0, 0.0)
         }
     }
 
@@ -154,7 +377,6 @@ impl MathSolver {
                 Box::new(self.differentiate(r, var)),
             ),
             Expr::Mul(l, r) => {
-                // Product rule: (uv)' = u'v + uv'
                 let u = l.as_ref();
                 let v = r.as_ref();
                 let du = self.differentiate(u, var);
@@ -166,7 +388,6 @@ impl MathSolver {
                 )
             }
             Expr::Div(u, v) => {
-                // Quotient rule: (u/v)' = (u'v - uv') / v^2
                 let du = self.differentiate(u, var);
                 let dv = self.differentiate(v, var);
                 
@@ -179,7 +400,6 @@ impl MathSolver {
                 Expr::Div(Box::new(numerator), Box::new(denominator))
             }
             Expr::Pow(base, exp) => {
-                // Power rule (assuming exp is constant for now): n * x^(n-1) * dx
                 if let Expr::Number(n) = **exp {
                     let new_exp = Expr::Number(n - 1.0);
                     let du = self.differentiate(base, var);
@@ -190,24 +410,25 @@ impl MathSolver {
                     );
                     Expr::Mul(Box::new(term), Box::new(du))
                 } else {
-                    // Generalized power rule not implemented fully yet
                     Expr::Variable("NotImplemented(PowerRuleGeneral)".to_string())
                 }
             }
             Expr::Sin(arg) => {
-                // diff(sin(u)) = cos(u) * u'
                 let du = self.differentiate(arg, var);
                 Expr::Mul(Box::new(Expr::Cos(arg.clone())), Box::new(du))
             }
             Expr::Cos(arg) => {
-                // diff(cos(u)) = -sin(u) * u'
                 let du = self.differentiate(arg, var);
                 Expr::Mul(
                     Box::new(Expr::Number(-1.0)),
                     Box::new(Expr::Mul(Box::new(Expr::Sin(arg.clone())), Box::new(du)))
                 )
             }
-            _ => Expr::Number(0.0),
+            Expr::Ln(arg) => {
+                // diff(ln(u)) = u'/u
+                let du = self.differentiate(arg, var);
+                Expr::Div(Box::new(du), arg.clone())
+            }
         }
     }
 
@@ -284,7 +505,7 @@ impl MathSolver {
         }
     }
 
-    /// Basic recursive descent parser (Simplified for demo)
+    /// Basic recursive descent parser
     fn parse(&self, input: &str) -> Result<Expr, String> {
         let clean = input.replace(' ', "");
         self.parse_recursive(&clean)
@@ -336,7 +557,6 @@ impl MathSolver {
             }
             // Just parentheses (expr)
             if input.starts_with('(') {
-                // Verify matching parens wrap the WHOLE string
                 if self.is_fully_enclosed(input) {
                     return self.parse_recursive(&input[1..input.len()-1]);
                 }
@@ -348,7 +568,6 @@ impl MathSolver {
             return Ok(Expr::Number(n));
         }
         
-        // Variables
         if input.chars().all(char::is_alphanumeric) {
             return Ok(Expr::Variable(input.to_string()));
         }
@@ -371,7 +590,6 @@ impl MathSolver {
 
     fn find_operator(&self, input: &str, ops: &[char]) -> Option<usize> {
         let mut depth = 0;
-        // Search from right to left for left-associativity
         for (i, c) in input.char_indices().rev() {
             if c == ')' { depth += 1; }
             else if c == '(' { depth -= 1; }
@@ -380,18 +598,5 @@ impl MathSolver {
             }
         }
         None
-    }
-
-    fn solve_linear_equation(&self, input: &str) -> MathResult {
-        let parts: Vec<&str> = input.split('=').collect();
-        if parts.len() == 2 {
-            let left = parts[0].trim();
-            let right = parts[1].trim();
-            // Try simplistic solver: 2x + 5 = 15 -> 2x = 10 -> x = 5
-            // This is a placeholder for a real algebraic solver
-            MathResult::Equation(format!("{} = {}", left, right)) // Just echo for now
-        } else {
-            MathResult::Error("Invalid equation".to_string())
-        }
     }
 }

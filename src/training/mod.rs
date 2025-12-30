@@ -237,12 +237,22 @@ impl MNISTTrainer {
         let mut correct = 0;
         let total = images.len();
 
+        let pb = ProgressBar::new(total as u64);
+        pb.set_style(
+            ProgressStyle::default_bar()
+                .template("  {spinner:.blue} Evaluating [{bar:30.white/blue}] {pos}/{len} ({eta})")
+                .unwrap()
+                .progress_chars("█▓░"),
+        );
+
         for image in images {
             let predicted = self.predict(image)?;
             if predicted as u8 == image.label {
                 correct += 1;
             }
+            pb.inc(1);
         }
+        pb.finish_and_clear();
 
         Ok(correct as f32 / total as f32)
     }

@@ -1,7 +1,9 @@
 //! Chemistry Solver & Analysis Engine
 //!
-//! Provides stoichiometric balancing, molar mass calculations, and elemental analysis.
-//! Uses a built-in periodic table for physical properties.
+//! Features:
+//! - Stoichiometric balancing
+//! - Molar Mass / Composition analysis
+//! - Mass Conservation Verification (Reality Check)
 
 use std::collections::HashMap;
 
@@ -55,6 +57,15 @@ pub struct ChemicalAnalysis {
     pub molar_mass: Option<f64>,
     pub composition: Option<Vec<(String, f64)>>, // Element -> Mass %
     pub steps: Vec<String>, // Reasoning steps
+    pub mass_verification: Option<MassConservationCheck>,
+}
+
+#[derive(Debug, Clone)]
+pub struct MassConservationCheck {
+    pub reactants_mass: f64,
+    pub products_mass: f64,
+    pub delta: f64,
+    pub is_conserved: bool,
 }
 
 impl std::fmt::Display for ChemicalAnalysis {
@@ -72,6 +83,19 @@ impl std::fmt::Display for ChemicalAnalysis {
                 writeln!(f, "  - {}: {:.2}%", elem, pct)?;
             }
         }
+        
+        if let Some(ver) = &self.mass_verification {
+            writeln!(f, "Mass Conservation Verification:")?;
+            writeln!(f, "  Reactants Mass: {:.4} g/mol", ver.reactants_mass)?;
+            writeln!(f, "  Products Mass:  {:.4} g/mol", ver.products_mass)?;
+            writeln!(f, "  Delta:          {:.6} g/mol", ver.delta.abs())?;
+            if ver.is_conserved {
+                writeln!(f, "  Status: ✅ CONSERVED (Law of Conservation of Mass held)")?;
+            } else {
+                writeln!(f, "  Status: ❌ VIOLATION (Calculation Error)")?;
+            }
+        }
+        
         Ok(())
     }
 }
@@ -111,23 +135,98 @@ impl ChemistrySolver {
     fn solve_equation(&self, input: &str, mut steps: Vec<String>) -> ChemicalAnalysis {
         steps.push("Detected chemical equation. Attempting to balance...".to_string());
         
-        let balanced = match self.balance(input) {
+        match self.balance(input) {
             Ok(b) => {
                 steps.push("Successfully balanced equation.".to_string());
-                Some(b.balanced)
+                
+                // === VERIFICATION ===
+                steps.push("Verifying Mass Conservation...".to_string());
+                let (r_mass, p_mass) = self.calculate_equation_masses(&b, &mut steps);
+                let delta = (r_mass - p_mass).abs();
+                let is_conserved = delta < 1e-4;
+                
+                if is_conserved {
+                    steps.push(format!("Verification PASSED. Delta: {:.6}", delta));
+                } else {
+                    steps.push(format!("Verification FAILED. Delta: {:.6}", delta));
+                }
+
+                ChemicalAnalysis {
+                    input: input.to_string(),
+                    balanced_equation: Some(b.balanced),
+                    molar_mass: None,
+                    composition: None,
+                    steps,
+                    mass_verification: Some(MassConservationCheck {
+                        reactants_mass: r_mass,
+                        products_mass: p_mass,
+                        delta,
+                        is_conserved
+                    })
+                }
             },
             Err(e) => {
                 steps.push(format!("Failed to balance: {}", e));
-                None
+                ChemicalAnalysis {
+                    input: input.to_string(),
+                    balanced_equation: None,
+                    molar_mass: None,
+                    composition: None,
+                    steps,
+                    mass_verification: None,
+                }
             }
-        };
+        }
+    }
 
-        ChemicalAnalysis {
-            input: input.to_string(),
-            balanced_equation: balanced,
-            molar_mass: None,
-            composition: None,
-            steps,
+    fn calculate_equation_masses(&self, eq: &BalancedEquation, steps: &mut Vec<String>) -> (f64, f64) {
+        // Parse reactants again to calculate mass
+        let reactants_parts: Vec<&str> = eq.original.split("->").next().unwrap_or("").split('+').collect();
+        // Or better, use the parsed coefficients
+        // We need to re-parse because BalancedEquation only stores counts, not the structure to look up masses easily without re-parsing.
+        // Actually, we can use the coefficients and the original string parts.
+        
+        // This is a bit hacky because we don't have the structured data in BalancedEquation, only strings and coefs.
+        // Let's assume standard format matches.
+        
+        // Reactants
+        let mut total_r = 0.0;
+        let parts: Vec<&str> = eq.original.split("->").collect();
+        if parts.len() < 2 { return (0.0, 0.0); }
+        
+        let r_strs: Vec<&str> = parts[0].split('+').map(|s| s.trim()).collect();
+        let p_strs: Vec<&str> = parts[1].split('+').map(|s| s.trim()).collect();
+        
+        for (i, formula) in r_strs.iter().enumerate() {
+            let coef = eq.reactant_coefficients.get(i).unwrap_or(&1);
+            let mass = self.calculate_formula_mass(formula);
+            total_r += mass * (*coef as f64);
+            steps.push(format!("  Reactant '{}': {} * {:.3} = {:.3}", formula, coef, mass, mass * (*coef as f64)));
+        }
+
+        // Products
+        let mut total_p = 0.0;
+        for (i, formula) in p_strs.iter().enumerate() {
+            let coef = eq.product_coefficients.get(i).unwrap_or(&1);
+            let mass = self.calculate_formula_mass(formula);
+            total_p += mass * (*coef as f64);
+            steps.push(format!("  Product '{}': {} * {:.3} = {:.3}", formula, coef, mass, mass * (*coef as f64)));
+        }
+
+        (total_r, total_p)
+    }
+
+    fn calculate_formula_mass(&self, formula: &str) -> f64 {
+        if let Ok(parsed) = self.parse_molecule(formula) {
+            let mut total = 0.0;
+            for (sym, count) in parsed {
+                if let Some(el) = self.elements.get(sym.as_str()) {
+                    total += el.mass * (count as f64);
+                }
+            }
+            total
+        } else {
+            0.0
         }
     }
 
@@ -144,6 +243,7 @@ impl ChemistrySolver {
                     molar_mass: None,
                     composition: None,
                     steps,
+                    mass_verification: None,
                 };
             }
         };
@@ -183,6 +283,7 @@ impl ChemistrySolver {
             molar_mass: Some(total_mass),
             composition: Some(composition),
             steps,
+            mass_verification: None,
         }
     }
 
@@ -451,10 +552,4 @@ pub struct BalancedEquation {
     pub balanced: String,
     pub reactant_coefficients: Vec<u32>,
     pub product_coefficients: Vec<u32>,
-}
-
-impl std::fmt::Display for BalancedEquation {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.balanced)
-    }
 }

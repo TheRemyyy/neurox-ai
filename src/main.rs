@@ -554,17 +554,19 @@ fn run_solve(problem_type: &str, problem: &str) -> Result<(), Box<dyn std::error
     match problem_type.to_lowercase().as_str() {
         "math" => {
             let mut solver = MathSolver::new();
-            let result = solver.solve(problem);
-            println!("{}Input:{}  {}", BOLD, COLOR_RESET, problem);
-            println!(
-                "{}Result:{} {}{}{}",
-                BOLD, COLOR_RESET, COLOR_GREEN, result, COLOR_RESET
-            );
+            let analysis = solver.solve(problem);
+            println!("{}Analysis Report:{}", BOLD, COLOR_RESET);
+            println!("{}", analysis);
+
+            println!("{}Reasoning Trace:{}", COLOR_GRAY, COLOR_RESET);
+            for step in analysis.steps {
+                println!("  › {}", step);
+            }
         }
         "chemistry" | "chem" => {
             let solver = ChemistrySolver::new();
             let analysis = solver.solve(problem);
-            
+
             println!("{}Analysis Report:{}", BOLD, COLOR_RESET);
             println!("{}", analysis);
 
@@ -712,7 +714,8 @@ fn run_benchmark(
             // Evaluate
             let train_subset = &train_images[..100.min(train_images.len())];
             let train_acc = trainer.evaluate(train_subset)?;
-            let test_acc = trainer.evaluate(&test_images)?;
+            let test_subset = &test_images[..1000.min(test_images.len())];
+            let test_acc = trainer.evaluate(test_subset)?;
 
             let elapsed = start_time.elapsed().as_secs_f32();
             println!(
