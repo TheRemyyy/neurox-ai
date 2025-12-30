@@ -22,6 +22,13 @@ We move beyond simple "layers" to simulate distinct brain organs:
 *   **Cerebellum**: Fine-motor control and error correction.
 *   **Thalamus**: The "switchboard" of consciousness and attention.
 
+### 🧩 Problem Solving
+*   **Math Solver**: Symbolic and numeric engines for precise calculation.
+*   **Chemistry Solver**: Stoichiometric balancing and scientific reasoning tools.
+
+### 📊 Benchmarks
+*   **MNIST**: Integrated benchmarking suite with quantization (4/8-bit) and synthetic data generation.
+
 ### ⚡ Synaptic & Structural Plasticity
 *   **STDP (Spike-Timing-Dependent Plasticity)**: Hebbian learning based on millisecond-precise timing.
 *   **Neuromodulation**: Dopamine (reward), Serotonin (patience), Norepinephrine (arousal), and Acetylcholine (attention) dynamically modulate learning rates and thresholds.

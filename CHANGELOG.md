@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Features**: `MathSolver` module for symbolic/numeric math operations.
+- **Features**: `ChemistrySolver` module for balancing chemical equations.
+- **Benchmarks**: Full CLI support for MNIST benchmarking via `neurox-ai benchmark`.
+    - Arguments: `--data-dir`, `--epochs`, `--bits` (quantization), `--neurons`, `--duration`, `--isi`.
+    - Support for "synthetic" data generation and "auto" download mode.
+- **CLI**: Enhanced `chat` command with detailed configuration arguments:
+    - `--vocab`: Vocabulary size (default: 10000).
+    - `--pattern-dim`: Hyperdimensional vector size (default: 512).
+    - `--neurons`: Total brain neuron count (default: 10000).
+    - `--context`: Working memory capacity (default: 128).
+    - `--sensitivity`: Dopamine reward scaling factor (default: 1.0).
+- **Data**: Full MNIST dataset binary files included in `data/mnist/`.
 - **Docs**: Comprehensive documentation structure in `docs/`.
 - **Docs**: Contribution guidelines.
 
