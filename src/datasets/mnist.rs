@@ -1,10 +1,77 @@
 //! MNIST dataset loader for spiking neural networks
 //!
 //! Converts MNIST images to spike trains using rate coding
+//! Supports automatic download from http://yann.lecun.com/exdb/mnist/
 
-use std::fs::File;
-use std::io::{Read, Result as IoResult};
+use flate2::read::GzDecoder;
+use std::fs::{self, File};
+use std::io::{Read, Result as IoResult, Write};
 use std::path::Path;
+
+/// MNIST download URLs (using PyTorch mirror - original LeCun server moved)
+const MNIST_BASE_URL: &str = "https://ossci-datasets.s3.amazonaws.com/mnist/";
+const MNIST_FILES: [(&str, &str); 4] = [
+    ("train-images-idx3-ubyte.gz", "train-images-idx3-ubyte"),
+    ("train-labels-idx1-ubyte.gz", "train-labels-idx1-ubyte"),
+    ("t10k-images-idx3-ubyte.gz", "t10k-images-idx3-ubyte"),
+    ("t10k-labels-idx1-ubyte.gz", "t10k-labels-idx1-ubyte"),
+];
+
+/// Download MNIST dataset to specified directory
+///
+/// Downloads all 4 files (train images, train labels, test images, test labels)
+/// and decompresses them from .gz format.
+///
+/// Returns the path to the download directory.
+pub fn download_mnist<P: AsRef<Path>>(target_dir: P) -> Result<String, Box<dyn std::error::Error>> {
+    let target_dir = target_dir.as_ref();
+
+    // Create directory if it doesn't exist
+    fs::create_dir_all(target_dir)?;
+
+    println!("Downloading MNIST dataset to {:?}...", target_dir);
+
+    for (gz_name, raw_name) in MNIST_FILES.iter() {
+        let output_path = target_dir.join(raw_name);
+
+        // Skip if already downloaded
+        if output_path.exists() {
+            println!("  ✓ {} already exists", raw_name);
+            continue;
+        }
+
+        let url = format!("{}{}", MNIST_BASE_URL, gz_name);
+        println!("  Downloading {}...", gz_name);
+
+        // Download file
+        let response = ureq::get(&url)
+            .call()
+            .map_err(|e| format!("Failed to download {}: {}", gz_name, e))?;
+
+        // Read response body
+        let mut compressed_data = Vec::new();
+        response.into_reader().read_to_end(&mut compressed_data)?;
+
+        // Decompress gzip
+        let mut decoder = GzDecoder::new(&compressed_data[..]);
+        let mut decompressed_data = Vec::new();
+        decoder.read_to_end(&mut decompressed_data)?;
+
+        // Write to file
+        let mut file = File::create(&output_path)?;
+        file.write_all(&decompressed_data)?;
+
+        println!(
+            "  ✓ {} downloaded ({} bytes)",
+            raw_name,
+            decompressed_data.len()
+        );
+    }
+
+    println!("MNIST download complete!");
+
+    Ok(target_dir.to_string_lossy().to_string())
+}
 
 /// MNIST image (28×28 grayscale)
 #[derive(Debug, Clone)]
@@ -57,6 +124,9 @@ impl MNISTImage {
 
 /// MNIST dataset
 pub struct MNISTDataset {
+    /// All images (combined view for simpler API)
+    pub images: Vec<MNISTImage>,
+
     /// Training images
     pub train_images: Vec<MNISTImage>,
 
@@ -66,7 +136,7 @@ pub struct MNISTDataset {
 
 impl MNISTDataset {
     /// Load MNIST from IDX format files
-    pub fn load<P: AsRef<Path>>(data_dir: P) -> IoResult<Self> {
+    pub fn load_from_dir<P: AsRef<Path>>(data_dir: P) -> IoResult<Self> {
         let data_dir = data_dir.as_ref();
 
         log::info!("Loading MNIST dataset from {:?}", data_dir);
@@ -81,13 +151,116 @@ impl MNISTDataset {
             data_dir.join("t10k-labels-idx1-ubyte"),
         )?;
 
-        log::info!("Loaded {} training images, {} test images",
-                   train_images.len(), test_images.len());
+        log::info!(
+            "Loaded {} training images, {} test images",
+            train_images.len(),
+            test_images.len()
+        );
+
+        let images = train_images.clone();
 
         Ok(Self {
+            images,
             train_images,
             test_images,
         })
+    }
+
+    /// Load MNIST from separate image and label files
+    pub fn load<P: AsRef<Path>>(image_path: P, label_path: P) -> IoResult<Self> {
+        let images = Self::load_images(image_path, label_path)?;
+
+        Ok(Self {
+            images: images.clone(),
+            train_images: images.clone(),
+            test_images: images,
+        })
+    }
+
+    /// Generate synthetic MNIST-like data for testing
+    pub fn generate_synthetic(n_samples: usize) -> Vec<MNISTImage> {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+
+        let mut images = Vec::with_capacity(n_samples);
+
+        for _ in 0..n_samples {
+            let label = rng.gen_range(0..10);
+
+            // Generate digit-like patterns (not random noise)
+            let mut pixels = vec![0u8; 784];
+
+            // Create a simple pattern based on the digit
+            let center_x = 14;
+            let center_y = 14;
+
+            match label {
+                0 => {
+                    // Circle
+                    for y in 0..28 {
+                        for x in 0..28 {
+                            let dx = (x as i32 - center_x) as f32;
+                            let dy = (y as i32 - center_y) as f32;
+                            let dist = (dx * dx + dy * dy).sqrt();
+                            if (dist - 8.0).abs() < 3.0 {
+                                pixels[y * 28 + x] = 200 + rng.gen_range(0..55);
+                            }
+                        }
+                    }
+                }
+                1 => {
+                    // Vertical line
+                    for y in 4..24 {
+                        for x in 12..16 {
+                            pixels[y * 28 + x] = 200 + rng.gen_range(0..55);
+                        }
+                    }
+                }
+                2..=9 => {
+                    // Various patterns for other digits
+                    let n_strokes = 2 + (label as usize % 3);
+                    for _ in 0..n_strokes {
+                        let start_x = rng.gen_range(5..23);
+                        let start_y = rng.gen_range(5..23);
+                        let dx: i32 = rng.gen_range(-1..=1);
+                        let dy: i32 = rng.gen_range(-1..=1);
+
+                        let mut x = start_x as i32;
+                        let mut y = start_y as i32;
+
+                        for _ in 0..12 {
+                            if x >= 0 && x < 28 && y >= 0 && y < 28 {
+                                let idx = (y * 28 + x) as usize;
+                                pixels[idx] = 200 + rng.gen_range(0..55);
+                                // Add some thickness
+                                if x + 1 < 28 {
+                                    pixels[(y * 28 + x + 1) as usize] = 150 + rng.gen_range(0..55);
+                                }
+                            }
+                            x += dx;
+                            y += dy;
+                        }
+                    }
+                }
+                _ => {}
+            }
+
+            // Add some noise
+            for p in pixels.iter_mut() {
+                if *p == 0 && rng.gen::<f32>() < 0.02 {
+                    *p = rng.gen_range(20..80);
+                }
+            }
+
+            images.push(MNISTImage {
+                pixels,
+                label,
+                width: 28,
+                height: 28,
+            });
+        }
+
+        images
     }
 
     /// Load images from IDX format
@@ -97,7 +270,12 @@ impl MNISTDataset {
         let mut label_header = [0u8; 8];
         label_file.read_exact(&mut label_header)?;
 
-        let n_labels = u32::from_be_bytes([label_header[4], label_header[5], label_header[6], label_header[7]]) as usize;
+        let n_labels = u32::from_be_bytes([
+            label_header[4],
+            label_header[5],
+            label_header[6],
+            label_header[7],
+        ]) as usize;
 
         let mut labels = vec![0u8; n_labels];
         label_file.read_exact(&mut labels)?;
@@ -107,9 +285,24 @@ impl MNISTDataset {
         let mut image_header = [0u8; 16];
         image_file.read_exact(&mut image_header)?;
 
-        let n_images = u32::from_be_bytes([image_header[4], image_header[5], image_header[6], image_header[7]]) as usize;
-        let height = u32::from_be_bytes([image_header[8], image_header[9], image_header[10], image_header[11]]) as usize;
-        let width = u32::from_be_bytes([image_header[12], image_header[13], image_header[14], image_header[15]]) as usize;
+        let n_images = u32::from_be_bytes([
+            image_header[4],
+            image_header[5],
+            image_header[6],
+            image_header[7],
+        ]) as usize;
+        let height = u32::from_be_bytes([
+            image_header[8],
+            image_header[9],
+            image_header[10],
+            image_header[11],
+        ]) as usize;
+        let width = u32::from_be_bytes([
+            image_header[12],
+            image_header[13],
+            image_header[14],
+            image_header[15],
+        ]) as usize;
 
         let pixels_per_image = width * height;
         let mut all_pixels = vec![0u8; n_images * pixels_per_image];
@@ -189,7 +382,10 @@ pub fn load_mnist_synthetic(n_train: usize, n_test: usize) -> MNISTDataset {
         });
     }
 
+    let images = train_images.clone();
+
     MNISTDataset {
+        images,
         train_images,
         test_images,
     }

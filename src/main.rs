@@ -6,8 +6,8 @@
 use clap::{Parser, Subcommand};
 use neurox_ai::brain::NeuromorphicBrain;
 use neurox_ai::language::PartOfSpeech;
+use neurox_ai::solve::{ChemistrySolver, MathSolver};
 use neurox_ai::{CudaContext, VERSION};
-use rustyline::error::ReadlineError;
 use rustyline::DefaultEditor;
 use std::io::{stdout, Write};
 use std::sync::Arc;
@@ -47,6 +47,44 @@ enum Commands {
         vocab: usize,
         #[arg(long, default_value_t = 512)]
         pattern_dim: usize,
+        /// Total neurons in the brain
+        #[arg(long, default_value_t = 10000)]
+        neurons: usize,
+        /// Context window size
+        #[arg(long, default_value_t = 128)]
+        context: usize,
+        /// Dopamine sensitivity (reward scaling)
+        #[arg(long, default_value_t = 1.0)]
+        sensitivity: f32,
+    },
+    /// Solve problems (math, chemistry)
+    Solve {
+        /// Type: math, chemistry
+        #[arg(long, default_value = "math")]
+        problem_type: String,
+        /// Problem to solve
+        problem: String,
+    },
+    /// Benchmark MNIST accuracy with quantization
+    Benchmark {
+        /// Path to MNIST data directory (or 'synthetic' for generated data)
+        #[arg(long, default_value = "synthetic")]
+        data_dir: String,
+        /// Number of epochs
+        #[arg(long, default_value_t = 10)]
+        epochs: usize,
+        /// Quantization bits (4 or 8)
+        #[arg(long, default_value_t = 4)]
+        bits: u8,
+        /// Number of hidden neurons
+        #[arg(long, default_value_t = 400)]
+        neurons: usize,
+        /// Presentation duration per image (ms)
+        #[arg(long, default_value_t = 50.0)]
+        duration: f32,
+        /// Inter-stimulus interval (ms)
+        #[arg(long, default_value_t = 20.0)]
+        isi: f32,
     },
 }
 
@@ -72,7 +110,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match cli.command {
         Some(Commands::Info) => display_system_info()?,
-        Some(Commands::Chat { vocab, pattern_dim }) => run_advanced_tui(vocab, pattern_dim)?,
+        Some(Commands::Chat {
+            vocab,
+            pattern_dim,
+            neurons,
+            context,
+            sensitivity,
+        }) => run_advanced_tui(vocab, pattern_dim, neurons, context, sensitivity)?,
+        Some(Commands::Solve {
+            problem_type,
+            problem,
+        }) => run_solve(&problem_type, &problem)?,
+        Some(Commands::Benchmark {
+            data_dir,
+            epochs,
+            bits,
+            neurons,
+            duration,
+            isi,
+        }) => run_benchmark(&data_dir, epochs, bits, neurons, duration, isi)?,
         None => display_welcome(),
     }
 
@@ -242,7 +298,13 @@ fn push_history(vec: &mut Vec<f32>, val: f32) {
     vec.push(val);
 }
 
-fn run_advanced_tui(vocab: usize, pattern_dim: usize) -> Result<(), Box<dyn std::error::Error>> {
+fn run_advanced_tui(
+    vocab: usize,
+    pattern_dim: usize,
+    neurons: usize,
+    context: usize,
+    sensitivity: f32,
+) -> Result<(), Box<dyn std::error::Error>> {
     // Clear screen
     print!("\x1b[2J\x1b[H");
 
@@ -251,7 +313,13 @@ fn run_advanced_tui(vocab: usize, pattern_dim: usize) -> Result<(), Box<dyn std:
         "{}Initializing Cortical Subsystems...{}",
         COLOR_GRAY, COLOR_RESET
     );
-    let mut brain = NeuromorphicBrain::new(5, 1000, vocab, pattern_dim);
+    // Use neurons arg for base neurons count
+    let mut brain = NeuromorphicBrain::new(5, neurons / 5, vocab, pattern_dim);
+    // Set sensitivity
+    brain.neuromodulation.dopamine_sensitivity = sensitivity;
+    // Set context (working memory capacity)
+    brain.working_memory.capacity = context;
+
     let mut monitor = BrainMonitor::new();
 
     // Initial warmup
@@ -465,6 +533,387 @@ fn run_advanced_tui(vocab: usize, pattern_dim: usize) -> Result<(), Box<dyn std:
         println!("{}{} >{} {}", BOLD, "NEUROX", COLOR_RESET, response);
 
         mode = "INTERACTIVE".to_string();
+    }
+
+    Ok(())
+}
+
+/// Run problem solver
+fn run_solve(problem_type: &str, problem: &str) -> Result<(), Box<dyn std::error::Error>> {
+    println!(
+        "{}╔════════════════════════════════════════════════════════════╗",
+        COLOR_CYAN
+    );
+    println!("║  NeuroxAI Problem Solver                                   ║");
+    println!(
+        "╚════════════════════════════════════════════════════════════╝{}",
+        COLOR_RESET
+    );
+    println!();
+
+    match problem_type.to_lowercase().as_str() {
+        "math" => {
+            let mut solver = MathSolver::new();
+            let result = solver.solve(problem);
+            println!("{}Problem:{} {}", BOLD, COLOR_RESET, problem);
+            println!(
+                "{}Result:{} {}{}{}",
+                BOLD, COLOR_RESET, COLOR_GREEN, result, COLOR_RESET
+            );
+        }
+        "chemistry" | "chem" => {
+            let solver = ChemistrySolver::new();
+            match solver.balance(problem) {
+                Ok(balanced) => {
+                    println!("{}Original:{} {}", BOLD, COLOR_RESET, problem);
+                    println!(
+                        "{}Balanced:{} {}{}{}",
+                        BOLD, COLOR_RESET, COLOR_GREEN, balanced, COLOR_RESET
+                    );
+                }
+                Err(e) => {
+                    println!(
+                        "{}Error:{} {}{}{}",
+                        BOLD, COLOR_RESET, COLOR_RED, e, COLOR_RESET
+                    );
+                }
+            }
+        }
+        _ => {
+            println!(
+                "{}Unknown problem type: {}. Use 'math' or 'chemistry'.{}",
+                COLOR_RED, problem_type, COLOR_RESET
+            );
+        }
+    }
+
+    Ok(())
+}
+
+/// Run MNIST benchmark
+fn run_benchmark(
+    data_dir: &str,
+    epochs: usize,
+    bits: u8,
+    neurons: usize,
+    duration: f32,
+    isi: f32,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use neurox_ai::datasets::{download_mnist, MNISTDataset};
+    use neurox_ai::learning::quantization::QuantizedWeights;
+    use neurox_ai::learning::STDPConfig;
+    use neurox_ai::simulation::Simulator;
+    use neurox_ai::training::{MNISTTrainer, TrainingConfig};
+    use neurox_ai::{CudaContext, ProceduralConnectivity, SparseConnectivity};
+
+    println!(
+        "{}╔════════════════════════════════════════════════════════════╗",
+        COLOR_CYAN
+    );
+    println!("║  NeuroxAI MNIST Benchmark                                  ║");
+    println!(
+        "╚════════════════════════════════════════════════════════════╝{}",
+        COLOR_RESET
+    );
+    println!();
+
+    // Handle auto download mode
+    let actual_data_dir = if data_dir == "auto" {
+        println!(
+            "{}Auto-downloading MNIST dataset...{}",
+            COLOR_YELLOW, COLOR_RESET
+        );
+        let download_path = "./data/mnist";
+        download_mnist(download_path)?;
+        println!();
+        download_path.to_string()
+    } else {
+        data_dir.to_string()
+    };
+
+    println!("{}Configuration:{}", BOLD, COLOR_RESET);
+    println!("  Data directory: {}", actual_data_dir);
+    println!("  Epochs: {}", epochs);
+    println!("  Quantization: {}-bit", bits);
+    println!("  Hidden Neurons: {}", neurons);
+    println!("  Presentation: {:.1}ms", duration);
+    println!("  ISI: {:.1}ms", isi);
+    println!();
+
+    // Architecture: 784 input + N hidden + 10 output
+    let n_input = 784;
+    let n_hidden = neurons;
+    let n_output = 10;
+    let n_neurons = n_input + n_hidden + n_output;
+
+    if actual_data_dir == "synthetic" {
+        println!(
+            "{}Note:{} Using synthetic data for demo.",
+            COLOR_YELLOW, COLOR_RESET
+        );
+        println!();
+
+        // Generate synthetic MNIST-like data
+        println!("{}Generating synthetic data...{}", COLOR_GRAY, COLOR_RESET);
+        let train_images = neurox_ai::datasets::MNISTDataset::generate_synthetic(1000);
+        let test_images = neurox_ai::datasets::MNISTDataset::generate_synthetic(200);
+
+        println!("  Train samples: {}", train_images.len());
+        println!("  Test samples: {}", test_images.len());
+        println!();
+
+        // Initialize CUDA context
+        println!("{}Initializing GPU...{}", COLOR_GRAY, COLOR_RESET);
+        let cuda_ctx = Arc::new(CudaContext::default()?);
+        let device_info = cuda_ctx.device_info()?;
+        let device_name = device_info.lines().next().unwrap_or("Unknown GPU");
+        println!("  {}", device_name);
+        println!();
+
+        // Create sparse connectivity using procedural generator
+        let proc_conn = ProceduralConnectivity::new(42, 0.1, 0.5, 0.1);
+        let connectivity = SparseConnectivity::from_procedural(n_neurons, &proc_conn);
+
+        // Create simulator
+        let simulator = Simulator::with_connectivity(
+            n_neurons,
+            0.1, // dt = 0.1ms
+            cuda_ctx.clone(),
+            &connectivity,
+        )?;
+
+        // Training config - optimized for speed
+        let config = TrainingConfig {
+            n_epochs: epochs,
+            batch_size: 100,
+            presentation_duration: duration,
+            isi_duration: isi,
+            lr_decay: 0.95,
+            wta_strength: 18.0,
+            target_rate: 5.0,
+            consolidation_interval: 5,
+        };
+
+        // STDP config
+        let stdp_config = STDPConfig {
+            lr_pre: 0.0001,
+            lr_post: 0.01,
+            tau_pre: 20.0,
+            tau_post: 20.0,
+            w_min: 0.0,
+            w_max: 1.0,
+        };
+
+        // Create trainer
+        let mut trainer = MNISTTrainer::new(simulator, config.clone(), stdp_config);
+
+        // Training loop
+        println!("{}Training...{}", COLOR_GRAY, COLOR_RESET);
+        let start_time = std::time::Instant::now();
+
+        for epoch in 1..=epochs {
+            // Train one epoch
+            trainer.train_epoch(&train_images)?;
+
+            // Evaluate
+            let train_subset = &train_images[..100.min(train_images.len())];
+            let train_acc = trainer.evaluate(train_subset)?;
+            let test_acc = trainer.evaluate(&test_images)?;
+
+            let elapsed = start_time.elapsed().as_secs_f32();
+            println!(
+                "  Epoch {}/{}: Train acc: {:.1}%, Test acc: {:.1}% [{:.1}s]",
+                epoch,
+                epochs,
+                train_acc * 100.0,
+                test_acc * 100.0,
+                elapsed
+            );
+
+            // Apply consolidation
+            if epoch % config.consolidation_interval == 0 {
+                let replay_samples = &train_images[..50.min(train_images.len())];
+                trainer.consolidate(replay_samples)?;
+                println!("    → Sleep consolidation applied");
+            }
+        }
+
+        // Final evaluation
+        println!();
+        let final_acc = trainer.evaluate(&test_images)?;
+
+        // Apply quantization
+        println!(
+            "{}Applying {}-bit quantization...{}",
+            COLOR_GRAY, bits, COLOR_RESET
+        );
+        let weights = trainer.simulator.get_weights()?;
+        let quantized = QuantizedWeights::from_float(&weights, bits);
+        let compression = quantized.compression_ratio();
+
+        // Real quantized evaluation: dequantize weights and re-evaluate
+        let dequantized_weights = quantized.to_float();
+        trainer.simulator.set_weights(&dequantized_weights)?;
+        let quant_acc = trainer.evaluate(&test_images)?;
+
+        println!();
+        println!(
+            "{}═══════════════════════════════════════════════════════════{}",
+            COLOR_CYAN, COLOR_RESET
+        );
+        println!("{}Results:{}", BOLD, COLOR_RESET);
+        println!("  FP32 Accuracy:     {:.2}%", final_acc * 100.0);
+        println!(
+            "  {}-bit Accuracy:    {}{:.2}%{}",
+            bits,
+            COLOR_GREEN,
+            quant_acc * 100.0,
+            COLOR_RESET
+        );
+        println!("  Compression ratio: {:.1}×", compression);
+        println!(
+            "  Memory saved:      {:.1}%",
+            (1.0 - 1.0 / compression) * 100.0
+        );
+        println!(
+            "{}═══════════════════════════════════════════════════════════{}",
+            COLOR_CYAN, COLOR_RESET
+        );
+    } else {
+        // Load real MNIST data
+        println!(
+            "{}Loading MNIST from {}...{}",
+            COLOR_GRAY, actual_data_dir, COLOR_RESET
+        );
+
+        let train_path = format!("{}/train-images-idx3-ubyte", actual_data_dir);
+        let train_labels_path = format!("{}/train-labels-idx1-ubyte", actual_data_dir);
+        let test_path = format!("{}/t10k-images-idx3-ubyte", actual_data_dir);
+        let test_labels_path = format!("{}/t10k-labels-idx1-ubyte", actual_data_dir);
+
+        // Check if files exist
+        if !std::path::Path::new(&train_path).exists() {
+            println!(
+                "{}Error:{} MNIST files not found at {}",
+                COLOR_RED, COLOR_RESET, actual_data_dir
+            );
+            println!();
+            println!("Expected files:");
+            println!("  - train-images-idx3-ubyte");
+            println!("  - train-labels-idx1-ubyte");
+            println!("  - t10k-images-idx3-ubyte");
+            println!("  - t10k-labels-idx1-ubyte");
+            println!();
+            println!("Options:");
+            println!("  neurox-ai benchmark --data-dir auto  (auto-download MNIST)");
+            println!("  neurox-ai benchmark                  (synthetic data demo)");
+            return Ok(());
+        }
+
+        let train_dataset = MNISTDataset::load(&train_path, &train_labels_path)?;
+        let test_dataset = MNISTDataset::load(&test_path, &test_labels_path)?;
+
+        println!("  Train samples: {}", train_dataset.images.len());
+        println!("  Test samples: {}", test_dataset.images.len());
+        println!();
+
+        // Initialize CUDA
+        println!("{}Initializing GPU...{}", COLOR_GRAY, COLOR_RESET);
+        let cuda_ctx = Arc::new(CudaContext::default()?);
+        let device_info = cuda_ctx.device_info()?;
+        let device_name = device_info.lines().next().unwrap_or("Unknown GPU");
+        println!("  {}", device_name);
+        println!();
+
+        // Create sparse connectivity using procedural generator
+        let proc_conn = ProceduralConnectivity::new(42, 0.1, 0.5, 0.1);
+        let connectivity = SparseConnectivity::from_procedural(n_neurons, &proc_conn);
+
+        // Create simulator
+        let simulator =
+            Simulator::with_connectivity(n_neurons, 0.1, cuda_ctx.clone(), &connectivity)?;
+
+        // Training config - optimized for speed
+        let config = TrainingConfig {
+            n_epochs: epochs,
+            batch_size: 100,
+            presentation_duration: duration,
+            isi_duration: isi,
+            lr_decay: 0.95,
+            wta_strength: 18.0,
+            target_rate: 5.0,
+            consolidation_interval: 5,
+        };
+
+        let stdp_config = STDPConfig::default();
+        let mut trainer = MNISTTrainer::new(simulator, config.clone(), stdp_config);
+
+        // Training loop
+        println!("{}Training...{}", COLOR_GRAY, COLOR_RESET);
+        let start_time = std::time::Instant::now();
+
+        for epoch in 1..=epochs {
+            trainer.train_epoch(&train_dataset.images)?;
+
+            let train_acc = trainer.evaluate(&train_dataset.images[..1000])?;
+            let test_acc = trainer.evaluate(&test_dataset.images)?;
+
+            let elapsed = start_time.elapsed().as_secs_f32();
+            println!(
+                "  Epoch {}/{}: Train acc: {:.1}%, Test acc: {:.1}% [{:.1}s]",
+                epoch,
+                epochs,
+                train_acc * 100.0,
+                test_acc * 100.0,
+                elapsed
+            );
+
+            if epoch % config.consolidation_interval == 0 {
+                trainer.consolidate(&train_dataset.images[..200])?;
+                println!("    → Sleep consolidation applied");
+            }
+        }
+
+        // Final results
+        println!();
+        let final_acc = trainer.evaluate(&test_dataset.images)?;
+
+        println!(
+            "{}Applying {}-bit quantization...{}",
+            COLOR_GRAY, bits, COLOR_RESET
+        );
+        let weights = trainer.simulator.get_weights()?;
+        let quantized = QuantizedWeights::from_float(&weights, bits);
+        let compression = quantized.compression_ratio();
+
+        // Real quantized evaluation: dequantize weights and re-evaluate
+        let dequantized_weights = quantized.to_float();
+        trainer.simulator.set_weights(&dequantized_weights)?;
+        let quant_acc = trainer.evaluate(&test_dataset.images)?;
+
+        println!();
+        println!(
+            "{}═══════════════════════════════════════════════════════════{}",
+            COLOR_CYAN, COLOR_RESET
+        );
+        println!("{}Results:{}", BOLD, COLOR_RESET);
+        println!("  FP32 Accuracy:     {:.2}%", final_acc * 100.0);
+        println!(
+            "  {}-bit Accuracy:    {}{:.2}%{}",
+            bits,
+            COLOR_GREEN,
+            quant_acc * 100.0,
+            COLOR_RESET
+        );
+        println!("  Compression ratio: {:.1}×", compression);
+        println!(
+            "  Memory saved:      {:.1}%",
+            (1.0 - 1.0 / compression) * 100.0
+        );
+        println!(
+            "{}═══════════════════════════════════════════════════════════{}",
+            COLOR_CYAN, COLOR_RESET
+        );
     }
 
     Ok(())

@@ -291,7 +291,9 @@ impl Metacognition {
                 .iter_mut()
                 .find(|r| r.strategy == process.strategy)
             {
-                record.record(success, process.confidence, 1.0); // TODO: actual time
+                // Estimate actual time from strategy base time and progress
+                let estimated_time = process.strategy.time_estimate() * process.progress.max(0.1);
+                record.record(success, process.confidence, estimated_time);
             }
         }
 

@@ -73,7 +73,7 @@ export default function Home() {
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <StatCard label="Accuracy" value="93.8%" sub="MNIST / 4-bit" />
+            <StatCard label="Accuracy" value="??.?%" sub="MNIST / 4-bit" />
             <StatCard label="Speedup" value="100x" sub="CUDA V1 Kernels" />
             <StatCard label="Neurons" value="1-10M" sub="Target Scale" />
             <StatCard label="Precision" value="0.1ms" sub="Simulation Step" />

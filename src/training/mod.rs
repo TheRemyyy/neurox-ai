@@ -7,6 +7,7 @@ use crate::learning::quantization::QuantizationConfig;
 use crate::learning::{HomeostaticPlasticity, STDPConfig, STPDynamics, TripletSTDP};
 use crate::simulation::Simulator;
 use cudarc::driver::DeviceSlice;
+use indicatif::{ProgressBar, ProgressStyle};
 
 /// Training configuration
 #[derive(Debug, Clone)]
@@ -79,8 +80,8 @@ pub struct MNISTTrainer {
     /// Training configuration
     config: TrainingConfig,
 
-    /// Simulator
-    simulator: Simulator,
+    /// Simulator (public for model export)
+    pub simulator: Simulator,
 
     /// STDP learning
     stdp: TripletSTDP,
@@ -191,9 +192,18 @@ impl MNISTTrainer {
 
     /// Train for one epoch
     pub fn train_epoch(&mut self, images: &[MNISTImage]) -> Result<(), Box<dyn std::error::Error>> {
+        let pb = ProgressBar::new(images.len() as u64);
+        pb.set_style(ProgressStyle::default_bar()
+            .template("  {spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} ({percent}%) [{elapsed_precise}] ETA: {eta}")
+            .unwrap()
+            .progress_chars("█▓░"));
+
         for image in images {
             self.train_on_image(image)?;
+            pb.inc(1);
         }
+
+        pb.finish_with_message("done");
 
         // Apply homeostatic regulation at end of epoch
         self.apply_homeostasis()?;

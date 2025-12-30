@@ -1,6 +1,6 @@
 [package]
 name = "neurox-ai" 
-version = "0.1.0"
+version = "1.0.1"
 edition = "2021"
 authors = ["TheRemyyy", "Aegis Labs"]
 description = "GPU-accelerated neuromorphic computing platform with biologically-inspired spiking neural networks"
@@ -47,6 +47,10 @@ rustyline = "14.0"
 
 # Performance monitoring
 indicatif = "0.17"
+
+# HTTP client for MNIST download
+ureq = "2.10"
+flate2 = "1.0"
 
 [dev-dependencies]
 criterion = "0.5"

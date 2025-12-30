@@ -36,6 +36,7 @@ pub mod affect;
 pub mod cognition;
 pub mod motivation;
 pub mod reasoning;
+pub mod solve;
 
 // Re-export key types
 pub use connectivity::{ConnectivityType, ProceduralConnectivity, SparseConnectivity};
