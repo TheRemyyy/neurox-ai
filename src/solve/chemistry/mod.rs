@@ -18,7 +18,7 @@ pub struct ChemicalAnalysis {
     pub balanced_equation: Option<String>,
     pub molar_mass: Option<f64>,
     pub composition: Option<Vec<(String, f64)>>, // Element -> Mass %
-    pub steps: Vec<String>, // Reasoning steps
+    pub steps: Vec<String>,                      // Reasoning steps
     pub mass_verification: Option<MassConservationCheck>,
     pub thermodynamics: Option<ThermodynamicResult>,
 }
@@ -49,22 +49,48 @@ impl std::fmt::Display for ChemicalAnalysis {
         if let Some(mass) = self.molar_mass {
             writeln!(f, "Molar Mass: {:.4} g/mol", mass)?;
         }
-        
+
+        if let Some(comp) = &self.composition {
+            writeln!(f, "Elemental Composition:")?;
+            for (elem, pct) in comp {
+                writeln!(f, "  {:>2}: {:>6.2}%", elem, pct)?;
+            }
+        }
+
         if let Some(thermo) = &self.thermodynamics {
             writeln!(f, "Thermodynamics (at 298K):")?;
-            writeln!(f, "  ΔH (Enthalpy): {:.2} kJ/mol ({})", thermo.delta_h, if thermo.is_exothermic { "Exothermic/Releases Heat" } else { "Endothermic/Absorbs Heat" })?;
-            writeln!(f, "  ΔG (Gibbs):    {:.2} kJ/mol ({})", thermo.delta_g, if thermo.is_spontaneous { "Spontaneous" } else { "Non-spontaneous" })?;
+            writeln!(
+                f,
+                "  ΔH (Enthalpy): {:.2} kJ/mol ({})",
+                thermo.delta_h,
+                if thermo.is_exothermic {
+                    "Exothermic"
+                } else {
+                    "Endothermic"
+                }
+            )?;
+            writeln!(
+                f,
+                "  ΔG (Gibbs):    {:.2} kJ/mol ({})",
+                thermo.delta_g,
+                if thermo.is_spontaneous {
+                    "Spontaneous"
+                } else {
+                    "Non-spontaneous"
+                }
+            )?;
         }
 
         if let Some(ver) = &self.mass_verification {
             writeln!(f, "Verification:")?;
-            if ver.is_conserved {
-                writeln!(f, "  Status: ✅ CONSERVED (Law of Conservation of Mass held)")?;
+            let status = if ver.is_conserved {
+                "✅ CONSERVED"
             } else {
-                writeln!(f, "  Status: ❌ VIOLATION (Calculation Error)")?;
-            }
+                "❌ VIOLATION"
+            };
+            writeln!(f, "  Status: {} (Mass Delta: {:.6})", status, ver.delta)?;
         }
-        
+
         Ok(())
     }
 }
@@ -88,8 +114,11 @@ impl ChemistrySolver {
         }
 
         let thermo_db = data::get_thermo_db();
-        
-        Self { elements, thermo_db }
+
+        Self {
+            elements,
+            thermo_db,
+        }
     }
 
     pub fn solve(&self, input: &str) -> ChemicalAnalysis {
@@ -105,16 +134,16 @@ impl ChemistrySolver {
 
     fn solve_equation(&self, input: &str, mut steps: Vec<String>) -> ChemicalAnalysis {
         steps.push("Detected chemical equation.".to_string());
-        
+
         match self.balance(input) {
             Ok(b) => {
                 steps.push("Balanced equation successfully.".to_string());
-                
+
                 // 1. Mass Verification
                 let (r_mass, p_mass) = self.calculate_equation_masses(&b);
                 let delta = (r_mass - p_mass).abs();
                 let is_conserved = delta < 1e-4;
-                
+
                 // 2. Thermodynamic Analysis
                 let thermo = self.calculate_thermodynamics(&b, &mut steps);
 
@@ -128,11 +157,11 @@ impl ChemistrySolver {
                         reactants_mass: r_mass,
                         products_mass: p_mass,
                         delta,
-                        is_conserved
+                        is_conserved,
                     }),
                     thermodynamics: thermo,
                 }
-            },
+            }
             Err(e) => {
                 steps.push(format!("Failed to balance: {}", e));
                 ChemicalAnalysis {
@@ -148,9 +177,13 @@ impl ChemistrySolver {
         }
     }
 
-    fn calculate_thermodynamics(&self, eq: &BalancedEquation, steps: &mut Vec<String>) -> Option<ThermodynamicResult> {
+    fn calculate_thermodynamics(
+        &self,
+        eq: &BalancedEquation,
+        steps: &mut Vec<String>,
+    ) -> Option<ThermodynamicResult> {
         steps.push("Calculating Thermodynamics (Hess's Law)...".to_string());
-        
+
         let mut h_reactants = 0.0;
         let mut s_reactants = 0.0;
         let mut h_products = 0.0;
@@ -186,13 +219,14 @@ impl ChemistrySolver {
         }
 
         if unknown_compound {
-            steps.push("  Cannot calculate precise thermodynamics due to missing data.".to_string());
+            steps
+                .push("  Cannot calculate precise thermodynamics due to missing data.".to_string());
             return None;
         }
 
         let delta_h = h_products - h_reactants;
         let delta_s = s_products - s_reactants; // J/mol K
-        
+
         // Gibbs Free Energy: G = H - TS
         // T = 298.15 K
         // delta_s is in J, delta_h is in kJ. Need to convert S to kJ.
@@ -215,11 +249,13 @@ impl ChemistrySolver {
     fn calculate_equation_masses(&self, eq: &BalancedEquation) -> (f64, f64) {
         let mut total_r = 0.0;
         let parts: Vec<&str> = eq.original.split("->").collect();
-        if parts.len() < 2 { return (0.0, 0.0); }
-        
+        if parts.len() < 2 {
+            return (0.0, 0.0);
+        }
+
         let r_strs: Vec<&str> = parts[0].split('+').map(|s| s.trim()).collect();
         let p_strs: Vec<&str> = parts[1].split('+').map(|s| s.trim()).collect();
-        
+
         for (i, formula) in r_strs.iter().enumerate() {
             let coef = eq.reactant_coefficients.get(i).unwrap_or(&1);
             let mass = self.calculate_formula_mass(formula);
@@ -277,9 +313,9 @@ impl ChemistrySolver {
                 let mass = element.mass * (*count as f64);
                 total_mass += mass;
                 elem_masses.push((symbol.clone(), mass));
-            } 
+            }
         }
-        
+
         steps.push(format!("Calculated Molar Mass: {:.3} g/mol", total_mass));
 
         let mut composition = Vec::new();
@@ -303,31 +339,49 @@ impl ChemistrySolver {
     }
 
     pub fn balance(&self, equation: &str) -> Result<BalancedEquation, String> {
-         let separator = if equation.contains("->") { "->" } else { "=" };
+        let separator = if equation.contains("->") { "->" } else { "=" };
         let parts: Vec<&str> = equation.split(separator).collect();
-        if parts.len() != 2 { return Err("Invalid format".to_string()); }
+        if parts.len() != 2 {
+            return Err("Invalid format".to_string());
+        }
 
         let reactants: Vec<&str> = parts[0].split('+').map(|s| s.trim()).collect();
         let products: Vec<&str> = parts[1].split('+').map(|s| s.trim()).collect();
 
-        let reactant_molecules: Vec<HashMap<String, i32>> = reactants.iter().map(|m| self.parse_molecule(m)).collect::<Result<Vec<_>, _>>()?;
-        let product_molecules: Vec<HashMap<String, i32>> = products.iter().map(|m| self.parse_molecule(m)).collect::<Result<Vec<_>, _>>()?;
+        let reactant_molecules: Vec<HashMap<String, i32>> = reactants
+            .iter()
+            .map(|m| self.parse_molecule(m))
+            .collect::<Result<Vec<_>, _>>()?;
+        let product_molecules: Vec<HashMap<String, i32>> = products
+            .iter()
+            .map(|m| self.parse_molecule(m))
+            .collect::<Result<Vec<_>, _>>()?;
 
         let mut elements: Vec<String> = Vec::new();
         for mol in reactant_molecules.iter().chain(product_molecules.iter()) {
             for elem in mol.keys() {
-                if !elements.contains(elem) { elements.push(elem.clone()); }
+                if !elements.contains(elem) {
+                    elements.push(elem.clone());
+                }
             }
         }
         elements.sort();
 
         for max_coef in 1..=12 {
-            if let Some(coefficients) = self.find_coefficients(&reactant_molecules, &product_molecules, &elements, max_coef) {
+            if let Some(coefficients) =
+                self.find_coefficients(&reactant_molecules, &product_molecules, &elements, max_coef)
+            {
                 let n_reactants = reactants.len();
                 let reactant_coefs: Vec<u32> = coefficients[..n_reactants].to_vec();
                 let product_coefs: Vec<u32> = coefficients[n_reactants..].to_vec();
-                let balanced = self.format_balanced(&reactants, &products, &reactant_coefs, &product_coefs);
-                return Ok(BalancedEquation { original: equation.to_string(), balanced, reactant_coefficients: reactant_coefs, product_coefficients: product_coefs });
+                let balanced =
+                    self.format_balanced(&reactants, &products, &reactant_coefs, &product_coefs);
+                return Ok(BalancedEquation {
+                    original: equation.to_string(),
+                    balanced,
+                    reactant_coefficients: reactant_coefs,
+                    product_coefficients: product_coefs,
+                });
             }
         }
         Err("Could not balance equation".to_string())
@@ -342,61 +396,161 @@ impl ChemistrySolver {
                 let mut element = String::new();
                 element.push(chars[i]);
                 i += 1;
-                while i < chars.len() && chars[i].is_ascii_lowercase() { element.push(chars[i]); i += 1; }
+                while i < chars.len() && chars[i].is_ascii_lowercase() {
+                    element.push(chars[i]);
+                    i += 1;
+                }
                 let mut num_str = String::new();
-                while i < chars.len() && chars[i].is_ascii_digit() { num_str.push(chars[i]); i += 1; }
-                let count: i32 = if num_str.is_empty() { 1 } else { num_str.parse().unwrap_or(1) };
+                while i < chars.len() && chars[i].is_ascii_digit() {
+                    num_str.push(chars[i]);
+                    i += 1;
+                }
+                let count: i32 = if num_str.is_empty() {
+                    1
+                } else {
+                    num_str.parse().unwrap_or(1)
+                };
                 *counts.entry(element).or_insert(0) += count;
             } else if chars[i] == '(' {
                 i += 1;
                 let mut group = String::new();
                 let mut depth = 1;
                 while i < chars.len() && depth > 0 {
-                    if chars[i] == '(' { depth += 1; } else if chars[i] == ')' { depth -= 1; if depth == 0 { break; } }
-                    group.push(chars[i]); i += 1;
+                    if chars[i] == '(' {
+                        depth += 1;
+                    } else if chars[i] == ')' {
+                        depth -= 1;
+                        if depth == 0 {
+                            break;
+                        }
+                    }
+                    group.push(chars[i]);
+                    i += 1;
                 }
-                i += 1; 
+                i += 1;
                 let mut num_str = String::new();
-                while i < chars.len() && chars[i].is_ascii_digit() { num_str.push(chars[i]); i += 1; }
-                let multiplier: i32 = if num_str.is_empty() { 1 } else { num_str.parse().unwrap_or(1) };
+                while i < chars.len() && chars[i].is_ascii_digit() {
+                    num_str.push(chars[i]);
+                    i += 1;
+                }
+                let multiplier: i32 = if num_str.is_empty() {
+                    1
+                } else {
+                    num_str.parse().unwrap_or(1)
+                };
                 let group_counts = self.parse_molecule(&group)?;
-                for (elem, count) in group_counts { *counts.entry(elem).or_insert(0) += count * multiplier; }
-            } else { i += 1; }
+                for (elem, count) in group_counts {
+                    *counts.entry(elem).or_insert(0) += count * multiplier;
+                }
+            } else {
+                i += 1;
+            }
         }
         Ok(counts)
     }
 
-    fn find_coefficients(&self, reactants: &[HashMap<String, i32>], products: &[HashMap<String, i32>], elements: &[String], max_coef: u32) -> Option<Vec<u32>> {
+    fn find_coefficients(
+        &self,
+        reactants: &[HashMap<String, i32>],
+        products: &[HashMap<String, i32>],
+        elements: &[String],
+        max_coef: u32,
+    ) -> Option<Vec<u32>> {
         let n_total = reactants.len() + products.len();
-        self.try_coefficients(reactants, products, elements, &mut vec![1; n_total], 0, max_coef)
+        self.try_coefficients(
+            reactants,
+            products,
+            elements,
+            &mut vec![1; n_total],
+            0,
+            max_coef,
+        )
     }
 
-    fn try_coefficients(&self, reactants: &[HashMap<String, i32>], products: &[HashMap<String, i32>], elements: &[String], coefficients: &mut Vec<u32>, pos: usize, max_coef: u32) -> Option<Vec<u32>> {
+    fn try_coefficients(
+        &self,
+        reactants: &[HashMap<String, i32>],
+        products: &[HashMap<String, i32>],
+        elements: &[String],
+        coefficients: &mut Vec<u32>,
+        pos: usize,
+        max_coef: u32,
+    ) -> Option<Vec<u32>> {
         if pos == coefficients.len() {
-            if self.is_balanced(reactants, products, elements, coefficients) { return Some(coefficients.clone()); }
+            if self.is_balanced(reactants, products, elements, coefficients) {
+                return Some(coefficients.clone());
+            }
             return None;
         }
         for c in 1..=max_coef {
             coefficients[pos] = c;
-            if let Some(result) = self.try_coefficients(reactants, products, elements, coefficients, pos + 1, max_coef) { return Some(result); }
+            if let Some(result) = self.try_coefficients(
+                reactants,
+                products,
+                elements,
+                coefficients,
+                pos + 1,
+                max_coef,
+            ) {
+                return Some(result);
+            }
         }
         None
     }
 
-    fn is_balanced(&self, reactants: &[HashMap<String, i32>], products: &[HashMap<String, i32>], elements: &[String], coefficients: &[u32]) -> bool {
+    fn is_balanced(
+        &self,
+        reactants: &[HashMap<String, i32>],
+        products: &[HashMap<String, i32>],
+        elements: &[String],
+        coefficients: &[u32],
+    ) -> bool {
         let n_reactants = reactants.len();
         for element in elements {
-            let mut left = 0; let mut right = 0;
-            for (i, mol) in reactants.iter().enumerate() { left += mol.get(element).unwrap_or(&0) * coefficients[i] as i32; }
-            for (i, mol) in products.iter().enumerate() { right += mol.get(element).unwrap_or(&0) * coefficients[n_reactants + i] as i32; }
-            if left != right { return false; }
+            let mut left = 0;
+            let mut right = 0;
+            for (i, mol) in reactants.iter().enumerate() {
+                left += mol.get(element).unwrap_or(&0) * coefficients[i] as i32;
+            }
+            for (i, mol) in products.iter().enumerate() {
+                right += mol.get(element).unwrap_or(&0) * coefficients[n_reactants + i] as i32;
+            }
+            if left != right {
+                return false;
+            }
         }
         true
     }
 
-    fn format_balanced(&self, reactants: &[&str], products: &[&str], r_coefs: &[u32], p_coefs: &[u32]) -> String {
-        let left: Vec<String> = reactants.iter().zip(r_coefs).map(|(m, &c)| if c == 1 { m.to_string() } else { format!("{}{}", c, m) }).collect();
-        let right: Vec<String> = products.iter().zip(p_coefs).map(|(m, &c)| if c == 1 { m.to_string() } else { format!("{}{}", c, m) }).collect();
+    fn format_balanced(
+        &self,
+        reactants: &[&str],
+        products: &[&str],
+        r_coefs: &[u32],
+        p_coefs: &[u32],
+    ) -> String {
+        let left: Vec<String> = reactants
+            .iter()
+            .zip(r_coefs)
+            .map(|(m, &c)| {
+                if c == 1 {
+                    m.to_string()
+                } else {
+                    format!("{}{}", c, m)
+                }
+            })
+            .collect();
+        let right: Vec<String> = products
+            .iter()
+            .zip(p_coefs)
+            .map(|(m, &c)| {
+                if c == 1 {
+                    m.to_string()
+                } else {
+                    format!("{}{}", c, m)
+                }
+            })
+            .collect();
         format!("{} -> {}", left.join(" + "), right.join(" + "))
     }
 }

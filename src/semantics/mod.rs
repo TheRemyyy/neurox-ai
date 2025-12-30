@@ -13,7 +13,6 @@
 use dashmap::DashMap;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::sync::Arc;
 
 /// Word2Vec-style embedding layer

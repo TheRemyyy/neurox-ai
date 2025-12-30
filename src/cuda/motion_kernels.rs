@@ -12,7 +12,7 @@
 //! - MSTv: Rotation cells (64×64)
 //! - Total: ~81,000 neurons in parallel
 
-use cudarc::driver::{CudaDevice, CudaFunction, LaunchAsync, CudaSlice};
+use cudarc::driver::{CudaDevice, CudaFunction, CudaSlice, LaunchAsync};
 use std::sync::Arc;
 
 /// MT Direction cell update kernel - processes all direction-selective cells in parallel
@@ -260,7 +260,9 @@ impl GpuMotionSystem {
         // Compile kernels
         let dir_ptx = cudarc::nvrtc::compile_ptx(MT_DIRECTION_KERNEL)?;
         device.load_ptx(dir_ptx, "mt_direction", &["mt_direction_update"])?;
-        let direction_kernel = device.get_func("mt_direction", "mt_direction_update").unwrap();
+        let direction_kernel = device
+            .get_func("mt_direction", "mt_direction_update")
+            .unwrap();
 
         let speed_ptx = cudarc::nvrtc::compile_ptx(MT_SPEED_KERNEL)?;
         device.load_ptx(speed_ptx, "mt_speed", &["mt_speed_update"])?;
@@ -268,7 +270,9 @@ impl GpuMotionSystem {
 
         let exp_ptx = cudarc::nvrtc::compile_ptx(MSTD_EXPANSION_KERNEL)?;
         device.load_ptx(exp_ptx, "mstd_exp", &["mstd_expansion_update"])?;
-        let expansion_kernel = device.get_func("mstd_exp", "mstd_expansion_update").unwrap();
+        let expansion_kernel = device
+            .get_func("mstd_exp", "mstd_expansion_update")
+            .unwrap();
 
         let flow_ptx = cudarc::nvrtc::compile_ptx(OPTIC_FLOW_KERNEL)?;
         device.load_ptx(flow_ptx, "optic_flow", &["compute_optic_flow"])?;
@@ -290,12 +294,21 @@ impl GpuMotionSystem {
         let flow_x_buffer = device.alloc_zeros::<f32>(mt_width * mt_height)?;
         let flow_y_buffer = device.alloc_zeros::<f32>(mt_width * mt_height)?;
 
-        log::info!("  GPU Motion initialized: MT {}×{}×{} dirs, MST {}×{}",
-                   mt_width, mt_height, n_directions, mst_width, mst_height);
-        log::info!("  GPU memory: {:.1} MB",
-                   (mt_width * mt_height * (n_orientations + n_directions + 1) * 4 +
-                    mst_width * mst_height * 3 * 4 +
-                    mt_width * mt_height * 2 * 4) as f32 / 1_000_000.0);
+        log::info!(
+            "  GPU Motion initialized: MT {}×{}×{} dirs, MST {}×{}",
+            mt_width,
+            mt_height,
+            n_directions,
+            mst_width,
+            mst_height
+        );
+        log::info!(
+            "  GPU memory: {:.1} MB",
+            (mt_width * mt_height * (n_orientations + n_directions + 1) * 4
+                + mst_width * mst_height * 3 * 4
+                + mt_width * mt_height * 2 * 4) as f32
+                / 1_000_000.0
+        );
 
         Ok(Self {
             device,
@@ -324,13 +337,12 @@ impl GpuMotionSystem {
     /// Returns (direction_responses, speed_estimates, expansion_strength, optic_flow)
     pub fn process(
         &mut self,
-        v1_input: &[f32],  // Flattened [width × height × orientations]
+        v1_input: &[f32], // Flattened [width × height × orientations]
         dt: f32,
     ) -> Result<GpuMotionOutput, Box<dyn std::error::Error>> {
-        use cudarc::driver::DeviceSlice;
-
         // Upload V1 input to GPU
-        self.device.htod_copy_into(v1_input.to_vec(), &mut self.v1_input_buffer)?;
+        self.device
+            .htod_copy_into(v1_input.to_vec(), &mut self.v1_input_buffer)?;
 
         // 1. Update MT direction cells (parallel across all cells)
         let total_dir_cells = self.mt_width * self.mt_height * self.n_directions;
@@ -345,7 +357,7 @@ impl GpuMotionSystem {
             self.n_directions as i32,
             self.n_orientations as i32,
             dt,
-            20.0f32,  // tau
+            20.0f32, // tau
         );
 
         unsafe {
@@ -370,7 +382,7 @@ impl GpuMotionSystem {
             self.mt_height as i32,
             self.n_directions as i32,
             dt,
-            50.0f32,  // tau
+            50.0f32, // tau
         );
 
         unsafe {
@@ -442,11 +454,16 @@ impl GpuMotionSystem {
         let mut flow_x_out = vec![0.0f32; total_speed_cells];
         let mut flow_y_out = vec![0.0f32; total_speed_cells];
 
-        self.device.dtoh_sync_copy_into(&self.direction_buffer, &mut direction_out)?;
-        self.device.dtoh_sync_copy_into(&self.speed_buffer, &mut speed_out)?;
-        self.device.dtoh_sync_copy_into(&self.expansion_buffer, &mut expansion_out)?;
-        self.device.dtoh_sync_copy_into(&self.flow_x_buffer, &mut flow_x_out)?;
-        self.device.dtoh_sync_copy_into(&self.flow_y_buffer, &mut flow_y_out)?;
+        self.device
+            .dtoh_sync_copy_into(&self.direction_buffer, &mut direction_out)?;
+        self.device
+            .dtoh_sync_copy_into(&self.speed_buffer, &mut speed_out)?;
+        self.device
+            .dtoh_sync_copy_into(&self.expansion_buffer, &mut expansion_out)?;
+        self.device
+            .dtoh_sync_copy_into(&self.flow_x_buffer, &mut flow_x_out)?;
+        self.device
+            .dtoh_sync_copy_into(&self.flow_y_buffer, &mut flow_y_out)?;
 
         // Compute average expansion strength
         let expansion_strength = expansion_out.iter().sum::<f32>() / expansion_out.len() as f32;
@@ -462,7 +479,8 @@ impl GpuMotionSystem {
 
     /// Get GPU memory usage in MB
     pub fn memory_usage_mb(&self) -> f32 {
-        let mt_floats = self.mt_width * self.mt_height * (self.n_orientations + self.n_directions + 1 + 2);
+        let mt_floats =
+            self.mt_width * self.mt_height * (self.n_orientations + self.n_directions + 1 + 2);
         let mst_floats = self.mst_width * self.mst_height * 3;
         ((mt_floats + mst_floats) * 4) as f32 / 1_000_000.0
     }
@@ -471,11 +489,11 @@ impl GpuMotionSystem {
 /// GPU motion processing output
 #[derive(Debug, Clone)]
 pub struct GpuMotionOutput {
-    pub direction_responses: Vec<f32>,  // [width × height × n_directions]
-    pub speed_estimates: Vec<f32>,      // [width × height]
+    pub direction_responses: Vec<f32>, // [width × height × n_directions]
+    pub speed_estimates: Vec<f32>,     // [width × height]
     pub expansion_strength: f32,
-    pub flow_x: Vec<f32>,               // [width × height]
-    pub flow_y: Vec<f32>,               // [width × height]
+    pub flow_x: Vec<f32>, // [width × height]
+    pub flow_y: Vec<f32>, // [width × height]
 }
 
 #[cfg(test)]
@@ -489,11 +507,12 @@ mod tests {
                 // CudaDevice::new already returns Arc<CudaDevice>
                 let mut motion = GpuMotionSystem::new(
                     device.clone(),
-                    128,  // mt_width
-                    120,  // mt_height
-                    4,    // n_directions
-                    4,    // n_orientations
-                ).expect("Failed to create GPU motion system");
+                    128, // mt_width
+                    120, // mt_height
+                    4,   // n_directions
+                    4,   // n_orientations
+                )
+                .expect("Failed to create GPU motion system");
 
                 // Test with random V1 input
                 let input_size = 128 * 120 * 4;
@@ -507,8 +526,16 @@ mod tests {
                 assert_eq!(output.flow_y.len(), 128 * 120);
 
                 // Check that some outputs are non-zero
-                let non_zero_dir = output.direction_responses.iter().filter(|&&x| x > 0.01).count();
-                assert!(non_zero_dir > 10, "Expected direction responses, got {} non-zero", non_zero_dir);
+                let non_zero_dir = output
+                    .direction_responses
+                    .iter()
+                    .filter(|&&x| x > 0.01)
+                    .count();
+                assert!(
+                    non_zero_dir > 10,
+                    "Expected direction responses, got {} non-zero",
+                    non_zero_dir
+                );
 
                 eprintln!("GPU Motion test passed!");
                 eprintln!("  Direction responses: {}", non_zero_dir);

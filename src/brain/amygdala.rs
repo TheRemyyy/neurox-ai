@@ -23,7 +23,6 @@
 
 use crate::neuron::{LIFNeuron, Neuron};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// Complete amygdala system with all nuclei
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -40,7 +39,7 @@ pub struct Amygdala {
 
     // State
     pub timestep: u32,
-    pub context: usize,  // Current context ID
+    pub context: usize, // Current context ID
 }
 
 /// Lateral Amygdala - Primary sensory input and CS-US association
@@ -53,8 +52,8 @@ pub struct LateralAmygdala {
     pub interneurons: Vec<InterneuronLA>,
 
     // Synaptic weights from sensory inputs (CS pathways)
-    pub thalamic_weights: Vec<Vec<f32>>,   // Thalamic input (fast, crude)
-    pub cortical_weights: Vec<Vec<f32>>,   // Cortical input (slow, detailed)
+    pub thalamic_weights: Vec<Vec<f32>>, // Thalamic input (fast, crude)
+    pub cortical_weights: Vec<Vec<f32>>, // Cortical input (slow, detailed)
 
     // US (unconditioned stimulus) pathway strength
     pub us_pathway_strength: f32,
@@ -111,7 +110,7 @@ pub struct PyramidalNeuron {
     pub id: usize,
     pub neuron: LIFNeuron,
     pub last_spike: u32,
-    pub activity_trace: f32,  // For plasticity
+    pub activity_trace: f32, // For plasticity
 }
 
 /// LA interneuron
@@ -180,45 +179,39 @@ impl Amygdala {
     ///
     /// # Returns
     /// Fear output (0.0 to 1.0)
-    pub fn update(
-        &mut self,
-        dt: f32,
-        cs_input: &[f32],
-        us_present: f32,
-        context: usize,
-    ) -> f32 {
+    pub fn update(&mut self, dt: f32, cs_input: &[f32], us_present: f32, context: usize) -> f32 {
         self.timestep += 1;
         self.context = context;
 
         // 1. Update Lateral Amygdala (CS-US association)
-        let la_activity = self.lateral_amygdala.update(dt, cs_input, us_present, self.timestep);
+        let la_activity = self
+            .lateral_amygdala
+            .update(dt, cs_input, us_present, self.timestep);
 
         // 2. Update Basolateral Amygdala (intermediate processing + extinction)
-        let (bla_activity, extinction_activity) = self.basolateral_amygdala.update(
-            dt,
-            &la_activity,
-            us_present,
-            self.timestep,
-        );
+        let (bla_activity, extinction_activity) =
+            self.basolateral_amygdala
+                .update(dt, &la_activity, us_present, self.timestep);
 
         // 3. Update Central Lateral (inhibitory gating)
-        let cel_inhibition = self.central_lateral.update(dt, &bla_activity, &extinction_activity);
+        let cel_inhibition = self
+            .central_lateral
+            .update(dt, &bla_activity, &extinction_activity);
 
         // 4. Update Central Medial (fear output)
-        let fear_output = self.central_medial.update(
-            dt,
-            &la_activity,
-            &bla_activity,
-            &cel_inhibition,
-        );
+        let fear_output =
+            self.central_medial
+                .update(dt, &la_activity, &bla_activity, &cel_inhibition);
 
         // 5. Apply learning rules
         if us_present > 0.5 {
             // Fear conditioning: strengthen CS-US associations
-            self.lateral_amygdala.apply_conditioning(cs_input, self.learning_rate);
+            self.lateral_amygdala
+                .apply_conditioning(cs_input, self.learning_rate);
         } else if cs_input.iter().any(|&x| x > 0.5) && us_present < 0.5 {
             // Extinction learning: CS present but no US
-            self.basolateral_amygdala.apply_extinction(self.extinction_rate);
+            self.basolateral_amygdala
+                .apply_extinction(self.extinction_rate);
         }
 
         fear_output
@@ -226,29 +219,38 @@ impl Amygdala {
 
     /// Get amygdala statistics
     pub fn stats(&self) -> AmygdalaStats {
-        let la_active = self.lateral_amygdala.pyramidal_neurons
+        let la_active = self
+            .lateral_amygdala
+            .pyramidal_neurons
             .iter()
             .filter(|n| self.timestep - n.last_spike < 10)
             .count();
 
-        let bla_active = self.basolateral_amygdala.pyramidal_neurons
+        let bla_active = self
+            .basolateral_amygdala
+            .pyramidal_neurons
             .iter()
             .filter(|n| self.timestep - n.last_spike < 10)
             .count();
 
-        let extinction_active = self.basolateral_amygdala.extinction_neurons
+        let extinction_active = self
+            .basolateral_amygdala
+            .extinction_neurons
             .iter()
             .filter(|n| n.extinction_strength > 0.5)
             .count();
 
         let avg_thalamic_weight = if !self.lateral_amygdala.thalamic_weights.is_empty()
-            && !self.lateral_amygdala.thalamic_weights[0].is_empty() {
+            && !self.lateral_amygdala.thalamic_weights[0].is_empty()
+        {
             let total_weights = self.lateral_amygdala.thalamic_weights.len()
                 * self.lateral_amygdala.thalamic_weights[0].len();
-            self.lateral_amygdala.thalamic_weights
+            self.lateral_amygdala
+                .thalamic_weights
                 .iter()
                 .flat_map(|w| w.iter())
-                .sum::<f32>() / total_weights as f32
+                .sum::<f32>()
+                / total_weights as f32
         } else {
             0.0
         };
@@ -306,7 +308,7 @@ impl LateralAmygdala {
             interneurons,
             thalamic_weights,
             cortical_weights,
-            us_pathway_strength: 5.0,  // Strong US input
+            us_pathway_strength: 5.0, // Strong US input
             n_neurons,
             n_inputs,
         }
@@ -318,15 +320,17 @@ impl LateralAmygdala {
         // Update pyramidal neurons
         for (i, neuron) in self.pyramidal_neurons.iter_mut().enumerate() {
             // Thalamic input (fast)
-            let thalamic_current: f32 = cs_input.iter()
+            let thalamic_current: f32 = cs_input
+                .iter()
                 .zip(self.thalamic_weights[i].iter())
                 .map(|(input, weight)| input * weight)
                 .sum();
 
             // Cortical input (slow, more processed)
-            let cortical_current: f32 = cs_input.iter()
+            let cortical_current: f32 = cs_input
+                .iter()
                 .zip(self.cortical_weights[i].iter())
-                .map(|(input, weight)| input * weight * 0.7)  // Slower
+                .map(|(input, weight)| input * weight * 0.7) // Slower
                 .sum();
 
             // US input
@@ -366,11 +370,13 @@ impl LateralAmygdala {
                 for (j, &input) in cs_input.iter().enumerate() {
                     if input > 0.5 {
                         // LTP at thalamic synapses
-                        self.thalamic_weights[i][j] += learning_rate * input * neuron.activity_trace;
+                        self.thalamic_weights[i][j] +=
+                            learning_rate * input * neuron.activity_trace;
                         self.thalamic_weights[i][j] = self.thalamic_weights[i][j].min(1.0);
 
                         // LTP at cortical synapses
-                        self.cortical_weights[i][j] += learning_rate * 0.7 * input * neuron.activity_trace;
+                        self.cortical_weights[i][j] +=
+                            learning_rate * 0.7 * input * neuron.activity_trace;
                         self.cortical_weights[i][j] = self.cortical_weights[i][j].min(1.0);
                     }
                 }
@@ -438,7 +444,8 @@ impl BasolateralAmygdala {
         // Update pyramidal neurons
         for (i, neuron) in self.pyramidal_neurons.iter_mut().enumerate() {
             // Input from LA (sample subset for efficiency)
-            let la_current: f32 = la_activity.iter()
+            let la_current: f32 = la_activity
+                .iter()
                 .take(self.la_weights[i].len())
                 .zip(self.la_weights[i].iter())
                 .map(|(act, weight)| act * weight)
@@ -512,7 +519,8 @@ impl CentralLateral {
 
         for (i, neuron) in self.gaba_neurons.iter_mut().enumerate() {
             // Receive from BLA
-            let bla_input: f32 = bla_activity.iter()
+            let bla_input: f32 = bla_activity
+                .iter()
                 .take(self.bla_weights[i].len())
                 .zip(self.bla_weights[i].iter())
                 .map(|(act, weight)| act * weight)
@@ -571,7 +579,8 @@ impl CentralMedial {
 
         for (i, neuron) in self.output_neurons.iter_mut().enumerate() {
             // Excitatory input from LA/BLA
-            let excitation: f32 = la_activity.iter()
+            let excitation: f32 = la_activity
+                .iter()
                 .chain(bla_activity.iter())
                 .take(self.excitatory_weights[i].len())
                 .zip(self.excitatory_weights[i].iter())
@@ -579,7 +588,8 @@ impl CentralMedial {
                 .sum();
 
             // Inhibitory input from CeL
-            let inhibition: f32 = cel_inhibition.iter()
+            let inhibition: f32 = cel_inhibition
+                .iter()
                 .take(self.inhibitory_weights[i].len())
                 .zip(self.inhibitory_weights[i].iter())
                 .map(|(inh, weight)| inh * weight)
@@ -591,7 +601,7 @@ impl CentralMedial {
             if neuron.neuron.update(dt, net_current.max(0.0)) {
                 neuron.fear_output = 1.0;
             } else {
-                neuron.fear_output *= 0.9;  // Decay
+                neuron.fear_output *= 0.9; // Decay
             }
 
             total_fear += neuron.fear_output;
@@ -626,7 +636,7 @@ mod tests {
     fn test_amygdala_creation() {
         let amygdala = Amygdala::new(100);
         let stats = amygdala.stats();
-        assert_eq!(stats.total_neurons, 32000);  // 10k + 15k + 5k + 2k
+        assert_eq!(stats.total_neurons, 32000); // 10k + 15k + 5k + 2k
     }
 
     #[test]
@@ -642,15 +652,17 @@ mod tests {
 
         // Conditioning trials: CS + US
         for _ in 0..50 {
-            amygdala.update(1.0, &cs, 1.0, 0);  // US present
+            amygdala.update(1.0, &cs, 1.0, 0); // US present
         }
 
         // After conditioning: CS alone should produce fear
         let conditioned_fear = amygdala.update(1.0, &cs, 0.0, 0);
         println!("Conditioned fear: {}", conditioned_fear);
 
-        assert!(conditioned_fear > initial_fear,
-            "Fear should increase after conditioning");
+        assert!(
+            conditioned_fear > initial_fear,
+            "Fear should increase after conditioning"
+        );
     }
 
     #[test]
@@ -667,15 +679,20 @@ mod tests {
 
         // Extinction trials: CS without US
         for _ in 0..100 {
-            amygdala.update(1.0, &cs, 0.0, 0);  // No US
+            amygdala.update(1.0, &cs, 0.0, 0); // No US
         }
 
         let extinguished_fear = amygdala.update(1.0, &cs, 0.0, 0);
-        println!("Conditioned: {}, Extinguished: {}", conditioned_fear, extinguished_fear);
+        println!(
+            "Conditioned: {}, Extinguished: {}",
+            conditioned_fear, extinguished_fear
+        );
 
         // Fear should decrease (though may not reach zero)
-        assert!(extinguished_fear < conditioned_fear,
-            "Fear should decrease during extinction");
+        assert!(
+            extinguished_fear < conditioned_fear,
+            "Fear should decrease during extinction"
+        );
     }
 
     #[test]
@@ -700,8 +717,10 @@ mod tests {
         println!("Similar: {}, Different: {}", similar_fear, different_fear);
 
         // Should show generalization gradient
-        assert!(similar_fear > different_fear,
-            "Similar stimuli should produce more fear");
+        assert!(
+            similar_fear > different_fear,
+            "Similar stimuli should produce more fear"
+        );
     }
 
     #[test]
@@ -711,12 +730,12 @@ mod tests {
 
         // Conditioning in context A
         for _ in 0..50 {
-            amygdala.update(1.0, &cs, 1.0, 0);  // Context 0
+            amygdala.update(1.0, &cs, 1.0, 0); // Context 0
         }
 
         // Extinction in context B
         for _ in 0..100 {
-            amygdala.update(1.0, &cs, 0.0, 1);  // Context 1
+            amygdala.update(1.0, &cs, 0.0, 1); // Context 1
         }
 
         let fear_context_b = amygdala.update(1.0, &cs, 0.0, 1);
@@ -724,7 +743,10 @@ mod tests {
         // Return to context A (renewal)
         let fear_context_a = amygdala.update(1.0, &cs, 0.0, 0);
 
-        println!("Context B: {}, Context A: {}", fear_context_b, fear_context_a);
+        println!(
+            "Context B: {}, Context A: {}",
+            fear_context_b, fear_context_a
+        );
 
         // Context renewal: fear can return in original context
         // (This is a simplified test - full renewal requires context encoding)

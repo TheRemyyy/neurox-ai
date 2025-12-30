@@ -5,7 +5,6 @@
 
 use clap::{Parser, Subcommand};
 use neurox_ai::brain::NeuromorphicBrain;
-use neurox_ai::language::PartOfSpeech;
 use neurox_ai::solve::{ChemistrySolver, MathSolver};
 use neurox_ai::{CudaContext, VERSION};
 use rustyline::DefaultEditor;
@@ -14,22 +13,6 @@ use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
 
-/// Convert JSON POS string to PartOfSpeech enum
-fn pos_from_string(s: &str) -> PartOfSpeech {
-    match s.to_lowercase().as_str() {
-        "noun" => PartOfSpeech::Noun,
-        "verb" => PartOfSpeech::Verb,
-        "adjective" => PartOfSpeech::Adjective,
-        "adverb" => PartOfSpeech::Adverb,
-        "pronoun" => PartOfSpeech::Pronoun,
-        "preposition" => PartOfSpeech::Preposition,
-        "conjunction" => PartOfSpeech::Conjunction,
-        "interjection" => PartOfSpeech::Interjection,
-        "determiner" => PartOfSpeech::Determiner,
-        "particle" => PartOfSpeech::Particle,
-        _ => PartOfSpeech::Unknown,
-    }
-}
 #[derive(Parser)]
 #[command(name = "neurox-ai")]
 #[command(version = VERSION)]
@@ -95,7 +78,6 @@ const COLOR_GREEN: &str = "\x1b[32m";
 const COLOR_YELLOW: &str = "\x1b[33m";
 const COLOR_RED: &str = "\x1b[31m";
 const COLOR_MAGENTA: &str = "\x1b[35m";
-const COLOR_BLUE: &str = "\x1b[34m";
 const COLOR_GRAY: &str = "\x1b[90m";
 const COLOR_WHITE_BG: &str = "\x1b[47m\x1b[30m";
 const BOLD: &str = "\x1b[1m";

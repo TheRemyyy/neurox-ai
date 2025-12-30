@@ -22,7 +22,6 @@
 //! - October 2024 paper on electromagnetic coupling in SNNs
 
 use serde::{Deserialize, Serialize};
-use std::f32::consts::PI;
 
 /// Memristive synapse with electromagnetic coupling
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -40,19 +39,19 @@ pub struct MemristiveSynapse {
     pub charge: f32,
 
     /// Memristor parameters
-    pub m_min: f32,        // Minimum memristance (Ω)
-    pub m_max: f32,        // Maximum memristance (Ω)
-    pub alpha: f32,        // Learning rate for memristance increase
-    pub beta: f32,         // Current exponent (nonlinearity)
-    pub gamma: f32,        // Decay rate
-    pub delta: f32,        // Memristance exponent
+    pub m_min: f32, // Minimum memristance (Ω)
+    pub m_max: f32, // Maximum memristance (Ω)
+    pub alpha: f32, // Learning rate for memristance increase
+    pub beta: f32,  // Current exponent (nonlinearity)
+    pub gamma: f32, // Decay rate
+    pub delta: f32, // Memristance exponent
 
     /// Electromagnetic coupling
-    pub coupling_strength: f32,  // Field coupling coefficient
-    pub coupling_length: f32,    // Spatial coupling length (μm)
+    pub coupling_strength: f32, // Field coupling coefficient
+    pub coupling_length: f32, // Spatial coupling length (μm)
 
     /// Neuron positions for field calculation
-    pub pre_position: (f32, f32, f32),   // 3D position
+    pub pre_position: (f32, f32, f32), // 3D position
     pub post_position: (f32, f32, f32),
 
     /// Statistics
@@ -70,17 +69,17 @@ impl MemristiveSynapse {
     pub fn new(weight: f32, pre_pos: (f32, f32, f32), post_pos: (f32, f32, f32)) -> Self {
         Self {
             weight,
-            memristance: 1000.0,    // Initial memristance (1kΩ)
+            memristance: 1000.0, // Initial memristance (1kΩ)
             flux: 0.0,
             charge: 0.0,
 
             // Memristor parameters (from Strukov et al. 2008)
-            m_min: 100.0,           // Min 100Ω
-            m_max: 10000.0,         // Max 10kΩ
-            alpha: 0.1,             // Learning rate
-            beta: 2.0,              // Quadratic current dependence
-            gamma: 0.01,            // Slow decay
-            delta: 1.0,             // Linear decay
+            m_min: 100.0,   // Min 100Ω
+            m_max: 10000.0, // Max 10kΩ
+            alpha: 0.1,     // Learning rate
+            beta: 2.0,      // Quadratic current dependence
+            gamma: 0.01,    // Slow decay
+            delta: 1.0,     // Linear decay
 
             // EM coupling parameters
             coupling_strength: 0.1,
@@ -140,7 +139,8 @@ impl MemristiveSynapse {
 
         // Memristance update (5D dynamics)
         // dM/dt = α·|I|^β - γ·M^δ
-        let dm_dt = self.alpha * current.abs().powf(self.beta) - self.gamma * self.memristance.powf(self.delta);
+        let dm_dt = self.alpha * current.abs().powf(self.beta)
+            - self.gamma * self.memristance.powf(self.delta);
         self.memristance += dm_dt * dt;
 
         // Clamp memristance to valid range
@@ -297,9 +297,16 @@ impl MemristiveNetwork {
             };
         }
 
-        let avg_memristance = self.synapses.iter().map(|s| s.memristance).sum::<f32>() / self.synapses.len() as f32;
-        let avg_weight = self.synapses.iter().map(|s| s.weight).sum::<f32>() / self.synapses.len() as f32;
-        let avg_em_coupling = self.synapses.iter().map(|s| s.em_field_coupling()).sum::<f32>() / self.synapses.len() as f32;
+        let avg_memristance =
+            self.synapses.iter().map(|s| s.memristance).sum::<f32>() / self.synapses.len() as f32;
+        let avg_weight =
+            self.synapses.iter().map(|s| s.weight).sum::<f32>() / self.synapses.len() as f32;
+        let avg_em_coupling = self
+            .synapses
+            .iter()
+            .map(|s| s.em_field_coupling())
+            .sum::<f32>()
+            / self.synapses.len() as f32;
 
         MemristiveNetworkStats {
             num_synapses: self.synapses.len(),
@@ -344,9 +351,12 @@ mod tests {
         let far = MemristiveSynapse::new(0.5, (0.0, 0.0, 0.0), (1.0, 0.0, 0.0));
         let far_coupling = far.em_field_coupling();
 
-        assert!(close_coupling > far_coupling,
+        assert!(
+            close_coupling > far_coupling,
             "Close neurons should have stronger coupling (close={}, far={})",
-            close_coupling, far_coupling);
+            close_coupling,
+            far_coupling
+        );
     }
 
     #[test]
@@ -355,7 +365,7 @@ mod tests {
         let initial_m = synapse.memristance;
 
         let dt = 0.1;
-        let v_pre = 10.0;  // Pre-synaptic voltage
+        let v_pre = 10.0; // Pre-synaptic voltage
         let v_post = -70.0; // Post-synaptic voltage
 
         // Apply voltage difference
@@ -364,9 +374,11 @@ mod tests {
         }
 
         // Memristance should change
-        assert_ne!(synapse.memristance, initial_m,
+        assert_ne!(
+            synapse.memristance, initial_m,
             "Memristance should update (initial={}, final={})",
-            initial_m, synapse.memristance);
+            initial_m, synapse.memristance
+        );
     }
 
     #[test]
@@ -376,7 +388,10 @@ mod tests {
 
         // Voltage difference should generate current
         let current = synapse.update(dt, 10.0, -70.0, None);
-        assert!(current.abs() > 0.0, "Voltage difference should generate current");
+        assert!(
+            current.abs() > 0.0,
+            "Voltage difference should generate current"
+        );
     }
 
     #[test]
@@ -386,11 +401,17 @@ mod tests {
 
         // LTP: post after pre (positive dt)
         synapse.stdp_update(10.0, 0.01);
-        assert!(synapse.weight > initial_weight, "Causal pairing should increase weight");
+        assert!(
+            synapse.weight > initial_weight,
+            "Causal pairing should increase weight"
+        );
 
         // LTD: pre after post (negative dt)
         synapse.stdp_update(-10.0, 0.01);
-        assert!(synapse.weight < initial_weight + 0.01, "Anti-causal should decrease weight");
+        assert!(
+            synapse.weight < initial_weight + 0.01,
+            "Anti-causal should decrease weight"
+        );
     }
 
     #[test]
@@ -441,9 +462,13 @@ mod tests {
         }
 
         // Memristance should stay within bounds
-        assert!(synapse.memristance >= synapse.m_min,
-            "Memristance should not go below minimum");
-        assert!(synapse.memristance <= synapse.m_max,
-            "Memristance should not exceed maximum");
+        assert!(
+            synapse.memristance >= synapse.m_min,
+            "Memristance should not go below minimum"
+        );
+        assert!(
+            synapse.memristance <= synapse.m_max,
+            "Memristance should not exceed maximum"
+        );
     }
 }

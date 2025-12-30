@@ -11,7 +11,7 @@
 //! - Recurrent inhibition (parallel reduction)
 //! - Non-max suppression (parallel scan)
 
-use cudarc::driver::{CudaDevice, CudaFunction, LaunchAsync, CudaSlice};
+use cudarc::driver::{CudaDevice, CudaFunction, CudaSlice, LaunchAsync};
 use std::sync::Arc;
 
 /// Gabor filter kernel - computes oriented edge responses
@@ -214,7 +214,9 @@ impl GpuV1OrientationSystem {
 
         let inhibition_ptx = cudarc::nvrtc::compile_ptx(RECURRENT_INHIBITION_KERNEL)?;
         device.load_ptx(inhibition_ptx, "v1_inhibition", &["recurrent_inhibition"])?;
-        let inhibition_kernel = device.get_func("v1_inhibition", "recurrent_inhibition").unwrap();
+        let inhibition_kernel = device
+            .get_func("v1_inhibition", "recurrent_inhibition")
+            .unwrap();
 
         let nms_ptx = cudarc::nvrtc::compile_ptx(NON_MAX_SUPPRESSION_KERNEL)?;
         device.load_ptx(nms_ptx, "v1_nms", &["non_max_suppression"])?;
@@ -225,8 +227,16 @@ impl GpuV1OrientationSystem {
         let orientation_buffer = device.alloc_zeros::<f32>(width * height * n_orientations)?;
         let output_buffer = device.alloc_zeros::<f32>(width * height * n_orientations)?;
 
-        log::info!("  GPU V1 initialized: {}×{}×{} orientations", width, height, n_orientations);
-        log::info!("  GPU memory: {:.1} MB", (width * height * n_orientations * 8) as f32 / 1_000_000.0);
+        log::info!(
+            "  GPU V1 initialized: {}×{}×{} orientations",
+            width,
+            height,
+            n_orientations
+        );
+        log::info!(
+            "  GPU memory: {:.1} MB",
+            (width * height * n_orientations * 8) as f32 / 1_000_000.0
+        );
 
         Ok(Self {
             device,
@@ -245,12 +255,11 @@ impl GpuV1OrientationSystem {
     /// Process input image on GPU - returns orientation energy map
     pub fn process(
         &mut self,
-        input: &[f32],  // Flattened [width × height]
+        input: &[f32], // Flattened [width × height]
     ) -> Result<Vec<f32>, Box<dyn std::error::Error>> {
-        use cudarc::driver::DeviceSlice;
-
         // Upload input to GPU
-        self.device.htod_copy_into(input.to_vec(), &mut self.input_buffer)?;
+        self.device
+            .htod_copy_into(input.to_vec(), &mut self.input_buffer)?;
 
         // 1. Gabor filtering (parallel across all neurons)
         let total_neurons = self.width * self.height * self.n_orientations;
@@ -263,8 +272,8 @@ impl GpuV1OrientationSystem {
             self.width as i32,
             self.height as i32,
             self.n_orientations as i32,
-            0.1f32,  // spatial_freq
-            11i32,   // rf_size
+            0.1f32, // spatial_freq
+            11i32,  // rf_size
         );
 
         unsafe {
@@ -287,7 +296,7 @@ impl GpuV1OrientationSystem {
             self.width as i32,
             self.height as i32,
             self.n_orientations as i32,
-            2.0f32,  // inhibition_strength
+            2.0f32, // inhibition_strength
         );
 
         unsafe {
@@ -308,7 +317,7 @@ impl GpuV1OrientationSystem {
             self.width as i32,
             self.height as i32,
             self.n_orientations as i32,
-            0.3f32,  // threshold
+            0.3f32, // threshold
         );
 
         unsafe {
@@ -324,7 +333,8 @@ impl GpuV1OrientationSystem {
 
         // Download result from GPU
         let mut output = vec![0.0f32; total_neurons];
-        self.device.dtoh_sync_copy_into(&self.output_buffer, &mut output)?;
+        self.device
+            .dtoh_sync_copy_into(&self.output_buffer, &mut output)?;
 
         Ok(output)
     }
@@ -348,13 +358,14 @@ mod tests {
                 // CudaDevice::new already returns Arc<CudaDevice>
                 let mut v1 = GpuV1OrientationSystem::new(
                     device.clone(),
-                    128,  // width
-                    128,  // height
-                    4,    // n_orientations
-                ).expect("Failed to create GPU V1");
+                    128, // width
+                    128, // height
+                    4,   // n_orientations
+                )
+                .expect("Failed to create GPU V1");
 
                 // Test with random input
-                let input: Vec<f32> = (0..128*128).map(|i| (i % 100) as f32 / 100.0).collect();
+                let input: Vec<f32> = (0..128 * 128).map(|i| (i % 100) as f32 / 100.0).collect();
 
                 let output = v1.process(&input).expect("Failed to process");
 
@@ -362,7 +373,11 @@ mod tests {
 
                 // Check that some outputs are non-zero (orientation responses)
                 let non_zero = output.iter().filter(|&&x| x > 0.01).count();
-                assert!(non_zero > 100, "Expected orientation responses, got {} non-zero", non_zero);
+                assert!(
+                    non_zero > 100,
+                    "Expected orientation responses, got {} non-zero",
+                    non_zero
+                );
 
                 eprintln!("GPU V1 test passed! {} non-zero responses", non_zero);
                 eprintln!("Memory usage: {:.1} MB", v1.memory_usage_mb());

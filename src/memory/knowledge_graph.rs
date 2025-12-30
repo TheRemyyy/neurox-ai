@@ -504,7 +504,7 @@ impl KnowledgeGraph {
     /// Decay salience of all entities
     pub fn decay_salience(&mut self, decay_rate: f32) {
         for entity in self.entities.values_mut() {
-            entity.salience *= (1.0 - decay_rate);
+            entity.salience *= 1.0 - decay_rate;
         }
     }
 

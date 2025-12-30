@@ -39,7 +39,6 @@ use crate::cuda::{
 };
 use crate::language::{
     AnnotatedWord, DualStreamLanguage, DualStreamStats, IFGSyntacticPlanner, IntentType, Lexicon,
-    PartOfSpeech,
 };
 use crate::learning::{
     HeterosynapticPlasticity, HeterosynapticStats, HomeostaticStats, HomeostaticSystem,
@@ -52,7 +51,7 @@ use crate::semantics::SemanticSystem;
 use crate::spatial::SpatialSystem;
 
 // Human-limit upgrade imports (2025)
-use crate::affect::{Emotion, EmotionalStateMachine};
+use crate::affect::EmotionalStateMachine;
 use crate::cognition::{
     InnerDialogue, Metacognition as CognitionMetacognition, SelfModel, TheoryOfMind,
 };

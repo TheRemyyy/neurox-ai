@@ -27,7 +27,6 @@
 //! - October 2024 paper on SC topographic mapping
 
 use serde::{Deserialize, Serialize};
-use std::f32::consts::PI;
 
 /// Superior Colliculus layers
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -75,7 +74,9 @@ impl SCNeuron {
         let x_centered = (map_x - 0.5) * 2.0; // -1 to 1
         let y_centered = (map_y - 0.5) * 2.0;
 
-        let r = k * (std::f32::consts::E + (x_centered * x_centered + y_centered * y_centered).sqrt()).ln();
+        let r = k
+            * (std::f32::consts::E + (x_centered * x_centered + y_centered * y_centered).sqrt())
+                .ln();
         let theta = y_centered.atan2(x_centered);
 
         let rf_x = r * theta.cos();
@@ -267,7 +268,9 @@ impl SuperiorColliculus {
             let col = i % self.map_width;
 
             let ior_suppression = self.ior_map[row][col];
-            let input = self.intermediate_neurons[i].activity * (1.0 - ior_suppression) * (1.0 - self.omnipause_activity);
+            let input = self.intermediate_neurons[i].activity
+                * (1.0 - ior_suppression)
+                * (1.0 - self.omnipause_activity);
 
             self.deep_neurons[i].update(input, dt);
         }
@@ -315,7 +318,9 @@ impl SuperiorColliculus {
 
         // Update statistics
         self.total_saccades += 1;
-        self.avg_saccade_amplitude = (self.avg_saccade_amplitude * (self.total_saccades - 1) as f32 + amplitude) / self.total_saccades as f32;
+        self.avg_saccade_amplitude =
+            (self.avg_saccade_amplitude * (self.total_saccades - 1) as f32 + amplitude)
+                / self.total_saccades as f32;
     }
 
     /// Trigger saccade from peak deep layer activity
@@ -358,7 +363,10 @@ impl SuperiorColliculus {
                 // Convert to RF coordinates
                 let x_centered = (map_x - 0.5) * 2.0;
                 let y_centered = (map_y - 0.5) * 2.0;
-                let r = k * (std::f32::consts::E + (x_centered * x_centered + y_centered * y_centered).sqrt()).ln();
+                let r = k
+                    * (std::f32::consts::E
+                        + (x_centered * x_centered + y_centered * y_centered).sqrt())
+                    .ln();
                 let theta = y_centered.atan2(x_centered);
                 let rf_x = r * theta.cos();
                 let rf_y = r * theta.sin();
@@ -381,7 +389,10 @@ impl SuperiorColliculus {
             // Interpolate during saccade
             let (amplitude, direction) = self.saccade_vector;
             let current_amplitude = amplitude * self.saccade_progress;
-            (current_amplitude * direction.cos(), current_amplitude * direction.sin())
+            (
+                current_amplitude * direction.cos(),
+                current_amplitude * direction.sin(),
+            )
         } else {
             (0.0, 0.0) // Fixation at center
         }
@@ -389,10 +400,18 @@ impl SuperiorColliculus {
 
     /// Get statistics
     pub fn stats(&self) -> SCStats {
-        let total_neurons = self.superficial_neurons.len() + self.intermediate_neurons.len() + self.deep_neurons.len();
+        let total_neurons = self.superficial_neurons.len()
+            + self.intermediate_neurons.len()
+            + self.deep_neurons.len();
 
-        let superficial_activity = self.superficial_neurons.iter().map(|n| n.activity).sum::<f32>() / self.superficial_neurons.len() as f32;
-        let deep_activity = self.deep_neurons.iter().map(|n| n.activity).sum::<f32>() / self.deep_neurons.len() as f32;
+        let superficial_activity = self
+            .superficial_neurons
+            .iter()
+            .map(|n| n.activity)
+            .sum::<f32>()
+            / self.superficial_neurons.len() as f32;
+        let deep_activity = self.deep_neurons.iter().map(|n| n.activity).sum::<f32>()
+            / self.deep_neurons.len() as f32;
 
         SCStats {
             total_neurons,
@@ -440,7 +459,11 @@ mod tests {
         sc.process_visual_input(5.0, 5.0, 1.0);
 
         // Some superficial neurons should respond
-        let max_activity = sc.superficial_neurons.iter().map(|n| n.activity).fold(0.0, f32::max);
+        let max_activity = sc
+            .superficial_neurons
+            .iter()
+            .map(|n| n.activity)
+            .fold(0.0, f32::max);
         assert!(max_activity > 0.0, "Visual input should activate neurons");
     }
 
@@ -501,7 +524,10 @@ mod tests {
             sc.update(0.1);
         }
 
-        assert!(sc.omnipause_activity < 0.5, "Omnipause should decrease during saccade");
+        assert!(
+            sc.omnipause_activity < 0.5,
+            "Omnipause should decrease during saccade"
+        );
     }
 
     #[test]

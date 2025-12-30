@@ -48,15 +48,15 @@ pub struct PVInterneuron {
 impl PVInterneuron {
     pub fn new(id: u32) -> Self {
         let mut state = NeuronState::new(id);
-        state.tau_m = 10.0;  // Fast
-        state.threshold = -50.0;  // High threshold
+        state.tau_m = 10.0; // Fast
+        state.threshold = -50.0; // High threshold
         state.v_reset = -65.0;
 
         Self {
             state,
             tau_m: 10.0,
             high_threshold: -50.0,
-            somatic_weight: 1.5,  // Strong inhibition
+            somatic_weight: 1.5, // Strong inhibition
             adaptation: 0.0,
             spike_count: 0,
             last_gamma_phase: 0.0,
@@ -78,7 +78,7 @@ impl PVInterneuron {
         // Check spike
         if self.state.v >= self.high_threshold {
             self.state.v = self.state.v_reset;
-            self.state.refractory_counter = 10;  // 1ms @ 0.1ms timestep
+            self.state.refractory_counter = 10; // 1ms @ 0.1ms timestep
             self.spike_count += 1;
             true
         } else {
@@ -96,11 +96,8 @@ impl PVInterneuron {
 
     /// Winner-take-all: suppress all but top-k neurons
     pub fn apply_wta_inhibition(&self, neuron_activities: &mut [f32], k: usize) {
-        let mut indexed: Vec<(usize, f32)> = neuron_activities
-            .iter()
-            .copied()
-            .enumerate()
-            .collect();
+        let mut indexed: Vec<(usize, f32)> =
+            neuron_activities.iter().copied().enumerate().collect();
 
         indexed.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
@@ -141,7 +138,7 @@ pub struct SSTInterneuron {
 impl SSTInterneuron {
     pub fn new(id: u32) -> Self {
         let mut state = NeuronState::new(id);
-        state.tau_m = 50.0;  // Slower
+        state.tau_m = 50.0; // Slower
         state.threshold = -55.0;
         state.v_reset = -70.0;
 
@@ -176,7 +173,7 @@ impl SSTInterneuron {
         // Check spike
         if self.state.v >= self.state.threshold {
             self.state.v = self.state.v_reset;
-            self.state.refractory_counter = 20;  // 2ms
+            self.state.refractory_counter = 20; // 2ms
 
             // Increase adaptation (causes firing rate adaptation)
             self.adaptation_current += self.adaptation_strength;
@@ -276,9 +273,9 @@ impl VIPInterneuron {
             // VIP suppresses SST and PV, reducing their inhibition
             let reduced_pv = pv_inhibition * (1.0 - self.disinhibition_strength);
             let reduced_sst = sst_inhibition * (1.0 - self.disinhibition_strength);
-            -(reduced_pv + reduced_sst)  // Net disinhibition
+            -(reduced_pv + reduced_sst) // Net disinhibition
         } else {
-            -(pv_inhibition + sst_inhibition)  // Full inhibition
+            -(pv_inhibition + sst_inhibition) // Full inhibition
         }
     }
 
@@ -331,13 +328,13 @@ impl InterneuronCircuit {
             sst_neurons,
             vip_neurons,
             gamma_phase: 0.0,
-            gamma_freq: 40.0,  // 40Hz gamma
+            gamma_freq: 40.0, // 40Hz gamma
         }
     }
 
     /// Update gamma oscillation
     pub fn update_gamma(&mut self, dt: f32) {
-        let delta_phase = self.gamma_freq * dt / 1000.0;  // dt in ms
+        let delta_phase = self.gamma_freq * dt / 1000.0; // dt in ms
         self.gamma_phase += delta_phase;
         self.gamma_phase %= 1.0;
     }
@@ -351,17 +348,21 @@ impl InterneuronCircuit {
         let pv_inhibition = (pv_active as f32 / self.pv_neurons.len() as f32) * 1.5;
 
         // SST: Dendritic inhibition
-        let sst_active = self.sst_neurons.iter().filter(|n| n.state.v > -60.0).count();
+        let sst_active = self
+            .sst_neurons
+            .iter()
+            .filter(|n| n.state.v > -60.0)
+            .count();
         let sst_inhibition = (sst_active as f32 / self.sst_neurons.len() as f32) * 1.0;
 
         // VIP: Disinhibition
         let vip_active = self.vip_neurons.iter().any(|n| n.state.v > -60.0);
 
         // Apply to each pyramidal neuron
-        for (i, inh) in inhibition.iter_mut().enumerate() {
+        for (_i, inh) in inhibition.iter_mut().enumerate() {
             // PV creates gamma-phase dependent inhibition
-            let gamma_modulated_pv = pv_inhibition *
-                (1.0 + 0.5 * (self.gamma_phase * 2.0 * std::f32::consts::PI).cos());
+            let gamma_modulated_pv =
+                pv_inhibition * (1.0 + 0.5 * (self.gamma_phase * 2.0 * std::f32::consts::PI).cos());
 
             // VIP disinhibits by suppressing PV and SST
             if vip_active {
@@ -385,8 +386,16 @@ impl InterneuronCircuit {
     /// Get circuit statistics
     pub fn stats(&self) -> InterneuronStats {
         let pv_active = self.pv_neurons.iter().filter(|n| n.state.v > -60.0).count();
-        let sst_active = self.sst_neurons.iter().filter(|n| n.state.v > -60.0).count();
-        let vip_active = self.vip_neurons.iter().filter(|n| n.state.v > -60.0).count();
+        let sst_active = self
+            .sst_neurons
+            .iter()
+            .filter(|n| n.state.v > -60.0)
+            .count();
+        let vip_active = self
+            .vip_neurons
+            .iter()
+            .filter(|n| n.state.v > -60.0)
+            .count();
 
         InterneuronStats {
             n_pv: self.pv_neurons.len(),
@@ -430,7 +439,7 @@ mod tests {
         }
 
         // Should achieve >100Hz with strong input
-        assert!(spike_count > 10);  // >100Hz for 100ms
+        assert!(spike_count > 10); // >100Hz for 100ms
     }
 
     #[test]
