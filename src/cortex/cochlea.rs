@@ -60,20 +60,20 @@ impl GammatoneFilter {
         // Coefficients for complex resonator
         let exp_b = (-two_pi_b_t).exp();
         let cos_f = two_pi_f_t.cos();
-        let sin_f = two_pi_f_t.sin();
+        let _sin_f = two_pi_f_t.sin();
 
         // We implement 4th order gammatone as cascade of 4 complex one-pole filters
         // Real-valued implementation approximates this.
         // Simplified IIR coefficients for stability:
         let a1 = -2.0 * exp_b * cos_f;
         let a2 = exp_b * exp_b;
-        
+
         let b0 = t;
         let b1 = 0.0;
         let b2 = 0.0;
 
         // Calculate gain at center frequency to normalize to unity
-        // H(z) at f_c should be 1.0. 
+        // H(z) at f_c should be 1.0.
         // For simplicity in this simulation, we use an empirical gain factor scaling with frequency
         let gain = 2.0 * (PI * b).powi(4) / sample_rate.powi(4); // Scaling factor
 
@@ -100,14 +100,13 @@ impl GammatoneFilter {
         for i in 0..4 {
             // Difference equation: y[n] = b0*x[n] - a1*y[n-1] - a2*y[n-2]
             // Note: Simple resonator implementation
-            let output = self.b0 * input 
-                       - self.a1 * self.state_y[i][0] 
-                       - self.a2 * self.state_y[i][1];
+            let output =
+                self.b0 * input - self.a1 * self.state_y[i][0] - self.a2 * self.state_y[i][1];
 
             // Update state
             self.state_x[i][1] = self.state_x[i][0];
             self.state_x[i][0] = input;
-            
+
             self.state_y[i][1] = self.state_y[i][0];
             self.state_y[i][0] = output;
 
@@ -161,11 +160,11 @@ impl InnerHairCell {
         // 3. Calcium / Neurotransmitter Release
         // Voltage dependent calcium channels
         let ca_open = 1.0 / (1.0 + (-(self.potential + 40.0) / 5.0).exp());
-        
+
         // Transmitter depletion
         let release_rate = 5.0 * ca_open * self.transmitter; // kHz
         let replenishment = 0.5 * (1.0 - self.transmitter);
-        
+
         let d_transmitter = (replenishment - release_rate * 0.001) * dt; // dt in ms
         self.transmitter += d_transmitter;
         self.transmitter = self.transmitter.clamp(0.0, 1.0);
@@ -203,7 +202,7 @@ impl NeuromorphicCochlea {
             // Linear spacing on ERB scale
             // simplified log spacing for now:
             let f = min_freq * (max_freq / min_freq).powf(i as f32 / (n_channels - 1) as f32);
-            
+
             filters.push(GammatoneFilter::new(f, sample_rate));
             ihcs.push(InnerHairCell::new());
         }
@@ -254,7 +253,10 @@ impl NeuromorphicCochlea {
 
     /// Get current energy in each band (for visualization/stats)
     pub fn energy(&self) -> Vec<f32> {
-        self.ihcs.iter().map(|ihc| (ihc.potential + 60.0).max(0.0)).collect()
+        self.ihcs
+            .iter()
+            .map(|ihc| (ihc.potential + 60.0).max(0.0))
+            .collect()
     }
 }
 
@@ -265,7 +267,7 @@ mod tests {
     #[test]
     fn test_gammatone_filter() {
         let mut filter = GammatoneFilter::new(1000.0, 44100.0);
-        
+
         // Sine wave at center freq
         let mut max_out = 0.0;
         for i in 0..1000 {
@@ -284,29 +286,35 @@ mod tests {
     #[test]
     fn test_ihc_transduction() {
         let mut ihc = InnerHairCell::new();
-        
+
         // Silence
         let prob_silence = ihc.process(0.0, 0.1);
-        
+
         // Loud sound (rectification check)
         // Positive displacement
         let prob_loud_pos = ihc.process(1.0, 0.1);
-        
+
         // Negative displacement (should be lower due to rectification)
         ihc = InnerHairCell::new(); // reset
         let prob_loud_neg = ihc.process(-1.0, 0.1);
 
-        assert!(prob_loud_pos > prob_silence, "Sound should increase firing prob");
-        assert!(prob_loud_pos > prob_loud_neg, "Rectification should favor one direction");
+        assert!(
+            prob_loud_pos > prob_silence,
+            "Sound should increase firing prob"
+        );
+        assert!(
+            prob_loud_pos > prob_loud_neg,
+            "Rectification should favor one direction"
+        );
     }
 
     #[test]
     fn test_cochlea_channels() {
         let mut cochlea = NeuromorphicCochlea::new(10, 16000.0, 100.0, 5000.0);
-        
+
         assert_eq!(cochlea.filters.len(), 10);
         assert_eq!(cochlea.ihcs.len(), 10);
-        
+
         // Low frequency tone
         for i in 0..100 {
             let t = i as f32 / 16000.0;
@@ -314,7 +322,7 @@ mod tests {
             let spikes = cochlea.process(input, 0.1);
             assert_eq!(spikes.len(), 10);
         }
-        
+
         // Check frequencies are ordered
         let freqs = cochlea.frequencies();
         assert!(freqs[0] < freqs[9]);

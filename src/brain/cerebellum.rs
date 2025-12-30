@@ -332,7 +332,7 @@ impl CerebellarHemisphere {
         let mut mli_activity = vec![false; self.molecular_interneurons.len()];
         for mli in &mut self.molecular_interneurons {
             // Receive from parallel fibers (granule cells)
-            let mut input = granule_spikes.iter().filter(|&&s| s).count() as f32 * 0.01;
+            let input = granule_spikes.iter().filter(|&&s| s).count() as f32 * 0.01;
             if mli.neuron.update(dt, input) {
                 mli_activity[mli.id] = true;
             }

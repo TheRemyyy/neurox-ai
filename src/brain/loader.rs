@@ -69,11 +69,7 @@ impl BrainLoader {
             annotated.neuro_impact = vocab_word.neuro_impact.clone();
 
             brain.lexicon.add_word(annotated);
-            brain
-                .language
-                .ventral
-                .embeddings
-                .add_word(vocab_word.word.clone());
+            brain.language.ventral.embeddings.add_word(&vocab_word.word);
         }
 
         // === STEP 2: Load sentence templates into IFG ===
@@ -197,40 +193,77 @@ impl BrainLoader {
 
         // === STEP 5: Train supervised pairs for semantic learning ===
         let total = dataset.pairs.len();
-        let bar_width = 30;
 
         if total > 0 {
             println!("  Training supervised pairs...");
         }
 
+        // OPTIMIZED: Process in batches with minimal biological simulation
+        let progress_bar = indicatif::ProgressBar::new(total as u64);
+        progress_bar.set_style(
+            indicatif::ProgressStyle::default_bar()
+                .template("  [{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}")
+                .unwrap()
+                .progress_chars("##-"),
+        );
+        progress_bar.set_message("Training pairs");
+
         for (i, pair) in dataset.pairs.iter().enumerate() {
-            // Supervised learning (semantic vectors, hippocampus, etc.)
-            // Optimized: Use batch method and run simulation only periodically
+            // Ensure words are in lexicon for word-by-word generation fallback
+            let mut ensure_lexicon = |text: &str| {
+                for word in text.split_whitespace() {
+                    let clean: String = word
+                        .to_lowercase()
+                        .chars()
+                        .filter(|c| c.is_alphanumeric())
+                        .collect();
+                    if !clean.is_empty() && brain.lexicon.get_by_text(&clean).is_none() {
+                        brain.lexicon.add_word(crate::language::AnnotatedWord::new(
+                            &clean,
+                            PartOfSpeech::Unknown,
+                        ));
+                    }
+                }
+            };
+            ensure_lexicon(&pair.input);
+            if let Some(ref output) = pair.output {
+                ensure_lexicon(output);
+            }
+
+            // Supervised learning (semantic vectors, hippocampus, assoc, dorsal)
             brain.train_supervised_batch(&pair.input, pair.output.as_deref(), pair.reward);
 
-            // Run full biological simulation only every 50 items to speed up loading
-            if (i + 1) % 50 == 0 {
+            // Run biological simulation periodically to keep state consistent
+            // 100 is a good balance for quality vs performance
+            if (i + 1) % 100 == 0 {
                 brain.update(0.1);
             }
 
-            // Apply emotional impact
-            brain.apply_emotional_impact(&pair.input);
+            // Apply emotional impact periodically to maintain neurochemical state
+            if (i + 1) % 50 == 0 {
+                brain.apply_emotional_impact(&pair.input);
+                if let Some(ref output) = pair.output {
+                    brain.apply_emotional_impact(output);
+                }
+            }
+
             if let Some(ref output) = pair.output {
-                brain.apply_emotional_impact(output);
-
-                // Store learned response for retrieval
+                // Register as potentially learned response
                 if pair.reward > 0.0 {
-                    let input_intent = brain.detect_intent(&pair.input);
-                    // Simplified logic for response intent (could be improved)
-                    let response_intent_type = match input_intent {
-                        IntentType::Greeting => IntentType::Greeting,
-                        IntentType::Question => IntentType::Response,
-                        _ => IntentType::Response,
-                    };
-
-                    let intent_str = match response_intent_type {
-                        IntentType::Greeting => "greeting",
-                        IntentType::Response => "response",
+                    // Map category to response intent for generate_sentence lookup
+                    let category = pair.category.as_deref().unwrap_or("response");
+                    let intent_str = match category {
+                        "greeting" => "greeting",
+                        "farewell" => "farewell",
+                        "thanks" => "thanks",
+                        "emotional" => "emotional",
+                        "insult" => "insult",
+                        // Most categories map to generic "response" for statement/question replies
+                        "small_talk" | "identity" | "preferences" | "reaction" | "confirmation"
+                        | "uncertainty" | "help" | "opinion" | "clarification" | "world"
+                        | "humor" | "personal" | "knowledge" | "future" | "culture" | "meta"
+                        | "agreement" | "disagreement" | "pause" | "philosophy" | "tech"
+                        | "weather" | "request" | "meta_ai" | "response" => "response",
                         _ => "response",
                     };
 
@@ -267,23 +300,11 @@ impl BrainLoader {
                     }
                 }
             }
-
-            // Progress bar
-            if (i + 1) % 10 == 0 || i == total - 1 {
-                let progress = (i + 1) as f32 / total as f32;
-                let filled = (progress * bar_width as f32) as usize;
-                let empty = bar_width - filled;
-                print!(
-                    "\r  [{}{}] {}/{} ({:.0}%)",
-                    "█".repeat(filled),
-                    "░".repeat(empty),
-                    i + 1,
-                    total,
-                    progress * 100.0
-                );
-                stdout().flush().unwrap();
-            }
+            progress_bar.inc(1);
         }
+
+        progress_bar.finish_with_message("Training complete");
+        brain.update(1.0); // Final deep update to settle state
 
         if total > 0 {
             println!();
@@ -305,7 +326,7 @@ impl BrainLoader {
         );
 
         for word in &dataset.idx_to_word {
-            brain.language.ventral.embeddings.add_word(word.clone());
+            brain.language.ventral.embeddings.add_word(word);
         }
 
         let pairs = dataset.generate_skipgram_pairs();

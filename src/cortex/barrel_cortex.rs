@@ -27,8 +27,8 @@
 //! - Surround suppression
 //! - Direction selectivity
 
-use serde::{Deserialize, Serialize};
 use crate::neuron::{lif::LIFNeuron, Neuron};
+use serde::{Deserialize, Serialize};
 
 /// Barrel cortex somatosensory system
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -44,7 +44,7 @@ pub struct BarrelCortex {
     pub n_cols: usize,
 
     /// Global modulatory signals
-    pub arousal_level: f32,      // 0-1 (norepinephrine/acetylcholine)
+    pub arousal_level: f32, // 0-1 (norepinephrine/acetylcholine)
     pub attention_focus: (usize, usize), // (row, col) attended barrel
 }
 
@@ -277,7 +277,8 @@ impl CorticalBarrel {
         // VIP reduces SST activity (disinhibition)
         sst_inhibition *= (1.0 - vip_to_sst * 0.5).max(0.0);
 
-        self.layer2_3.update(&l4_output, pv_inhibition, sst_inhibition, self.gain, dt);
+        self.layer2_3
+            .update(&l4_output, pv_inhibition, sst_inhibition, self.gain, dt);
 
         // L2/3 → L5
         let l23_output = self.layer2_3.get_output();
@@ -332,7 +333,10 @@ impl Layer4 {
 
     pub fn get_output(&self) -> Vec<f32> {
         // Check if neurons spiked recently based on their last_spike timing
-        self.neurons.iter().map(|n| if n.state.last_spike > 0 { 1.0 } else { 0.0 }).collect()
+        self.neurons
+            .iter()
+            .map(|n| if n.state.last_spike > 0 { 1.0 } else { 0.0 })
+            .collect()
     }
 }
 
@@ -368,7 +372,8 @@ impl Layer2_3 {
             let ff_input: f32 = l4_input.iter().take(20).sum::<f32>() / 20.0; // Pool 20 L4 neurons
 
             // Total input with gain modulation
-            let total_input = (ff_input * gain - pv_inhibition * 0.5 - sst_inhibition * 0.3).max(0.0);
+            let total_input =
+                (ff_input * gain - pv_inhibition * 0.5 - sst_inhibition * 0.3).max(0.0);
 
             let input_current = total_input * 5.0;
             neuron.update(dt, input_current);
@@ -383,11 +388,18 @@ impl Layer2_3 {
     }
 
     pub fn get_output(&self) -> Vec<f32> {
-        self.neurons.iter().map(|n| if n.state.last_spike > 0 { 1.0 } else { 0.0 }).collect()
+        self.neurons
+            .iter()
+            .map(|n| if n.state.last_spike > 0 { 1.0 } else { 0.0 })
+            .collect()
     }
 
     pub fn get_population_rate(&self) -> f32 {
-        let spike_count: f32 = self.neurons.iter().map(|n| if n.state.last_spike > 0 { 1.0 } else { 0.0 }).sum();
+        let spike_count: f32 = self
+            .neurons
+            .iter()
+            .map(|n| if n.state.last_spike > 0 { 1.0 } else { 0.0 })
+            .sum();
         spike_count / self.n_neurons as f32
     }
 }
@@ -440,7 +452,11 @@ impl Layer6 {
     }
 
     pub fn get_population_rate(&self) -> f32 {
-        let spike_count: f32 = self.neurons.iter().map(|n| if n.state.last_spike > 0 { 1.0 } else { 0.0 }).sum();
+        let spike_count: f32 = self
+            .neurons
+            .iter()
+            .map(|n| if n.state.last_spike > 0 { 1.0 } else { 0.0 })
+            .sum();
         spike_count / self.n_neurons as f32
     }
 }
@@ -577,7 +593,7 @@ impl ThalamicNeuron {
         self.spike_train[0] = if spiked { 1.0 } else { 0.0 };
     }
 
-    pub fn apply_cortical_feedback(&mut self, feedback: f32, dt: f32) {
+    pub fn apply_cortical_feedback(&mut self, feedback: f32, _dt: f32) {
         // L6 corticothalamic feedback (modulatory)
         self.cortical_feedback_strength = feedback;
     }
@@ -622,12 +638,15 @@ mod tests {
         let mut velocities = vec![vec![0.0; 5]; 5];
 
         deflections[2][2] = 0.5; // 0.5 radians
-        velocities[2][2] = 1.0;  // Fast deflection
+        velocities[2][2] = 1.0; // Fast deflection
 
         let activity = bc.process(&deflections, &velocities, 1.0);
 
         // Center barrel should show highest activity
-        assert!(activity[2][2] >= activity[0][0], "Center barrel should respond most");
+        assert!(
+            activity[2][2] >= activity[0][0],
+            "Center barrel should respond most"
+        );
     }
 
     #[test]

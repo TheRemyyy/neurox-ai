@@ -63,15 +63,28 @@ impl EmbeddingLayer {
         }
     }
 
-    /// Add word to vocabulary
-    pub fn add_word(&mut self, word: String) -> usize {
-        if let Some(idx) = self.word_to_idx.get(&word) {
+    /// Add word to vocabulary and grow embeddings matrix if needed
+    pub fn add_word(&mut self, word: &str) -> usize {
+        if let Some(idx) = self.word_to_idx.get(word) {
             return *idx;
         }
 
         let idx = self.idx_to_word.len();
-        self.word_to_idx.insert(word.clone(), idx);
-        self.idx_to_word.push(word);
+        let word_str = word.to_string();
+        self.word_to_idx.insert(word_str.clone(), idx);
+        self.idx_to_word.push(word_str);
+
+        // Grow embeddings matrix if we've exceeded initial vocab_size
+        if idx >= self.embeddings.len() {
+            let mut rng = rand::thread_rng();
+            let scale = (6.0 / (self.embeddings.len() + 1 + self.embedding_dim) as f32).sqrt();
+            let new_emb = (0..self.embedding_dim)
+                .map(|_| rng.gen_range(-scale..scale))
+                .collect();
+            self.embeddings.push(new_emb);
+            self.vocab_size = self.embeddings.len();
+        }
+
         idx
     }
 

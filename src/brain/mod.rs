@@ -529,7 +529,7 @@ impl NeuromorphicBrain {
         let mut token_indices = Vec::new();
 
         for word in &words {
-            self.language.ventral.embeddings.add_word(word.to_string());
+            self.language.ventral.embeddings.add_word(word);
             if let Some(idx) = self.language.ventral.embeddings.word_to_idx.get(*word) {
                 token_indices.push(*idx);
             }
@@ -820,7 +820,7 @@ impl NeuromorphicBrain {
                 .filter(|c| c.is_alphanumeric())
                 .collect();
             if !clean.is_empty() {
-                self.language.ventral.embeddings.add_word(clean);
+                self.language.ventral.embeddings.add_word(&clean);
             }
         }
         if let Some(out) = output {
@@ -831,7 +831,7 @@ impl NeuromorphicBrain {
                     .filter(|c| c.is_alphanumeric())
                     .collect();
                 if !clean.is_empty() {
-                    self.language.ventral.embeddings.add_word(clean);
+                    self.language.ventral.embeddings.add_word(&clean);
                 }
             }
         }
@@ -911,79 +911,74 @@ impl NeuromorphicBrain {
     pub fn train_supervised_batch(&mut self, input: &str, output: Option<&str>, reward: f32) {
         let dt = 0.1;
 
-        // 1. Add words to vocabulary
-        for word in input.split_whitespace() {
-            let clean: String = word
-                .to_lowercase()
-                .chars()
-                .filter(|c| c.is_alphanumeric())
-                .collect();
-            if !clean.is_empty() {
-                self.language.ventral.embeddings.add_word(clean);
-            }
-        }
-        if let Some(out) = output {
-            for word in out.split_whitespace() {
+        // 1. Process input words and add to vocabulary
+        let input_indices: Vec<usize> = input
+            .split_whitespace()
+            .filter_map(|word| {
                 let clean: String = word
                     .to_lowercase()
                     .chars()
                     .filter(|c| c.is_alphanumeric())
                     .collect();
-                if !clean.is_empty() {
-                    self.language.ventral.embeddings.add_word(clean);
+                if clean.is_empty() {
+                    None
+                } else {
+                    Some(self.language.ventral.embeddings.add_word(&clean))
                 }
-            }
-        }
-
-        // 2. Process input through language system
-        let input_words: Vec<&str> = input.split_whitespace().collect();
-        let input_indices: Vec<usize> = input_words
-            .iter()
-            .filter_map(|w| {
-                let clean: String = w
-                    .to_lowercase()
-                    .chars()
-                    .filter(|c| c.is_alphanumeric())
-                    .collect();
-                self.language.get_word_idx(&clean)
             })
             .collect();
 
+        if input_indices.is_empty() {
+            return;
+        }
+
         let input_semantics = self.language.comprehend(&input_indices);
 
-        // 3. If we have expected output, create associations
+        // 2. If we have expected output, create associations
         if let Some(out) = output {
-            let output_words: Vec<&str> = out.split_whitespace().collect();
-            let output_indices: Vec<usize> = output_words
-                .iter()
-                .filter_map(|w| {
-                    let clean: String = w
+            let output_indices: Vec<usize> = out
+                .split_whitespace()
+                .filter_map(|word| {
+                    let clean: String = word
                         .to_lowercase()
                         .chars()
                         .filter(|c| c.is_alphanumeric())
                         .collect();
-                    self.language.get_word_idx(&clean)
+                    if clean.is_empty() {
+                        None
+                    } else {
+                        Some(self.language.ventral.embeddings.add_word(&clean))
+                    }
                 })
                 .collect();
 
-            // Create input → output associations
-            for &in_idx in &input_indices {
-                for &out_idx in &output_indices {
-                    // Reward-modulated association learning
-                    let effective_strength = reward.max(0.0) * 0.3; // Scale reward
-                    self.language
-                        .learn_association(in_idx, out_idx, effective_strength);
+            if !output_indices.is_empty() {
+                // Create input → output associations
+                for &in_idx in &input_indices {
+                    for &out_idx in &output_indices {
+                        // Reward-modulated association learning
+                        let effective_strength = reward.max(0.0) * 0.3; // Scale reward
+                        self.language
+                            .learn_association(in_idx, out_idx, effective_strength);
+                    }
                 }
+
+                // Learn output semantics
+                let output_semantics = self.language.comprehend(&output_indices);
+
+                // 2.5 Learn dorsal mapping (Meaning -> Production)
+                // This informs the AI's ability to generate the expected response
+                self.language
+                    .dorsal
+                    .spt
+                    .learn_mapping(input_semantics.clone(), output_semantics.clone());
+
+                // Store in hippocampus
+                self.hippocampus.encode(&output_semantics);
             }
-
-            // Learn output semantics
-            let output_semantics = self.language.comprehend(&output_indices);
-
-            // Store in hippocampus
-            self.hippocampus.encode(&output_semantics);
         }
 
-        // 4. Apply reward signal via dopamine system
+        // 3. Apply reward signal via dopamine system
         if reward != 0.0 {
             // Modulate dopamine based on reward
             let da_change = reward * 0.2; // Scale to reasonable range
@@ -996,10 +991,10 @@ impl NeuromorphicBrain {
             self.basal_ganglia.update(reward, next_value, dt);
         }
 
-        // 5. Store input in hippocampus
+        // 4. Store input in hippocampus
         self.hippocampus.encode(&input_semantics);
 
-        // NOTE: Skipped self.update(dt) for performance optimization
+        // NOTE: update(dt) handled by caller (BrainLoader) at a lower frequency for performance
     }
 
     /// Detect intent from input text
@@ -1473,7 +1468,7 @@ impl NeuromorphicBrain {
         let mut motor_input_right = vec![false; 246];
 
         // Encode spatial velocity and BG value into mossy fiber patterns
-        let (spatial_x, spatial_y) = self.spatial.position;
+        let _position = self.spatial.position;
         let (vel_x, vel_y) = self.spatial.velocity;
         let bg_value = self.basal_ganglia.dopamine.value_estimate;
 
@@ -1515,7 +1510,7 @@ impl NeuromorphicBrain {
         );
 
         // USE cerebellum output - motor corrections influence basal ganglia
-        let motor_correction = (left_motor_out.iter().sum::<f32>()
+        let _motor_correction = (left_motor_out.iter().sum::<f32>()
             + right_motor_out.iter().sum::<f32>())
             / (left_motor_out.len() + right_motor_out.len()) as f32;
 
@@ -1527,8 +1522,8 @@ impl NeuromorphicBrain {
         let fear_output = self.amygdala.update(dt, &cs_input, us_present, context);
 
         // USE amygdala output - fear modulates attention and learning
-        let emotional_modulation = fear_output * 2.0; // Fear amplifies salience
-                                                      // Apply emotional modulation to neuromodulation (already updated above, will use in next cycle)
+        let _emotional_modulation = fear_output * 2.0; // Fear amplifies salience
+                                                       // Apply emotional modulation to neuromodulation (already updated above, will use in next cycle)
 
         // 6a. Superior Colliculus and Thalamus will be updated AFTER sensory processing
         // (moved to after V1/Cochlea/Motion/Barrel for proper data flow)
@@ -1540,7 +1535,6 @@ impl NeuromorphicBrain {
         // Use activity from working memory and predictive hierarchy
         let wm_activity = self.working_memory.get_all_patterns();
         let mut pre_activity = Vec::new();
-        let mut post_activity = Vec::new();
 
         // Flatten working memory patterns for structural plasticity
         for pattern in wm_activity.iter().take(10) {
@@ -1551,7 +1545,7 @@ impl NeuromorphicBrain {
         pre_activity.resize(self.structural_plasticity.neuron_positions.len(), 0.0);
 
         // Post-activity from attention-modulated patterns
-        post_activity = pre_activity.iter().map(|&x| x * attention).collect();
+        let post_activity: Vec<f32> = pre_activity.iter().map(|&x| x * attention).collect();
 
         self.structural_plasticity.update(
             &pre_activity,
@@ -1689,7 +1683,7 @@ impl NeuromorphicBrain {
             &hetero_post_spikes,
             dt,
         );
-        let avg_hetero_change: f32 =
+        let _avg_hetero_change: f32 =
             hetero_changes.iter().sum::<f32>() / hetero_changes.len() as f32;
 
         // 9d. Update memristive network (EM field coupling)
@@ -1836,7 +1830,7 @@ impl NeuromorphicBrain {
         // USE V1 complex cell output (proper data flow!)
 
         // === GPU MOTION ACCELERATION (80× faster) ===
-        let (motion_output, optic_flow) = if let Some(ref mut gpu_motion) = self.gpu_motion {
+        let (motion_output, _optic_flow) = if let Some(ref mut gpu_motion) = self.gpu_motion {
             // GPU path: Flatten V1 output to 1D, process on GPU
             let flattened_v1: Vec<f32> = v1_output
                 .iter()
@@ -1945,7 +1939,7 @@ impl NeuromorphicBrain {
         // 12f. Update Superior Colliculus with motion/attention data
         self.superior_colliculus.update(dt);
         // Feed motion information to colliculus for saccade planning
-        if let Some(salient_location) = self.find_salient_location(&motion_output) {
+        if let Some(_salient_location) = self.find_salient_location(&motion_output) {
             // Trigger saccade toward salient location
             if let Some(saccade_target) = self.superior_colliculus.trigger_saccade_from_activity() {
                 // Saccade target guides spatial attention and exploration
@@ -2032,7 +2026,7 @@ impl NeuromorphicBrain {
         state
     }
 
-    fn estimate_value(&self, state: &[f32]) -> f32 {
+    fn estimate_value(&self, _state: &[f32]) -> f32 {
         // Simple value estimate - in full system would use learned value function
         self.basal_ganglia.dopamine.value_estimate
     }

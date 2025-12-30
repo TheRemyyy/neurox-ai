@@ -20,7 +20,7 @@
 //! - 6+ word window: Discourse coherence (frontal/parietal)
 
 use crate::cortex::WorkingMemory;
-use crate::semantics::{SemanticHub, EmbeddingLayer};
+use crate::semantics::{EmbeddingLayer, SemanticHub};
 use serde::{Deserialize, Serialize};
 
 /// Superior Temporal Gyrus - primary auditory/phonological processing
@@ -114,7 +114,7 @@ impl ATL {
     pub fn new(n_concept_cells: usize, embedding_dim: usize) -> Self {
         Self {
             semantic_hub: SemanticHub::new(n_concept_cells, embedding_dim, 0.02),
-            modality_weights: vec![0.5; 4],  // Visual, auditory, motor, emotional
+            modality_weights: vec![0.5; 4], // Visual, auditory, motor, emotional
         }
     }
 
@@ -138,7 +138,7 @@ impl ATL {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Spt {
     /// Sensorimotor mappings
-    pub mappings: Vec<(Vec<f32>, Vec<f32>)>,  // (auditory, motor)
+    pub mappings: Vec<(Vec<f32>, Vec<f32>)>, // (auditory, motor)
 
     /// Buffer size
     pub capacity: usize,
@@ -181,7 +181,11 @@ impl Spt {
         let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
         let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
         let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
-        if norm_a == 0.0 || norm_b == 0.0 { 0.0 } else { dot / (norm_a * norm_b) }
+        if norm_a == 0.0 || norm_b == 0.0 {
+            0.0
+        } else {
+            dot / (norm_a * norm_b)
+        }
     }
 }
 
@@ -235,7 +239,7 @@ pub struct VentralStream {
 impl VentralStream {
     pub fn new(vocab_size: usize, embedding_dim: usize) -> Self {
         Self {
-            stg: STG::new(20, embedding_dim),  // 20 token buffer, use full embedding dim
+            stg: STG::new(20, embedding_dim), // 20 token buffer, use full embedding dim
             mtg: MTG::new(embedding_dim),
             atl: ATL::new(500, embedding_dim),
             embeddings: EmbeddingLayer::new(vocab_size, embedding_dim),
@@ -315,7 +319,7 @@ impl DorsalStream {
 
 impl Default for DorsalStream {
     fn default() -> Self {
-        Self::new(300)  // Default embedding dimension
+        Self::new(300) // Default embedding dimension
     }
 }
 
@@ -474,22 +478,31 @@ impl DualStreamLanguage {
     pub fn train_on_pairs(&mut self, pairs: &[(usize, usize)], learning_rate: f32) {
         for &(center_idx, context_idx) in pairs {
             // 1. Update embeddings via Skip-gram
-            self.ventral.embeddings.train_skipgram(center_idx, context_idx);
+            self.ventral
+                .embeddings
+                .train_skipgram(center_idx, context_idx);
 
             // 2. Build associative memory (which words appear together)
             self.learn_association(center_idx, context_idx, learning_rate);
 
             // 3. Train ATL concept cells on co-occurring patterns
             if let (Some(center_emb), Some(context_emb)) = (
-                self.ventral.embeddings.get_embedding_by_idx(center_idx).cloned(),
-                self.ventral.embeddings.get_embedding_by_idx(context_idx).cloned(),
+                self.ventral
+                    .embeddings
+                    .get_embedding_by_idx(center_idx)
+                    .cloned(),
+                self.ventral
+                    .embeddings
+                    .get_embedding_by_idx(context_idx)
+                    .cloned(),
             ) {
                 // Combined pattern for concept learning
-                let mut combined: Vec<f32> = center_emb.iter()
+                let mut combined: Vec<f32> = center_emb
+                    .iter()
                     .zip(context_emb.iter())
                     .map(|(a, b)| (a + b) / 2.0)
                     .collect();
-                
+
                 self.ventral.atl.integrate(&combined);
             }
         }
@@ -504,7 +517,7 @@ impl DualStreamLanguage {
 
     fn add_association(&mut self, from: usize, to: usize, strength: f32) {
         let associations = self.word_associations.entry(from).or_insert_with(Vec::new);
-        
+
         // Check if association already exists
         if let Some(pos) = associations.iter().position(|(idx, _)| *idx == to) {
             // Strengthen existing association (with decay toward 1.0)
@@ -552,7 +565,11 @@ impl DualStreamLanguage {
 
     /// Get word by index from vocabulary
     pub fn get_word(&self, idx: usize) -> Option<&str> {
-        self.ventral.embeddings.idx_to_word.get(idx).map(|s| s.as_str())
+        self.ventral
+            .embeddings
+            .idx_to_word
+            .get(idx)
+            .map(|s| s.as_str())
     }
 
     /// Get word index from vocabulary
@@ -564,7 +581,11 @@ impl DualStreamLanguage {
         let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
         let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
         let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
-        if norm_a == 0.0 || norm_b == 0.0 { 0.0 } else { dot / (norm_a * norm_b) }
+        if norm_a == 0.0 || norm_b == 0.0 {
+            0.0
+        } else {
+            dot / (norm_a * norm_b)
+        }
     }
 
     /// Get statistics
@@ -598,7 +619,7 @@ mod tests {
     fn test_ventral_stream() {
         let mut ventral = VentralStream::new(100, 50);
 
-        ventral.embeddings.add_word("hello".to_string());
+        ventral.embeddings.add_word("hello");
         let tokens = vec![0];
 
         let semantics = ventral.comprehend(&tokens);
@@ -633,7 +654,7 @@ mod tests {
     fn test_dual_stream_system() {
         let mut system = DualStreamLanguage::new(100, 50);
 
-        system.ventral.embeddings.add_word("test".to_string());
+        system.ventral.embeddings.add_word("test");
         let tokens = vec![0];
 
         let semantics = system.comprehend(&tokens);
