@@ -218,18 +218,18 @@ impl MNISTTrainer {
 
         let label = image.label as usize;
 
-        // Convert image to input currents (784 pixels → 784 input neurons)
-        let mut input_currents = image.to_input_currents(10.0); // Scale factor
+        // Use Poisson spike trains to break synchrony and enable STDP learning
+        // Constant current injection causes synchronous firing which disrupts STDP
+        let max_rate = 60.0; // 60 Hz max firing rate for bright pixels
+        let spike_trains = image.to_spike_train(
+            self.config.presentation_duration,
+            self.simulator.dt(),
+            max_rate,
+        );
+        let n_steps = spike_trains.len();
 
-        // Pad with zeros for hidden and output neurons
-        input_currents.resize(self.simulator.n_neurons(), 0.0);
-
-        // SUPERVISION: Inject current into correct output neuron
-        let correct_output = self.output_assignments[label];
-        input_currents[correct_output] = 15.0; // Strong teacher signal
-
-        // Present image for configured duration
-        let n_steps = (self.config.presentation_duration / self.simulator.dt()) as usize;
+        // Input buffer
+        let mut input_currents = vec![0.0; self.simulator.n_neurons()];
 
         // Track spike counts per hidden neuron for STDP
         let mut hidden_spike_counts = vec![0u32; self.hidden_end - self.hidden_start];
@@ -239,10 +239,22 @@ impl MNISTTrainer {
         let mut winner_cache: Option<usize> = None;
 
         for step in 0..n_steps {
-            // Apply lateral inhibition to non-winning hidden neurons (optimized: every 100 steps)
+            // 1. Prepare inputs based on Poisson spikes
+            input_currents.fill(0.0);
+            for (pixel_idx, &is_spike) in spike_trains[step].iter().enumerate() {
+                if is_spike {
+                    input_currents[pixel_idx] = 40.0; // Spike pulse
+                }
+            }
+
+            // 2. Supervision signal
+            let correct_output = self.output_assignments[label];
+            input_currents[correct_output] = 20.0;
+
+            // 3. Apply lateral inhibition (WTA)
             self.apply_wta_inhibition(&mut input_currents, step, &mut winner_cache)?;
 
-            // Update simulator
+            // 4. Update simulator
             self.simulator.step(Some(&input_currents))?;
 
             // Get spikes
@@ -271,15 +283,23 @@ impl MNISTTrainer {
                     // Access cached connectivity map directly via self
                     // This avoids borrowing issues
                     if let Some(map) = &self.conn_map {
-                        // 1. LTD: Update incoming connections (Post-spike)
+                        // 1. LTP: Update incoming connections (Post-spike -> Pre trace)
+                        // Neuron ID is POST. Pre ID is PRE.
+                        // If Pre trace is high, it caused this spike -> Strengthen
+                        let lr_pos = self.stdp.config.lr_post;
                         for &(pre_id, w_idx) in &map.incoming[neuron_id] {
-                            let dw = self.stdp.calculate_dw(pre_id, neuron_id);
+                            let trace_pre = self.stdp.pre_traces[pre_id];
+                            let dw = trace_pre * lr_pos;
                             self.weight_changes[w_idx] += dw;
                         }
 
-                        // 2. LTP: Update outgoing connections (Pre-spike)
+                        // 2. LTD: Update outgoing connections (Pre-spike -> Post trace)
+                        // Neuron ID is PRE. Post ID is POST.
+                        // If Post trace is high, it spiked BEFORE us (acausal) -> We weaken
+                        let lr_neg = 0.02; // self.stdp.config.lr_pre; // Explicit LTD rate
                         for &(post_id, w_idx) in &map.outgoing[neuron_id] {
-                            let dw = self.stdp.calculate_dw(neuron_id, post_id);
+                            let trace_post = self.stdp.post_traces_1[post_id];
+                            let dw = -trace_post * lr_neg;
                             self.weight_changes[w_idx] += dw;
                         }
                     }
@@ -303,7 +323,10 @@ impl MNISTTrainer {
             .unwrap_or(0);
 
         let reward = if predicted == label { 1.0 } else { -0.3 };
-        self.apply_reward_modulation(reward)?;
+        // self.apply_reward_modulation(reward)?; // DISABLE: Global scaling destroys selectivity
+
+        // Instead, we rely on Teacher Forcing (input 20.0 to correct output).
+        // STDP will naturally reinforce connection from Active Input -> Active Correct Output.
 
         // Rest period (ISI)
         let isi_steps = (self.config.isi_duration / self.simulator.dt()) as usize;
