@@ -240,7 +240,7 @@ impl MNISTTrainer {
         let pb = ProgressBar::new(total as u64);
         pb.set_style(
             ProgressStyle::default_bar()
-                .template("  {spinner:.blue} Evaluating [{bar:30.white/blue}] {pos}/{len} ({eta})")
+                .template("  {spinner:.green} Evaluating [{bar:40.cyan/blue}] {pos}/{len} ({percent}%) [{elapsed_precise}] ETA: {eta}")
                 .unwrap()
                 .progress_chars("█▓░"),
         );
