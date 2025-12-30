@@ -544,7 +544,7 @@ fn run_solve(problem_type: &str, problem: &str) -> Result<(), Box<dyn std::error
         "{}╔════════════════════════════════════════════════════════════╗",
         COLOR_CYAN
     );
-    println!("║  NeuroxAI Problem Solver                                   ║");
+    println!("║  NeuroxAI Cognitive Symbolic Engine                        ║");
     println!(
         "╚════════════════════════════════════════════════════════════╝{}",
         COLOR_RESET
@@ -555,7 +555,7 @@ fn run_solve(problem_type: &str, problem: &str) -> Result<(), Box<dyn std::error
         "math" => {
             let mut solver = MathSolver::new();
             let result = solver.solve(problem);
-            println!("{}Problem:{} {}", BOLD, COLOR_RESET, problem);
+            println!("{}Input:{}  {}", BOLD, COLOR_RESET, problem);
             println!(
                 "{}Result:{} {}{}{}",
                 BOLD, COLOR_RESET, COLOR_GREEN, result, COLOR_RESET
@@ -563,20 +563,14 @@ fn run_solve(problem_type: &str, problem: &str) -> Result<(), Box<dyn std::error
         }
         "chemistry" | "chem" => {
             let solver = ChemistrySolver::new();
-            match solver.balance(problem) {
-                Ok(balanced) => {
-                    println!("{}Original:{} {}", BOLD, COLOR_RESET, problem);
-                    println!(
-                        "{}Balanced:{} {}{}{}",
-                        BOLD, COLOR_RESET, COLOR_GREEN, balanced, COLOR_RESET
-                    );
-                }
-                Err(e) => {
-                    println!(
-                        "{}Error:{} {}{}{}",
-                        BOLD, COLOR_RESET, COLOR_RED, e, COLOR_RESET
-                    );
-                }
+            let analysis = solver.solve(problem);
+            
+            println!("{}Analysis Report:{}", BOLD, COLOR_RESET);
+            println!("{}", analysis);
+
+            println!("{}Reasoning Trace:{}", COLOR_GRAY, COLOR_RESET);
+            for step in analysis.steps {
+                println!("  › {}", step);
             }
         }
         _ => {

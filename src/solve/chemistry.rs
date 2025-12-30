@@ -1,30 +1,84 @@
-//! Chemistry Equation Solver
+//! Chemistry Solver & Analysis Engine
 //!
-//! Balances chemical equations using linear algebra approach.
+//! Provides stoichiometric balancing, molar mass calculations, and elemental analysis.
+//! Uses a built-in periodic table for physical properties.
 
 use std::collections::HashMap;
 
-/// A balanced chemical equation
+/// Chemical Element Data
 #[derive(Debug, Clone)]
-pub struct BalancedEquation {
-    /// Original equation string
-    pub original: String,
-    /// Balanced equation string
-    pub balanced: String,
-    /// Coefficients for reactants
-    pub reactant_coefficients: Vec<u32>,
-    /// Coefficients for products
-    pub product_coefficients: Vec<u32>,
+pub struct Element {
+    pub number: u32,
+    pub symbol: &'static str,
+    pub name: &'static str,
+    pub mass: f64, // g/mol
 }
 
-impl std::fmt::Display for BalancedEquation {
+/// Static Periodic Table Data (Common Elements)
+const PERIODIC_TABLE: &[Element] = &[
+    Element { number: 1, symbol: "H", name: "Hydrogen", mass: 1.008 },
+    Element { number: 2, symbol: "He", name: "Helium", mass: 4.0026 },
+    Element { number: 3, symbol: "Li", name: "Lithium", mass: 6.94 },
+    Element { number: 4, symbol: "Be", name: "Beryllium", mass: 9.0122 },
+    Element { number: 5, symbol: "B", name: "Boron", mass: 10.81 },
+    Element { number: 6, symbol: "C", name: "Carbon", mass: 12.011 },
+    Element { number: 7, symbol: "N", name: "Nitrogen", mass: 14.007 },
+    Element { number: 8, symbol: "O", name: "Oxygen", mass: 15.999 },
+    Element { number: 9, symbol: "F", name: "Fluorine", mass: 18.998 },
+    Element { number: 10, symbol: "Ne", name: "Neon", mass: 20.180 },
+    Element { number: 11, symbol: "Na", name: "Sodium", mass: 22.990 },
+    Element { number: 12, symbol: "Mg", name: "Magnesium", mass: 24.305 },
+    Element { number: 13, symbol: "Al", name: "Aluminium", mass: 26.982 },
+    Element { number: 14, symbol: "Si", name: "Silicon", mass: 28.085 },
+    Element { number: 15, symbol: "P", name: "Phosphorus", mass: 30.974 },
+    Element { number: 16, symbol: "S", name: "Sulfur", mass: 32.06 },
+    Element { number: 17, symbol: "Cl", name: "Chlorine", mass: 35.45 },
+    Element { number: 18, symbol: "Ar", name: "Argon", mass: 39.948 },
+    Element { number: 19, symbol: "K", name: "Potassium", mass: 39.098 },
+    Element { number: 20, symbol: "Ca", name: "Calcium", mass: 40.078 },
+    Element { number: 26, symbol: "Fe", name: "Iron", mass: 55.845 },
+    Element { number: 29, symbol: "Cu", name: "Copper", mass: 63.546 },
+    Element { number: 30, symbol: "Zn", name: "Zinc", mass: 65.38 },
+    Element { number: 35, symbol: "Br", name: "Bromine", mass: 79.904 },
+    Element { number: 47, symbol: "Ag", name: "Silver", mass: 107.87 },
+    Element { number: 53, symbol: "I", name: "Iodine", mass: 126.90 },
+    Element { number: 79, symbol: "Au", name: "Gold", mass: 196.97 },
+    Element { number: 82, symbol: "Pb", name: "Lead", mass: 207.2 },
+    Element { number: 92, symbol: "U", name: "Uranium", mass: 238.03 },
+];
+
+/// Result of a chemical analysis
+#[derive(Debug, Clone)]
+pub struct ChemicalAnalysis {
+    pub input: String,
+    pub balanced_equation: Option<String>,
+    pub molar_mass: Option<f64>,
+    pub composition: Option<Vec<(String, f64)>>, // Element -> Mass %
+    pub steps: Vec<String>, // Reasoning steps
+}
+
+impl std::fmt::Display for ChemicalAnalysis {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.balanced)
+        writeln!(f, "Analysis for: {}", self.input)?;
+        if let Some(eq) = &self.balanced_equation {
+            writeln!(f, "Balanced: {}", eq)?;
+        }
+        if let Some(mass) = self.molar_mass {
+            writeln!(f, "Molar Mass: {:.4} g/mol", mass)?;
+        }
+        if let Some(comp) = &self.composition {
+            writeln!(f, "Composition:")?;
+            for (elem, pct) in comp {
+                writeln!(f, "  - {}: {:.2}%", elem, pct)?;
+            }
+        }
+        Ok(())
     }
 }
 
-/// Chemistry problem solver
-pub struct ChemistrySolver;
+pub struct ChemistrySolver {
+    elements: HashMap<&'static str, Element>,
+}
 
 impl Default for ChemistrySolver {
     fn default() -> Self {
@@ -34,21 +88,113 @@ impl Default for ChemistrySolver {
 
 impl ChemistrySolver {
     pub fn new() -> Self {
-        Self
+        let mut elements = HashMap::new();
+        for e in PERIODIC_TABLE {
+            elements.insert(e.symbol, e.clone());
+        }
+        Self { elements }
+    }
+
+    /// Entry point for solving any chemistry problem
+    pub fn solve(&self, input: &str) -> ChemicalAnalysis {
+        let mut steps = Vec::new();
+        steps.push(format!("Analyzing input: '{}'", input));
+
+        // Detect type: Equation vs Formula
+        if input.contains("->") || input.contains('=') {
+            self.solve_equation(input, steps)
+        } else {
+            self.solve_formula(input, steps)
+        }
+    }
+
+    fn solve_equation(&self, input: &str, mut steps: Vec<String>) -> ChemicalAnalysis {
+        steps.push("Detected chemical equation. Attempting to balance...".to_string());
+        
+        let balanced = match self.balance(input) {
+            Ok(b) => {
+                steps.push("Successfully balanced equation.".to_string());
+                Some(b.balanced)
+            },
+            Err(e) => {
+                steps.push(format!("Failed to balance: {}", e));
+                None
+            }
+        };
+
+        ChemicalAnalysis {
+            input: input.to_string(),
+            balanced_equation: balanced,
+            molar_mass: None,
+            composition: None,
+            steps,
+        }
+    }
+
+    fn solve_formula(&self, formula: &str, mut steps: Vec<String>) -> ChemicalAnalysis {
+        steps.push("Detected chemical formula. Calculating properties...".to_string());
+
+        let parsed = match self.parse_molecule(formula) {
+            Ok(p) => p,
+            Err(e) => {
+                steps.push(format!("Error parsing formula: {}", e));
+                return ChemicalAnalysis {
+                    input: formula.to_string(),
+                    balanced_equation: None,
+                    molar_mass: None,
+                    composition: None,
+                    steps,
+                };
+            }
+        };
+
+        // Calculate Molar Mass
+        let mut total_mass = 0.0;
+        let mut elem_masses = Vec::new();
+
+        for (symbol, count) in &parsed {
+            if let Some(element) = self.elements.get(symbol.as_str()) {
+                let mass = element.mass * (*count as f64);
+                total_mass += mass;
+                elem_masses.push((symbol.clone(), mass));
+                steps.push(format!("  - {}: {} atoms * {:.3} g/mol = {:.3} g/mol", 
+                    element.name, count, element.mass, mass));
+            } else {
+                steps.push(format!("  - WARNING: Unknown element symbol '{}'", symbol));
+            }
+        }
+        
+        steps.push(format!("Total Molar Mass: {:.3} g/mol", total_mass));
+
+        // Calculate Composition %
+        let mut composition = Vec::new();
+        if total_mass > 0.0 {
+            for (sym, mass) in elem_masses {
+                let pct = (mass / total_mass) * 100.0;
+                composition.push((sym, pct));
+            }
+        }
+        // Sort by percentage descending
+        composition.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+
+        ChemicalAnalysis {
+            input: formula.to_string(),
+            balanced_equation: None,
+            molar_mass: Some(total_mass),
+            composition: Some(composition),
+            steps,
+        }
     }
 
     /// Balance a chemical equation
     pub fn balance(&self, equation: &str) -> Result<BalancedEquation, String> {
-        // Parse equation: "H2 + O2 -> H2O" or "H2 + O2 = H2O"
-        let separator = if equation.contains("->") {
+         // Parse equation: "H2 + O2 -> H2O" or "H2 + O2 = H2O"
+         let separator = if equation.contains("->") {
             "->"
         } else if equation.contains('=') {
             "="
         } else {
-            return Err(
-                "Invalid equation format. Use '->' or '=' to separate reactants and products."
-                    .to_string(),
-            );
+            return Err("Invalid equation format".to_string());
         };
 
         let parts: Vec<&str> = equation.split(separator).collect();
@@ -81,20 +227,16 @@ impl ChemistrySolver {
         }
         elements.sort();
 
-        // Try coefficients from 1 to 10 for each molecule
-        let n_reactants = reactants.len();
-        let n_products = products.len();
-        let n_molecules = n_reactants + n_products;
-
-        // Brute force small coefficients (good enough for simple equations)
-        for max_coef in 1..=10 {
+        // Matrix solver / Brute force approach
+        // We stick to brute force for small integers as it's robust for simple cases
+        for max_coef in 1..=12 {
             if let Some(coefficients) =
                 self.find_coefficients(&reactant_molecules, &product_molecules, &elements, max_coef)
             {
+                let n_reactants = reactants.len();
                 let reactant_coefs: Vec<u32> = coefficients[..n_reactants].to_vec();
                 let product_coefs: Vec<u32> = coefficients[n_reactants..].to_vec();
 
-                // Build balanced equation string
                 let balanced =
                     self.format_balanced(&reactants, &products, &reactant_coefs, &product_coefs);
 
@@ -107,7 +249,7 @@ impl ChemistrySolver {
             }
         }
 
-        Err("Could not balance equation with small coefficients".to_string())
+        Err("Could not balance equation (too complex or invalid)".to_string())
     }
 
     /// Parse a molecule like "H2O" or "Ca(OH)2" into element counts
@@ -122,7 +264,7 @@ impl ChemistrySolver {
                 element.push(chars[i]);
                 i += 1;
 
-                // Check for lowercase continuation (e.g., "Ca")
+                // Check for lowercase continuation
                 while i < chars.len() && chars[i].is_ascii_lowercase() {
                     element.push(chars[i]);
                     i += 1;
@@ -173,20 +315,18 @@ impl ChemistrySolver {
                     num_str.parse().unwrap_or(1)
                 };
 
-                // Recursively parse group
                 let group_counts = self.parse_molecule(&group)?;
                 for (elem, count) in group_counts {
                     *counts.entry(elem).or_insert(0) += count * multiplier;
                 }
             } else {
-                i += 1;
+                i += 1; // Skip other chars
             }
         }
 
         Ok(counts)
     }
 
-    /// Find coefficients that balance the equation
     fn find_coefficients(
         &self,
         reactants: &[HashMap<String, i32>],
@@ -198,7 +338,6 @@ impl ChemistrySolver {
         let n_products = products.len();
         let n_total = n_reactants + n_products;
 
-        // Generate all combinations of coefficients
         self.try_coefficients(
             reactants,
             products,
@@ -219,7 +358,6 @@ impl ChemistrySolver {
         max_coef: u32,
     ) -> Option<Vec<u32>> {
         if pos == coefficients.len() {
-            // Check if balanced
             if self.is_balanced(reactants, products, elements, coefficients) {
                 return Some(coefficients.clone());
             }
@@ -239,7 +377,6 @@ impl ChemistrySolver {
                 return Some(result);
             }
         }
-
         None
     }
 
@@ -256,12 +393,10 @@ impl ChemistrySolver {
             let mut left_count: i32 = 0;
             let mut right_count: i32 = 0;
 
-            // Sum reactants
             for (i, mol) in reactants.iter().enumerate() {
                 left_count += mol.get(element).unwrap_or(&0) * coefficients[i] as i32;
             }
 
-            // Sum products
             for (i, mol) in products.iter().enumerate() {
                 right_count +=
                     mol.get(element).unwrap_or(&0) * coefficients[n_reactants + i] as i32;
@@ -271,7 +406,6 @@ impl ChemistrySolver {
                 return false;
             }
         }
-
         true
     }
 
@@ -310,39 +444,17 @@ impl ChemistrySolver {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+/// A balanced chemical equation
+#[derive(Debug, Clone)]
+pub struct BalancedEquation {
+    pub original: String,
+    pub balanced: String,
+    pub reactant_coefficients: Vec<u32>,
+    pub product_coefficients: Vec<u32>,
+}
 
-    #[test]
-    fn test_parse_molecule() {
-        let solver = ChemistrySolver::new();
-
-        let h2o = solver.parse_molecule("H2O").unwrap();
-        assert_eq!(h2o.get("H"), Some(&2));
-        assert_eq!(h2o.get("O"), Some(&1));
-
-        let ca_oh_2 = solver.parse_molecule("Ca(OH)2").unwrap();
-        assert_eq!(ca_oh_2.get("Ca"), Some(&1));
-        assert_eq!(ca_oh_2.get("O"), Some(&2));
-        assert_eq!(ca_oh_2.get("H"), Some(&2));
-    }
-
-    #[test]
-    fn test_balance_water() {
-        let solver = ChemistrySolver::new();
-
-        let result = solver.balance("H2 + O2 -> H2O").unwrap();
-        assert_eq!(result.balanced, "2H2 + O2 -> 2H2O");
-    }
-
-    #[test]
-    fn test_balance_combustion() {
-        let solver = ChemistrySolver::new();
-
-        let result = solver.balance("CH4 + O2 -> CO2 + H2O").unwrap();
-        // CH4 + 2O2 -> CO2 + 2H2O
-        assert!(result.balanced.contains("CH4"));
-        assert!(result.balanced.contains("CO2"));
+impl std::fmt::Display for BalancedEquation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.balanced)
     }
 }

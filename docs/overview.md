@@ -22,9 +22,9 @@ We move beyond simple "layers" to simulate distinct brain organs:
 *   **Cerebellum**: Fine-motor control and error correction.
 *   **Thalamus**: The "switchboard" of consciousness and attention.
 
-### 🧩 Problem Solving
-*   **Math Solver**: Symbolic and numeric engines for precise calculation.
-*   **Chemistry Solver**: Stoichiometric balancing and scientific reasoning tools.
+### 🧠 Cognitive Symbolic Engine
+*   **Symbolic Math**: AST-based engine for calculus (`diff`), algebra, and simplification.
+*   **Scientific Reasoning**: Stoichiometry, molar mass calculation, and step-by-step chemical analysis.
 
 ### 📊 Benchmarks
 *   **MNIST**: Integrated benchmarking suite with quantization (4/8-bit) and synthetic data generation.

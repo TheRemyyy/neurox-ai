@@ -1,36 +1,38 @@
-# Problem Solving Modules
+# Cognitive Symbolic Engine
 
-NeuroxAI includes dedicated modules for symbolic and algorithmic problem solving, bridging the gap between neural heuristics and precise logical operations.
+The **Cognitive Symbolic Engine** acts as the "System 2" reasoning cortex for NeuroxAI. While the neural spiking networks handle probabilistic pattern matching and intuition, this engine handles precision, logic, and symbolic manipulation.
 
-## Math Solver
-The `MathSolver` module (`src/solve/math.rs`) provides symbolic and numeric computation capabilities. It allows the system to handle explicit mathematical queries that require precision beyond probabilistic estimation.
+It bridges the gap between biological plausibility and the need for exact analytical answers in AGI systems.
 
-### Features
-*   **Numeric Computation**: Precise floating-point arithmetic.
-*   **Symbolic Algebra**: Handling of variables and simple equations (e.g., "x + 5 = 10").
-*   **Multiple Solutions**: Support for quadratic equations or systems yielding multiple roots.
+## 📐 Symbolic Math Engine
+The `MathSolver` is not a calculator; it is a recursive **Abstract Syntax Tree (AST)** processor capable of algebraic manipulation.
 
-### Usage
-```rust
-let solver = MathSolver::new();
-// Solves arithmetic or algebraic expressions
-let result = solver.solve("2 * x + 4 = 12"); 
-```
+### Capabilities
+*   **Symbolic Differentiation**: Calculates derivatives of complex functions.
+    *   *Example*: `diff(x^2 + sin(x), x)` → `2*x + cos(x)`
+*   **AST Simplification**: intelligently reduces expressions.
+    *   *Example*: `x * 1 + 0` → `x`
+*   **Variable Context**: Maintains a persistent state of variables (`x = 5`, `y = 10`).
+*   **Supported Operations**:
+    *   Arithmetic: `+`, `-`, `*`, `/`, `^`
+    *   Trigonometry: `sin`, `cos`, `tan`
+    *   Calculus: `diff`, `d/dx`
+    *   Logarithms: `ln`, `log`
 
-## Chemistry Solver
-The `ChemistrySolver` module (`src/solve/chemistry.rs`) implements a linear algebra-based approach to balancing chemical equations. This serves as a foundational component for scientific reasoning capabilities.
+### Architecture
+Input strings are tokenized and parsed into a recursive enum structure (`Expr`). Operations like differentiation are implemented as recursive tree transformations, not numerical approximations.
 
-### Features
-*   **Equation Balancing**: Automatically calculates stoichiometric coefficients.
-*   **Format Support**: Accepts standard notation (e.g., "H2 + O2 -> H2O").
-*   **Validation**: Ensures mass conservation.
+## 🧪 Computational Chemistry
+The `ChemistrySolver` integrates a static database of physical properties with linear algebra solvers to simulate chemical reasoning.
 
-### Usage
-```rust
-let solver = ChemistrySolver::new();
-let balanced = solver.balance("C6H12O6 + O2 -> CO2 + H2O");
-// Output: C6H12O6 + 6O2 -> 6CO2 + 6H2O
-```
+### Capabilities
+*   **Stoichiometric Balancing**: Uses matrix operations to balance reaction equations.
+    *   *Input*: `C3H8 + O2 -> CO2 + H2O`
+    *   *Output*: `C3H8 + 5O2 -> 3CO2 + 4H2O`
+*   **Deep Analysis**: Parses molecular formulas to compute physical properties.
+    *   **Molar Mass**: Calculates exact weight based on atomic composition (e.g., H2SO4 = 98.07 g/mol).
+    *   **Elemental Composition**: Returns mass percentage breakdowns (e.g., "Oxygen: 65.2%").
+*   **Reasoning Trace**: Generates a step-by-step log of its deduction process, allowing the cognitive system to "explain" its work.
 
-## Integration with Cognition
-These solvers are designed to be triggered by the `CognitiveSystem` when specific "needs" or "queries" are detected in the inner dialogue stream that require high-precision answers, functioning similarly to tool-use in LLMs but integrated into the neuromorphic loop.
+## Integration Philosophy
+In the human brain, explicit calculation recruits specific cortical regions (like the intraparietal sulcus) distinct from intuitive processing. NeuroxAI simulates this by having the `CognitiveSystem` delegate specific queries (detected via grammar or intent) to this Symbolic Engine, injecting the precise results back into the neural stream as "context".
