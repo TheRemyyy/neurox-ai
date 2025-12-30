@@ -8,6 +8,43 @@ use crate::brain::learning::{HomeostaticPlasticity, STDPConfig, STPDynamics, Tri
 use crate::brain::simulation::Simulator;
 use cudarc::driver::DeviceSlice;
 use indicatif::{ProgressBar, ProgressStyle};
+use std::collections::HashMap;
+
+/// Maps neuron ID to list of (connected_neuron_id, weight_index)
+#[derive(Debug, Clone)]
+struct ConnectivityMap {
+    /// Outgoing connections: pre_id -> [(post_id, weight_idx)]
+    outgoing: Vec<Vec<(usize, usize)>>,
+    /// Incoming connections: post_id -> [(pre_id, weight_idx)]
+    incoming: Vec<Vec<(usize, usize)>>,
+}
+
+impl ConnectivityMap {
+    fn new(n_neurons: usize) -> Self {
+        Self {
+            outgoing: vec![Vec::new(); n_neurons],
+            incoming: vec![Vec::new(); n_neurons],
+        }
+    }
+
+    fn from_csr(row_ptr: &[i32], col_idx: &[i32], n_neurons: usize) -> Self {
+        let mut map = Self::new(n_neurons);
+
+        for row in 0..n_neurons {
+            let start = row_ptr[row] as usize;
+            let end = row_ptr[row + 1] as usize;
+
+            for w_idx in start..end {
+                let col = col_idx[w_idx] as usize;
+                // Outgoing from row to col
+                map.outgoing[row].push((col, w_idx));
+                // Incoming to col from row
+                map.incoming[col].push((row, w_idx));
+            }
+        }
+        map
+    }
+}
 
 /// Training configuration
 #[derive(Debug, Clone)]
@@ -75,7 +112,7 @@ pub struct TrainingStats {
     pub weight_std: f32,
 }
 
-/// MNIST Trainer with Triplet STDP
+/// MNIST Trainer with Triplet STDP + Supervision
 pub struct MNISTTrainer {
     /// Training configuration
     config: TrainingConfig,
@@ -97,12 +134,31 @@ pub struct MNISTTrainer {
 
     /// Training statistics
     stats: Vec<TrainingStats>,
+
+    /// Hidden layer neuron range (for STDP weight updates)
+    hidden_start: usize,
+    hidden_end: usize,
+
+    /// Input layer size
+    input_size: usize,
+
+    /// Cached connectivity map for efficient CPU-side STDP
+    conn_map: Option<ConnectivityMap>,
+
+    /// Accumulator for weight changes (to batch updates)
+    weight_changes: Vec<f32>,
 }
 
 impl MNISTTrainer {
     /// Create new MNIST trainer
     pub fn new(simulator: Simulator, config: TrainingConfig, stdp_config: STDPConfig) -> Self {
         let n_neurons = simulator.n_neurons();
+
+        // Architecture: 784 input -> 400 hidden -> 10 output
+        let input_size = 784;
+        let output_size = 10;
+        let hidden_start = input_size;
+        let hidden_end = n_neurons.saturating_sub(output_size);
 
         // Initialize STDP
         let stdp = TripletSTDP::new(n_neurons, stdp_config);
@@ -111,7 +167,7 @@ impl MNISTTrainer {
         let homeostasis = HomeostaticPlasticity::new(n_neurons, config.target_rate);
 
         // Output neurons: last 10 neurons represent digits 0-9
-        let output_start = n_neurons.saturating_sub(10);
+        let output_start = n_neurons.saturating_sub(output_size);
         let output_assignments: Vec<usize> = (output_start..n_neurons).collect();
 
         Self {
@@ -122,42 +178,132 @@ impl MNISTTrainer {
             stp: None,
             output_assignments,
             stats: Vec::new(),
+            hidden_start,
+            hidden_end,
+            input_size,
+            conn_map: None,
+            weight_changes: Vec::new(),
         }
     }
 
-    /// Train on single image
+    /// Initialize connectivity map from simulator (must be called before training)
+    pub fn loop_init_checks(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        if self.conn_map.is_none() {
+            if let Some(conn) = self.simulator.get_connectivity() {
+                let device = self.simulator.cuda.device();
+
+                // Download topology
+                let mut row_ptr = vec![0i32; conn.row_ptr.len()];
+                let mut col_idx = vec![0i32; conn.col_idx.len()];
+
+                device.dtoh_sync_copy_into(&conn.row_ptr, &mut row_ptr)?;
+                device.dtoh_sync_copy_into(&conn.col_idx, &mut col_idx)?;
+
+                self.conn_map = Some(ConnectivityMap::from_csr(
+                    &row_ptr,
+                    &col_idx,
+                    self.simulator.n_neurons(),
+                ));
+                self.weight_changes = vec![0.0; conn.weights.len()];
+                log::info!("Initialized connectivity map for efficient STDP");
+            }
+        }
+        Ok(())
+    }
+
+    /// Train on single image with supervision
     pub fn train_on_image(&mut self, image: &MNISTImage) -> Result<(), Box<dyn std::error::Error>> {
+        // Ensure connectivity map is initialized
+        self.loop_init_checks()?;
+
+        let label = image.label as usize;
+
         // Convert image to input currents (784 pixels → 784 input neurons)
         let mut input_currents = image.to_input_currents(10.0); // Scale factor
 
         // Pad with zeros for hidden and output neurons
         input_currents.resize(self.simulator.n_neurons(), 0.0);
 
+        // SUPERVISION: Inject current into correct output neuron
+        let correct_output = self.output_assignments[label];
+        input_currents[correct_output] = 15.0; // Strong teacher signal
+
         // Present image for configured duration
         let n_steps = (self.config.presentation_duration / self.simulator.dt()) as usize;
 
-        for _ in 0..n_steps {
+        // Track spike counts per hidden neuron for STDP
+        let mut hidden_spike_counts = vec![0u32; self.hidden_end - self.hidden_start];
+        let mut output_spike_counts = vec![0u32; 10];
+
+        // Winner cache for WTA optimization
+        let mut winner_cache: Option<usize> = None;
+
+        for step in 0..n_steps {
+            // Apply lateral inhibition to non-winning hidden neurons (optimized: every 100 steps)
+            self.apply_wta_inhibition(&mut input_currents, step, &mut winner_cache)?;
+
             // Update simulator
             self.simulator.step(Some(&input_currents))?;
 
             // Get spikes
             let spikes = self.simulator.get_spikes()?;
 
-            // Apply Winner-Take-All lateral inhibition
-            let _winner_idx = self.apply_wta(&spikes);
-
-            // Update STDP traces
+            // Update STDP traces and count spikes
             for (neuron_id, &spike) in spikes.iter().enumerate() {
                 if spike > 0.5 {
                     self.stdp.on_pre_spike(neuron_id);
                     self.stdp.on_post_spike(neuron_id);
                     self.homeostasis.record_spike(neuron_id);
+
+                    // Count hidden layer spikes
+                    if neuron_id >= self.hidden_start && neuron_id < self.hidden_end {
+                        hidden_spike_counts[neuron_id - self.hidden_start] += 1;
+                    }
+
+                    // Count output layer spikes
+                    for (class_idx, &out_idx) in self.output_assignments.iter().enumerate() {
+                        if neuron_id == out_idx {
+                            output_spike_counts[class_idx] += 1;
+                        }
+                    }
+
+                    // ACCUMULATE STDP WEIGHT CHANGES
+                    // Access cached connectivity map directly via self
+                    // This avoids borrowing issues
+                    if let Some(map) = &self.conn_map {
+                        // 1. LTD: Update incoming connections (Post-spike)
+                        for &(pre_id, w_idx) in &map.incoming[neuron_id] {
+                            let dw = self.stdp.calculate_dw(pre_id, neuron_id);
+                            self.weight_changes[w_idx] += dw;
+                        }
+
+                        // 2. LTP: Update outgoing connections (Pre-spike)
+                        for &(post_id, w_idx) in &map.outgoing[neuron_id] {
+                            let dw = self.stdp.calculate_dw(neuron_id, post_id);
+                            self.weight_changes[w_idx] += dw;
+                        }
+                    }
                 }
             }
 
             // Decay traces
             self.stdp.decay_traces(self.simulator.dt());
         }
+
+        // Apply STDP weight updates ONCE at end of presentation
+        self.apply_accumulated_weight_updates()?;
+
+        // === SUPERVISION SIGNAL ===
+        // Reward/punish based on whether correct output fired most
+        let predicted = output_spike_counts
+            .iter()
+            .enumerate()
+            .max_by_key(|(_, &count)| count)
+            .map(|(idx, _)| idx)
+            .unwrap_or(0);
+
+        let reward = if predicted == label { 1.0 } else { -0.3 };
+        self.apply_reward_modulation(reward)?;
 
         // Rest period (ISI)
         let isi_steps = (self.config.isi_duration / self.simulator.dt()) as usize;
@@ -169,25 +315,93 @@ impl MNISTTrainer {
         Ok(())
     }
 
-    /// Apply Winner-Take-All lateral inhibition
-    /// Returns index of winning neuron (highest spike count)
-    fn apply_wta(&self, spikes: &[f32]) -> Option<usize> {
-        let mut max_idx = None;
-        let mut max_spikes = 0.0;
+    /// Apply accumulated weight updates
+    fn apply_accumulated_weight_updates(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        if self.simulator.get_connectivity().is_none() {
+            return Ok(());
+        }
 
-        // Find neuron with most spikes (winner)
-        for (idx, &spike) in spikes.iter().enumerate() {
-            if spike > max_spikes {
-                max_spikes = spike;
-                max_idx = Some(idx);
+        let mut weights = self.simulator.get_weights()?;
+
+        let mut changed_count = 0;
+        let mut max_dw = 0.0f32;
+
+        // Apply changes
+        for (i, dw) in self.weight_changes.iter_mut().enumerate() {
+            if *dw != 0.0 {
+                weights[i] = self.stdp.update_weight(weights[i], *dw);
+                *dw = 0.0; // Reset accumulator
+                changed_count += 1;
+                if dw.abs() > max_dw {
+                    max_dw = dw.abs();
+                }
             }
         }
 
-        // Lateral inhibition is achieved via WTA strength parameter
-        // configured in TrainingConfig.wta_strength (typically 17-20)
-        // This inhibits competing neurons during learning phase
+        // Only upload if something changed
+        if changed_count > 0 {
+            self.simulator.set_weights(&weights)?;
+        }
 
-        max_idx
+        Ok(())
+    }
+
+    /// Apply reward modulation to recent weight changes
+    fn apply_reward_modulation(&mut self, reward: f32) -> Result<(), Box<dyn std::error::Error>> {
+        if self.simulator.get_connectivity().is_none() {
+            return Ok(());
+        }
+
+        let mut weights = self.simulator.get_weights()?;
+
+        // Scale recent weight changes by reward
+        // Positive reward: amplify changes, Negative: reverse changes
+        let modulation = 1.0 + reward * 0.1;
+
+        for w in &mut weights {
+            // Soft modulation to avoid instability
+            *w = (*w * modulation).clamp(self.stdp.config.w_min, self.stdp.config.w_max);
+        }
+
+        self.simulator.set_weights(&weights)?;
+        Ok(())
+    }
+
+    /// Apply Winner-Take-All lateral inhibition to hidden layer
+    /// Only fetches voltages every 100 steps to reduce GPU→CPU transfers
+    fn apply_wta_inhibition(
+        &mut self,
+        currents: &mut [f32],
+        step: usize,
+        winner_cache: &mut Option<usize>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        // Only recalculate winner every 100 steps to reduce GPU→CPU overhead
+        if step % 100 == 0 || winner_cache.is_none() {
+            let voltages = self.simulator.get_voltages()?;
+
+            // Find winner in hidden layer (highest membrane potential)
+            let mut max_v = f32::NEG_INFINITY;
+            let mut best_idx = None;
+
+            for i in self.hidden_start..self.hidden_end {
+                if voltages[i] > max_v {
+                    max_v = voltages[i];
+                    best_idx = Some(i);
+                }
+            }
+            *winner_cache = best_idx;
+        }
+
+        // Apply lateral inhibition to non-winners
+        if let Some(winner) = *winner_cache {
+            for i in self.hidden_start..self.hidden_end {
+                if i != winner {
+                    currents[i] -= self.config.wta_strength;
+                }
+            }
+        }
+
+        Ok(())
     }
 
     /// Train for one epoch
