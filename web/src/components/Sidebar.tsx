@@ -2,11 +2,13 @@ import { NavLink } from 'react-router-dom';
 import { 
   Brain, Cpu, Zap, Github, X,
   Layers, Dna, Compass, TrendingUp, Lightbulb,
-  GitMerge, FlaskConical, HardDrive, MessageSquare, Database
+  GitMerge, FlaskConical, HardDrive, MessageSquare, Database,
+  Terminal, Activity, Calculator
 } from 'lucide-react';
 
 const navItems = [
   { label: 'Introduction', path: '/', icon: Brain },
+  { label: 'CLI Reference', path: '/docs/cli_reference.md', icon: Terminal },
   { label: 'Architecture', path: '/docs/architecture/system_overview.md', icon: Cpu },
   { 
     label: 'Modules', 
@@ -17,6 +19,8 @@ const navItems = [
       { label: 'Neuron Models', path: '/docs/modules/neuron_models.md', icon: Zap },
       { label: 'Cognitive Upgrades', path: '/docs/modules/cognitive_upgrades.md', icon: TrendingUp },
       { label: 'Reasoning & Motivation', path: '/docs/modules/reasoning_motivation.md', icon: Lightbulb },
+      { label: 'Problem Solving', path: '/docs/modules/problem_solving.md', icon: Calculator },
+      { label: 'MNIST Benchmark', path: '/docs/modules/mnist_benchmark.md', icon: Activity },
     ]
   },
   {

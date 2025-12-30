@@ -11,6 +11,7 @@ const MarkdownViewer = lazy(() => import('./components/MarkdownViewer').then(mod
 
 const allPages = [
   { label: 'Introduction', path: '/' },
+  { label: 'CLI Reference', path: '/docs/cli_reference.md' },
   { label: 'Architecture', path: '/docs/architecture/system_overview.md' },
   { label: 'Cortical Hierarchy', path: '/docs/modules/cortical_hierarchy.md' },
   { label: 'Subcortical Systems', path: '/docs/modules/subcortical_systems.md' },
@@ -18,6 +19,8 @@ const allPages = [
   { label: 'Neuron Models', path: '/docs/modules/neuron_models.md' },
   { label: 'Cognitive Upgrades', path: '/docs/modules/cognitive_upgrades.md' },
   { label: 'Reasoning & Motivation', path: '/docs/modules/reasoning_motivation.md' },
+  { label: 'Problem Solving', path: '/docs/modules/problem_solving.md' },
+  { label: 'MNIST Benchmark', path: '/docs/modules/mnist_benchmark.md' },
   { label: 'Plasticity', path: '/docs/internals/plasticity.md' },
   { label: 'Neuromodulation', path: '/docs/internals/neuromodulation.md' },
   { label: 'GPU Acceleration', path: '/docs/internals/gpu_acceleration.md' },
