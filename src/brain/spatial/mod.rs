@@ -58,9 +58,8 @@ impl PlaceCell {
 
     /// Update firing rate based on position
     pub fn update(&mut self, position: (f32, f32)) {
-        let distance = ((position.0 - self.center.0).powi(2)
-            + (position.1 - self.center.1).powi(2))
-            .sqrt();
+        let distance =
+            ((position.0 - self.center.0).powi(2) + (position.1 - self.center.1).powi(2)).sqrt();
 
         // Gaussian tuning curve
         let gaussian = (-distance.powi(2) / (2.0 * self.field_size.powi(2))).exp();
@@ -70,9 +69,8 @@ impl PlaceCell {
 
     /// Check if in place field
     pub fn in_field(&self, position: (f32, f32)) -> bool {
-        let distance = ((position.0 - self.center.0).powi(2)
-            + (position.1 - self.center.1).powi(2))
-            .sqrt();
+        let distance =
+            ((position.0 - self.center.0).powi(2) + (position.1 - self.center.1).powi(2)).sqrt();
         distance < self.field_size
     }
 
@@ -118,10 +116,7 @@ impl GridCell {
         let mut rng = rand::thread_rng();
         use rand::Rng;
 
-        let phase = (
-            rng.gen_range(0.0..spacing),
-            rng.gen_range(0.0..spacing),
-        );
+        let phase = (rng.gen_range(0.0..spacing), rng.gen_range(0.0..spacing));
 
         Self {
             id,
@@ -215,7 +210,7 @@ impl GridModule {
                 GridCell::new(
                     i,
                     spacing,
-                    rng.gen_range(0.0..(PI / 3.0)),  // Random orientation within 60°
+                    rng.gen_range(0.0..(PI / 3.0)), // Random orientation within 60°
                     module_id,
                 )
             })
@@ -300,7 +295,8 @@ impl GridCellSystem {
 
         if let Some(module) = self.modules.first() {
             // Use finest scale module
-            let max_cell = module.cells
+            let max_cell = module
+                .cells
                 .iter()
                 .max_by(|a, b| a.firing_rate.partial_cmp(&b.firing_rate).unwrap());
 
@@ -355,14 +351,15 @@ impl SemanticGrid {
         // Simple projection (in reality would use learned mapping)
         let x = features.iter().step_by(2).sum::<f32>();
         let y = features.iter().skip(1).step_by(2).sum::<f32>();
-        (x * 100.0, y * 100.0)  // Scale to cm
+        (x * 100.0, y * 100.0) // Scale to cm
     }
 
     /// Retrieve similar concepts
     pub fn retrieve_similar(&self, query: &[f32], k: usize) -> Vec<Vec<f32>> {
         let query_pos = self.features_to_position(query);
 
-        let mut distances: Vec<(Vec<f32>, f32)> = self.semantic_map
+        let mut distances: Vec<(Vec<f32>, f32)> = self
+            .semantic_map
             .iter()
             .map(|(feat, pos)| {
                 let dist = ((pos.0 - query_pos.0).powi(2) + (pos.1 - query_pos.1).powi(2)).sqrt();
@@ -413,7 +410,7 @@ impl SpatialSystem {
                         rng.gen_range(0.0..environment_size),
                         rng.gen_range(0.0..environment_size),
                     ),
-                    rng.gen_range(30.0..50.0),  // 30-50cm fields
+                    rng.gen_range(30.0..50.0), // 30-50cm fields
                     0,
                 )
             })
@@ -437,7 +434,7 @@ impl SpatialSystem {
         self.velocity = velocity;
 
         // Integrate position
-        self.position.0 += velocity.0 * dt / 1000.0;  // dt in ms
+        self.position.0 += velocity.0 * dt / 1000.0; // dt in ms
         self.position.1 += velocity.1 * dt / 1000.0;
 
         // Wrap around environment
@@ -505,7 +502,7 @@ mod tests {
         cell.update((0.0, 0.0));
         let rate1 = cell.firing_rate;
 
-        cell.update((50.0, 0.0));  // One spacing over
+        cell.update((50.0, 0.0)); // One spacing over
         let rate2 = cell.firing_rate;
 
         // Should have hexagonal pattern

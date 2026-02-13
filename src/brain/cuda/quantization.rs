@@ -2,7 +2,7 @@
 //!
 //! FP16 quantization reduces memory usage by 50% with minimal quality loss
 
-use cudarc::driver::{CudaDevice, CudaFunction, LaunchAsync, CudaSlice};
+use cudarc::driver::{CudaDevice, CudaFunction, CudaSlice, LaunchAsync};
 use std::sync::Arc;
 
 /// FP32 to FP16 conversion kernel
@@ -77,7 +77,9 @@ impl FP16Quantizer {
         let params = (input, output, n as i32);
 
         unsafe {
-            self.to_fp16_kernel.clone().launch(config.to_launch_config(), params)?;
+            self.to_fp16_kernel
+                .clone()
+                .launch(config.to_launch_config(), params)?;
         }
 
         self.device.synchronize()?;
@@ -98,7 +100,9 @@ impl FP16Quantizer {
         let params = (input, output, n as i32);
 
         unsafe {
-            self.to_fp32_kernel.clone().launch(config.to_launch_config(), params)?;
+            self.to_fp32_kernel
+                .clone()
+                .launch(config.to_launch_config(), params)?;
         }
 
         self.device.synchronize()?;
@@ -147,7 +151,8 @@ impl QuantizedTensor {
 
     /// Load as FP32 (automatically dequantizes from FP16)
     pub fn load(&mut self) -> Result<&CudaSlice<f32>, Box<dyn std::error::Error>> {
-        self.quantizer.dequantize(&self.storage_fp16, &mut self.working_fp32)?;
+        self.quantizer
+            .dequantize(&self.storage_fp16, &mut self.working_fp32)?;
         Ok(&self.working_fp32)
     }
 
@@ -195,14 +200,20 @@ mod tests {
                     let expected_precision = if val.abs() < 1.0 { 0.001 } else { 0.01 };
 
                     // Verify value is within FP16 range (-65504 to 65504)
-                    assert!(val.abs() <= 65504.0,
-                        "Value {} should be within FP16 range", val);
+                    assert!(
+                        val.abs() <= 65504.0,
+                        "Value {} should be within FP16 range",
+                        val
+                    );
 
                     // Verify precision expectation (mock quantization)
                     let quantized_approx = (val / expected_precision).round() * expected_precision;
-                    assert!((val - quantized_approx).abs() <= expected_precision,
+                    assert!(
+                        (val - quantized_approx).abs() <= expected_precision,
                         "FP16 precision test for value {}: expected precision {}",
-                        val, expected_precision);
+                        val,
+                        expected_precision
+                    );
                 }
 
                 eprintln!("CUDA device not available - tested FP16 precision requirements instead");

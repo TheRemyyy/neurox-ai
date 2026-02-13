@@ -178,8 +178,8 @@ impl StriatumNeuron {
 
             // D1 and D2 respond differently to dopamine
             let modulated_delta = match self.receptor_type {
-                ReceptorType::D1 => delta_w,        // Potentiate when dopamine high
-                ReceptorType::D2 => -delta_w,       // Potentiate when dopamine low
+                ReceptorType::D1 => delta_w,  // Potentiate when dopamine high
+                ReceptorType::D2 => -delta_w, // Potentiate when dopamine low
             };
 
             *weight += modulated_delta;
@@ -401,7 +401,10 @@ impl BasalGanglia {
             .collect();
 
         // Softmax selection
-        let max_score = action_scores.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+        let max_score = action_scores
+            .iter()
+            .cloned()
+            .fold(f32::NEG_INFINITY, f32::max);
         let exp_scores: Vec<f32> = action_scores
             .iter()
             .map(|&s| ((s - max_score) / self.temperature).exp())
@@ -445,17 +448,21 @@ impl BasalGanglia {
 
     /// Get statistics
     pub fn stats(&self) -> BasalGangliaStats {
-        let avg_d1_trace: f32 = self.striatum
+        let avg_d1_trace: f32 = self
+            .striatum
             .iter()
             .filter(|n| n.receptor_type == ReceptorType::D1)
             .map(|n| n.eligibility_trace)
-            .sum::<f32>() / (self.n_striatum / 2) as f32;
+            .sum::<f32>()
+            / (self.n_striatum / 2) as f32;
 
-        let avg_d2_trace: f32 = self.striatum
+        let avg_d2_trace: f32 = self
+            .striatum
             .iter()
             .filter(|n| n.receptor_type == ReceptorType::D2)
             .map(|n| n.eligibility_trace)
-            .sum::<f32>() / (self.n_striatum / 2) as f32;
+            .sum::<f32>()
+            / (self.n_striatum / 2) as f32;
 
         BasalGangliaStats {
             dopamine_level: self.dopamine.dopamine_level,

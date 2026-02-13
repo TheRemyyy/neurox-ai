@@ -30,9 +30,9 @@ impl TripletSTDP {
             pre_traces: vec![0.0; n_neurons],
             post_traces_1: vec![0.0; n_neurons],
             post_traces_2: vec![0.0; n_neurons],
-            tau_pre: 20.0,    // ms
-            tau_post1: 20.0,  // ms
-            tau_post2: 40.0,  // ms (slower trace)
+            tau_pre: 20.0,   // ms
+            tau_post1: 20.0, // ms
+            tau_post2: 40.0, // ms (slower trace)
         }
     }
 
@@ -190,13 +190,13 @@ impl CalciumBasedPlasticity {
     pub fn new(n_synapses: usize) -> Self {
         Self {
             calcium: vec![0.0; n_synapses],
-            tau_ca: 20.0,           // 20ms calcium decay
-            eta_nmda: 0.5,          // NMDA contribution
-            eta_vdcc: 0.3,          // VDCC contribution
-            theta_plus: 1.0,        // LTP threshold (high calcium)
-            theta_minus: 0.5,       // LTD threshold (moderate calcium)
-            k_plus: 0.001,          // LTP rate
-            k_minus: 0.0005,        // LTD rate
+            tau_ca: 20.0,     // 20ms calcium decay
+            eta_nmda: 0.5,    // NMDA contribution
+            eta_vdcc: 0.3,    // VDCC contribution
+            theta_plus: 1.0,  // LTP threshold (high calcium)
+            theta_minus: 0.5, // LTD threshold (moderate calcium)
+            k_plus: 0.001,    // LTP rate
+            k_minus: 0.0005,  // LTD rate
             learning_rate: 0.01,
             w_min: 0.0,
             w_max: 1.0,
@@ -220,11 +220,9 @@ impl CalciumBasedPlasticity {
         let ca = self.calcium[synapse_id];
 
         // d[Ca²⁺]/dt = -[Ca²⁺]/τCa + ηNMDA·INMDA + ηVDCC·IVDCC
-        let d_ca = -ca / self.tau_ca
-            + self.eta_nmda * nmda_current
-            + self.eta_vdcc * vdcc_current;
+        let d_ca = -ca / self.tau_ca + self.eta_nmda * nmda_current + self.eta_vdcc * vdcc_current;
 
-        self.calcium[synapse_id] = (ca + d_ca * dt).max(0.0).min(5.0);  // Clamp to biological range
+        self.calcium[synapse_id] = (ca + d_ca * dt).max(0.0).min(5.0); // Clamp to biological range
     }
 
     /// Calculate weight change based on calcium level
@@ -333,14 +331,14 @@ impl BurstDependentSTDP {
             ca_pre: vec![0.0; n_synapses],
             ca_post: vec![0.0; n_synapses],
             ca_total: vec![0.0; n_synapses],
-            alpha_nl: 2.0,          // Nonlinear amplification
-            tau_ca: 50.0,           // 50ms calcium decay
-            theta_plus: 1.5,        // LTP threshold (requires burst)
-            theta_minus: 0.8,       // LTD threshold
-            gamma_plus: 0.002,      // LTP rate
-            gamma_minus: 0.001,     // LTD rate
-            burst_window: 100.0,    // 100ms burst detection window
-            burst_threshold: 3,     // ≥3 spikes = burst
+            alpha_nl: 2.0,       // Nonlinear amplification
+            tau_ca: 50.0,        // 50ms calcium decay
+            theta_plus: 1.5,     // LTP threshold (requires burst)
+            theta_minus: 0.8,    // LTD threshold
+            gamma_plus: 0.002,   // LTP rate
+            gamma_minus: 0.001,  // LTD rate
+            burst_window: 100.0, // 100ms burst detection window
+            burst_threshold: 3,  // ≥3 spikes = burst
             pre_spike_times: vec![Vec::new(); n_synapses],
             post_spike_times: vec![Vec::new(); n_synapses],
         }
@@ -423,7 +421,7 @@ mod tests {
 
         // Simulate NMDA activation
         for _ in 0..100 {
-            cbp.update_calcium(0, 0.1, 5.0, 2.0);  // Strong NMDA + VDCC
+            cbp.update_calcium(0, 0.1, 5.0, 2.0); // Strong NMDA + VDCC
         }
 
         // Should have elevated calcium
@@ -453,8 +451,10 @@ mod tests {
         let dw_burst = bdstdp.calculate_dw(1, 0.1);
 
         println!("Single spike dw: {}, Burst dw: {}", dw_single, dw_burst);
-        assert!(dw_burst.abs() > dw_single.abs(),
-            "Bursts should produce stronger plasticity");
+        assert!(
+            dw_burst.abs() > dw_single.abs(),
+            "Bursts should produce stronger plasticity"
+        );
     }
 
     #[test]
@@ -463,13 +463,23 @@ mod tests {
 
         // Set calcium to LTD range (between theta_minus and theta_plus)
         // theta_minus = 0.5, theta_plus = 1.0
-        cbp.calcium[0] = 0.7;  // In LTD range
+        cbp.calcium[0] = 0.7; // In LTD range
         let dw_ltd = cbp.calculate_dw(0, 1.0);
-        assert!(dw_ltd < 0.0, "Moderate calcium ({}) should induce LTD, got dw={}", cbp.calcium[0], dw_ltd);
+        assert!(
+            dw_ltd < 0.0,
+            "Moderate calcium ({}) should induce LTD, got dw={}",
+            cbp.calcium[0],
+            dw_ltd
+        );
 
         // Set calcium to LTP range (above theta_plus)
-        cbp.calcium[0] = 1.5;  // Above LTP threshold
+        cbp.calcium[0] = 1.5; // Above LTP threshold
         let dw_ltp = cbp.calculate_dw(0, 1.0);
-        assert!(dw_ltp > 0.0, "High calcium ({}) should induce LTP, got dw={}", cbp.calcium[0], dw_ltp);
+        assert!(
+            dw_ltp > 0.0,
+            "High calcium ({}) should induce LTP, got dw={}",
+            cbp.calcium[0],
+            dw_ltp
+        );
     }
 }

@@ -76,8 +76,8 @@ pub struct RSTDPSystem {
     pub tau_post: f32,
 
     /// STDP parameters
-    pub a_plus: f32,   // LTP amplitude
-    pub a_minus: f32,  // LTD amplitude
+    pub a_plus: f32, // LTP amplitude
+    pub a_minus: f32, // LTD amplitude
 
     /// Reward statistics (for meta-learning)
     pub reward_mean: f32,
@@ -105,15 +105,15 @@ impl RSTDPSystem {
         Self {
             synapses: HashMap::new(),
             eta,
-            tau_eligibility: 1000.0,  // 1s eligibility trace
-            tau_pre: 20.0,             // 20ms pre-synaptic trace
-            tau_post: 20.0,            // 20ms post-synaptic trace
-            a_plus: 0.01,              // LTP amplitude
-            a_minus: 0.012,            // LTD amplitude (slightly stronger)
+            tau_eligibility: 1000.0, // 1s eligibility trace
+            tau_pre: 20.0,           // 20ms pre-synaptic trace
+            tau_post: 20.0,          // 20ms post-synaptic trace
+            a_plus: 0.01,            // LTP amplitude
+            a_minus: 0.012,          // LTD amplitude (slightly stronger)
             reward_mean: 0.0,
             reward_std: 1.0,
             reward_history: Vec::new(),
-            reward_window: 100,        // Track last 100 rewards
+            reward_window: 100, // Track last 100 rewards
             meta_learning_enabled: true,
             eta_min: 0.0001,
             eta_max: 0.01,
@@ -126,7 +126,8 @@ impl RSTDPSystem {
 
     /// Add synapse
     pub fn add_synapse(&mut self, pre_id: usize, post_id: usize, initial_weight: f32) {
-        self.synapses.insert((pre_id, post_id), RSTDPSynapse::new(initial_weight));
+        self.synapses
+            .insert((pre_id, post_id), RSTDPSynapse::new(initial_weight));
     }
 
     /// Update traces on pre-synaptic spike
@@ -179,7 +180,8 @@ impl RSTDPSystem {
         let n = self.reward_history.len() as f32;
         self.reward_mean = self.reward_history.iter().sum::<f32>() / n;
 
-        let variance: f32 = self.reward_history
+        let variance: f32 = self
+            .reward_history
             .iter()
             .map(|r| (r - self.reward_mean).powi(2))
             .sum::<f32>()
@@ -193,7 +195,8 @@ impl RSTDPSystem {
         if self.meta_learning_enabled {
             // Higher uncertainty → higher learning rate
             let uncertainty = self.reward_std;
-            self.eta = self.eta_min + (self.eta_max - self.eta_min) * (uncertainty / (1.0 + uncertainty));
+            self.eta =
+                self.eta_min + (self.eta_max - self.eta_min) * (uncertainty / (1.0 + uncertainty));
         }
 
         // Update all synaptic weights using eligibility traces
@@ -246,8 +249,10 @@ impl RSTDPSystem {
             };
         }
 
-        let avg_weight = self.synapses.values().map(|s| s.weight).sum::<f32>() / self.synapses.len() as f32;
-        let avg_eligibility = self.synapses.values().map(|s| s.eligibility).sum::<f32>() / self.synapses.len() as f32;
+        let avg_weight =
+            self.synapses.values().map(|s| s.weight).sum::<f32>() / self.synapses.len() as f32;
+        let avg_eligibility =
+            self.synapses.values().map(|s| s.eligibility).sum::<f32>() / self.synapses.len() as f32;
 
         RSTDPStats {
             num_synapses: self.synapses.len(),
@@ -303,7 +308,10 @@ mod tests {
         rstdp.on_post_spike(1, &[0], 10.0); // 10ms later
 
         let synapse = rstdp.synapses.get(&(0, 1)).unwrap();
-        assert!(synapse.eligibility > 0.0, "Causal pairing should create positive eligibility");
+        assert!(
+            synapse.eligibility > 0.0,
+            "Causal pairing should create positive eligibility"
+        );
     }
 
     #[test]
@@ -328,9 +336,12 @@ mod tests {
         let final_weight = rstdp.get_weight(0, 1).unwrap();
 
         // Positive eligibility + positive reward → weight increase
-        assert!(final_weight > initial_weight,
+        assert!(
+            final_weight > initial_weight,
             "Positive reward should increase weight (initial={}, final={})",
-            initial_weight, final_weight);
+            initial_weight,
+            final_weight
+        );
     }
 
     #[test]
@@ -374,9 +385,12 @@ mod tests {
 
         let eta_low_variance = rstdp.eta;
 
-        assert!(eta_high_variance > eta_low_variance,
+        assert!(
+            eta_high_variance > eta_low_variance,
             "High variance should increase learning rate (high={}, low={})",
-            eta_high_variance, eta_low_variance);
+            eta_high_variance,
+            eta_low_variance
+        );
     }
 
     #[test]
@@ -397,8 +411,10 @@ mod tests {
 
         let final_eligibility = rstdp.synapses.get(&(0, 1)).unwrap().eligibility;
 
-        assert!(final_eligibility < initial_eligibility * 0.5,
-            "Eligibility should decay over time");
+        assert!(
+            final_eligibility < initial_eligibility * 0.5,
+            "Eligibility should decay over time"
+        );
     }
 
     #[test]
@@ -450,10 +466,16 @@ mod tests {
         let weight_02_after = rstdp.get_weight(0, 2).unwrap();
 
         // Only synapse with eligibility should change
-        assert!((weight_01_after - weight_01_before).abs() > 0.00001,
+        assert!(
+            (weight_01_after - weight_01_before).abs() > 0.00001,
             "Synapse with eligibility should change (01_before={}, 01_after={}, diff={})",
-            weight_01_before, weight_01_after, (weight_01_after - weight_01_before).abs());
-        assert!((weight_02_after - weight_02_before).abs() < 0.00001,
-            "Synapse without eligibility should not change");
+            weight_01_before,
+            weight_01_after,
+            (weight_01_after - weight_01_before).abs()
+        );
+        assert!(
+            (weight_02_after - weight_02_before).abs() < 0.00001,
+            "Synapse without eligibility should not change"
+        );
     }
 }

@@ -58,15 +58,13 @@ impl BCMMetaplasticity {
 
         // Compute <y²>
         if !self.activity_history.is_empty() {
-            self.target_activity_squared = self.activity_history
-                .iter()
-                .map(|&y| y * y)
-                .sum::<f32>() / self.activity_history.len() as f32;
+            self.target_activity_squared =
+                self.activity_history.iter().map(|&y| y * y).sum::<f32>()
+                    / self.activity_history.len() as f32;
 
             // Slide threshold toward <y²>
             let decay = (-dt / self.tau_threshold).exp();
-            self.threshold = self.threshold * decay
-                + self.target_activity_squared * (1.0 - decay);
+            self.threshold = self.threshold * decay + self.target_activity_squared * (1.0 - decay);
         }
     }
 
@@ -115,7 +113,7 @@ impl SynapticScaling {
     pub fn new(target_rate: f32) -> Self {
         Self {
             target_rate,
-            tau_scaling: 172800000.0,  // 48 hours in ms
+            tau_scaling: 172800000.0, // 48 hours in ms
             scaling_factor: 1.0,
             rate_history: Vec::new(),
             history_size: 1000,
@@ -130,16 +128,14 @@ impl SynapticScaling {
         }
 
         if !self.rate_history.is_empty() {
-            let avg_rate = self.rate_history.iter().sum::<f32>()
-                / self.rate_history.len() as f32;
+            let avg_rate = self.rate_history.iter().sum::<f32>() / self.rate_history.len() as f32;
 
             // Multiplicative scaling: w_new = w_old * (target / actual)
             let target_scaling = self.target_rate / avg_rate.max(0.1);
 
             // Slow update
             let decay = (-dt / self.tau_scaling).exp();
-            self.scaling_factor = self.scaling_factor * decay
-                + target_scaling * (1.0 - decay);
+            self.scaling_factor = self.scaling_factor * decay + target_scaling * (1.0 - decay);
 
             // Clamp to reasonable range
             self.scaling_factor = self.scaling_factor.clamp(0.1, 10.0);
@@ -290,8 +286,7 @@ impl IntrinsicPlasticity {
             self.rate_buffer.remove(0);
         }
 
-        let avg_rate = self.rate_buffer.iter().sum::<f32>()
-            / self.rate_buffer.len().max(1) as f32;
+        let avg_rate = self.rate_buffer.iter().sum::<f32>() / self.rate_buffer.len().max(1) as f32;
 
         // Adjust threshold to maintain target rate
         // High firing → increase threshold (reduce excitability)
@@ -335,7 +330,7 @@ pub struct HomeostaticSystem {
 impl HomeostaticSystem {
     pub fn new(target_rate: f32, initial_threshold: f32) -> Self {
         Self {
-            bcm: BCMMetaplasticity::new(10000.0, 1000),  // 10s window
+            bcm: BCMMetaplasticity::new(10000.0, 1000), // 10s window
             scaling: SynapticScaling::new(target_rate),
             criticality: CriticalityHomeostasis::new(),
             intrinsic: IntrinsicPlasticity::new(target_rate, initial_threshold),
@@ -346,13 +341,7 @@ impl HomeostaticSystem {
     }
 
     /// Update all homeostatic mechanisms
-    pub fn update(
-        &mut self,
-        dt: f32,
-        firing_rate: f32,
-        activity: f32,
-        avalanche_size: usize,
-    ) {
+    pub fn update(&mut self, dt: f32, firing_rate: f32, activity: f32, avalanche_size: usize) {
         self.time += dt;
 
         // Update BCM threshold (fast, 10s-1h)
@@ -364,14 +353,16 @@ impl HomeostaticSystem {
         // Update criticality (continuous)
         self.criticality.record_avalanche(avalanche_size);
         self.criticality_update_counter += 1;
-        if self.criticality_update_counter >= 1000 {  // Every second (assuming ~1ms timesteps)
+        if self.criticality_update_counter >= 1000 {
+            // Every second (assuming ~1ms timesteps)
             self.criticality.update();
             self.criticality_update_counter = 0;
         }
 
         // Update intrinsic plasticity (intermediate, ~hours)
         self.intrinsic_update_counter += 1;
-        if self.intrinsic_update_counter >= 100 {  // Every 100ms
+        if self.intrinsic_update_counter >= 100 {
+            // Every 100ms
             self.intrinsic.update(firing_rate);
             self.intrinsic_update_counter = 0;
         }
@@ -463,7 +454,7 @@ mod tests {
 
         // Low firing → scale up
         for _ in 0..100 {
-            scaling.update(1000.0, 1.0);  // 1Hz << 5Hz target
+            scaling.update(1000.0, 1.0); // 1Hz << 5Hz target
         }
 
         assert!(scaling.scaling_factor > 1.0);
@@ -471,7 +462,7 @@ mod tests {
         // High firing → scale down
         let mut scaling2 = SynapticScaling::new(5.0);
         for _ in 0..100 {
-            scaling2.update(1000.0, 20.0);  // 20Hz >> 5Hz target
+            scaling2.update(1000.0, 20.0); // 20Hz >> 5Hz target
         }
 
         assert!(scaling2.scaling_factor < 1.0);
@@ -488,10 +479,15 @@ mod tests {
         }
         crit.update();
 
-        assert!(crit.branching_ratio < 1.0,
-            "Branching ratio should be < 1.0 for subcritical pattern, got {}", crit.branching_ratio);
-        assert!(crit.adjust_toward_criticality() > 0.0,
-            "Should increase excitability for subcritical network");
+        assert!(
+            crit.branching_ratio < 1.0,
+            "Branching ratio should be < 1.0 for subcritical pattern, got {}",
+            crit.branching_ratio
+        );
+        assert!(
+            crit.adjust_toward_criticality() > 0.0,
+            "Should increase excitability for subcritical network"
+        );
     }
 
     #[test]

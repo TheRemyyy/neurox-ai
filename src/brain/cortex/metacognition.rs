@@ -30,7 +30,7 @@ impl Default for MetacognitiveState {
 pub struct Metacognition {
     pub state: MetacognitiveState,
     pub history: Vec<MetacognitiveState>,
-    
+
     // Configurable markers loaded from JSON
     pub reasoning_markers: Vec<String>,
     pub uncertainty_markers: Vec<String>,
@@ -45,7 +45,7 @@ impl Metacognition {
             uncertainty_markers: Vec::new(),
         }
     }
-    
+
     /// Load markers from configuration
     pub fn load_markers(&mut self, reasoning: Vec<String>, uncertainty: Vec<String>) {
         self.reasoning_markers = reasoning;
@@ -54,27 +54,44 @@ impl Metacognition {
 
     /// Analyze a potential response before vocalization.
     /// Returns a state assessing the quality of the thought.
-    pub fn evaluate_thought(&mut self, thought: &str, context_complexity: f32) -> MetacognitiveState {
+    pub fn evaluate_thought(
+        &mut self,
+        thought: &str,
+        context_complexity: f32,
+    ) -> MetacognitiveState {
         // Heuristic 1: Length & Detail (Correlation with "intelligence" in simple models)
         let length_score = (thought.len() as f32 / 100.0).clamp(0.0, 1.0);
-        
+
         // Heuristic 2: Logical Connectors (simulate reasoning)
         // Uses loaded markers instead of hardcoded strings
-        let reasoning_score = if !self.reasoning_markers.is_empty() && self.reasoning_markers.iter().any(|m| thought.to_lowercase().contains(m)) {
+        let reasoning_score = if !self.reasoning_markers.is_empty()
+            && self
+                .reasoning_markers
+                .iter()
+                .any(|m| thought.to_lowercase().contains(m))
+        {
             0.9
         } else {
             0.3
         };
 
         // Heuristic 3: Intellectual Honesty (detection of "I don't know")
-        let uncertainty_score = if !self.uncertainty_markers.is_empty() && self.uncertainty_markers.iter().any(|m| thought.to_lowercase().contains(m)) {
+        let uncertainty_score = if !self.uncertainty_markers.is_empty()
+            && self
+                .uncertainty_markers
+                .iter()
+                .any(|m| thought.to_lowercase().contains(m))
+        {
             0.2 // Low confidence in content, but high honesty
         } else {
             0.8
         };
 
         // Combine scores logic
-        let raw_confidence = (length_score * 0.3) + (reasoning_score * 0.4) + (uncertainty_score * 0.3) + (context_complexity * 0.2);
+        let raw_confidence = (length_score * 0.3)
+            + (reasoning_score * 0.4)
+            + (uncertainty_score * 0.3)
+            + (context_complexity * 0.2);
         let final_confidence = raw_confidence.clamp(0.0, 1.0);
 
         self.state = MetacognitiveState {

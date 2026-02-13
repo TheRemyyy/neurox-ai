@@ -67,7 +67,7 @@ impl BistableNeuron {
         if self.nmda_current > self.plateau_threshold && !self.in_up_state {
             self.in_up_state = true;
         }
-        
+
         // Exit UP state if strong inhibition or fatigue
         if (inhibition > 2.0 || self.adaptation > 1.0) && self.in_up_state {
             self.in_up_state = false;
@@ -75,7 +75,7 @@ impl BistableNeuron {
 
         // 3. Somatic Input
         let mut total_current = synaptic_input - inhibition;
-        
+
         // Add self-sustaining plateau current if in UP state
         if self.in_up_state {
             total_current += self.plateau_current * (1.0 - self.adaptation);
@@ -150,11 +150,13 @@ impl WorkingMemory {
     /// - `attention_threshold`: (Unused in attractor model, kept for API compatibility)
     pub fn new(capacity: usize, pattern_dim: usize, _attention_threshold: f32) -> Self {
         // We simulate a network large enough to hold 'capacity' orthogonal patterns
-        // For simulation efficiency, we map 1:1 neuron to pattern dimension, 
+        // For simulation efficiency, we map 1:1 neuron to pattern dimension,
         // but add "hidden" slots if needed. Here we assume pattern_dim IS the network size.
-        let n_neurons = pattern_dim; 
-        
-        let neurons = (0..n_neurons).map(|i| BistableNeuron::new(i as u32)).collect();
+        let n_neurons = pattern_dim;
+
+        let neurons = (0..n_neurons)
+            .map(|i| BistableNeuron::new(i as u32))
+            .collect();
 
         // Initialize weights as Identity (Auto-associative) - Self-excitation is handled internally
         // In a full Hopfield net, this would be Hebbian learned.
@@ -180,26 +182,30 @@ impl WorkingMemory {
     /// # Returns
     /// `true` if stored (gate was open), `false` otherwise
     pub fn store(&mut self, pattern: &[f32], attention: f32) -> bool {
-        if attention < 0.5 { return false; }
+        if attention < 0.5 {
+            return false;
+        }
 
         assert_eq!(pattern.len(), self.neurons.len(), "Pattern dim mismatch");
 
         // 1. Fast Hebbian Plasticity: Imprint pattern weights
         // W_ij += rate * (p_i * p_j)
-        // To prevent catastrophic forgetting, we implement a "palimpsest" memory 
+        // To prevent catastrophic forgetting, we implement a "palimpsest" memory
         // where old weights decay slightly.
         let learning_rate = 0.5 * attention;
-        let decay = 0.95; 
+        let decay = 0.95;
 
         for i in 0..self.pattern_dim {
             for j in 0..self.pattern_dim {
-                if i == j { continue; } // No self-weights (handled by intrinsic bistability)
-                
+                if i == j {
+                    continue;
+                } // No self-weights (handled by intrinsic bistability)
+
                 let idx = i * self.pattern_dim + j;
                 let delta = learning_rate * pattern[i] * pattern[j];
-                
+
                 self.recurrent_weights[idx] = self.recurrent_weights[idx] * decay + delta;
-                
+
                 // Bound weights
                 self.recurrent_weights[idx] = self.recurrent_weights[idx].clamp(-1.0, 1.0);
             }
@@ -209,7 +215,7 @@ impl WorkingMemory {
         for (i, &val) in pattern.iter().enumerate() {
             if val > 0.5 {
                 // Strong input pushes neuron into UP state
-                self.neurons[i].nmda_current += 1.0; 
+                self.neurons[i].nmda_current += 1.0;
                 self.neurons[i].in_up_state = true;
                 self.neurons[i].adaptation = 0.0; // Reset fatigue (refresh memory)
             }
@@ -225,7 +231,7 @@ impl WorkingMemory {
     pub fn retrieve(&self, query: &[f32]) -> Option<Vec<f32>> {
         // Clone state for simulation
         let mut sim_neurons = self.neurons.clone();
-        
+
         // Inject query
         for (i, &val) in query.iter().enumerate() {
             sim_neurons[i].nmda_current += val * 2.0; // Strong seed
@@ -236,13 +242,14 @@ impl WorkingMemory {
         for _ in 0..20 {
             let n = sim_neurons.len();
             let mut inputs = vec![0.0; n];
-            
+
             // Compute recurrent input
             for i in 0..n {
                 for j in 0..n {
-                    if sim_neurons[j].in_up_state { // Using state as proxy for rate
-                         let weight = self.recurrent_weights[i * n + j];
-                         inputs[i] += weight;
+                    if sim_neurons[j].in_up_state {
+                        // Using state as proxy for rate
+                        let weight = self.recurrent_weights[i * n + j];
+                        inputs[i] += weight;
                     }
                 }
             }
@@ -258,7 +265,8 @@ impl WorkingMemory {
         }
 
         // Read out state
-        let result: Vec<f32> = sim_neurons.iter()
+        let result: Vec<f32> = sim_neurons
+            .iter()
             .map(|n| if n.in_up_state { 1.0 } else { 0.0 })
             .collect();
 
@@ -273,11 +281,13 @@ impl WorkingMemory {
     /// Maintain reverberating activity (Update loop)
     pub fn maintain(&mut self, dt: f32) {
         let n = self.neurons.len();
-        
+
         // 1. Calculate Recurrent Inputs (Matrix-Vector Multiply)
         // input_i = \sum_j W_ij * activity_j
         let mut recurrent_inputs = vec![0.0; n];
-        let activity: Vec<f32> = self.neurons.iter()
+        let activity: Vec<f32> = self
+            .neurons
+            .iter()
             .map(|n| if n.in_up_state { 1.0 } else { 0.0 }) // Binary rate proxy
             .collect();
 
@@ -294,11 +304,11 @@ impl WorkingMemory {
         // 2. Calculate Global Inhibition (Negative Feedback)
         // Regulates network to prevent epilepsy and enforce capacity
         let total_activity: f32 = activity.iter().sum();
-        
-        // Target roughly 'capacity' active neurons (if distributed) 
-        // or 'pattern_dim / capacity' if local. 
+
+        // Target roughly 'capacity' active neurons (if distributed)
+        // or 'pattern_dim / capacity' if local.
         // Simple regulation: Inhibition proportional to activity squared
-        self.global_inhibition = total_activity * 0.05; 
+        self.global_inhibition = total_activity * 0.05;
 
         // 3. Update Neurons
         for (i, neuron) in self.neurons.iter_mut().enumerate() {
@@ -306,7 +316,8 @@ impl WorkingMemory {
         }
 
         // Estimate active items
-        self.active_items = (total_activity / (self.pattern_dim as f32 / self.capacity as f32)).ceil() as usize;
+        self.active_items =
+            (total_activity / (self.pattern_dim as f32 / self.capacity as f32)).ceil() as usize;
     }
 
     /// Clear all memories (Global Reset)
@@ -334,7 +345,9 @@ impl WorkingMemory {
     pub fn get_all_patterns(&self) -> Vec<Vec<f32>> {
         // In an attractor net, patterns are superpositioned.
         // We return the current raw state vector.
-        let state: Vec<f32> = self.neurons.iter()
+        let state: Vec<f32> = self
+            .neurons
+            .iter()
             .map(|n| if n.in_up_state { 1.0 } else { 0.0 })
             .collect();
         vec![state] // Return as single "superposition" pattern
@@ -349,7 +362,7 @@ impl WorkingMemory {
     pub fn stats(&self) -> WorkingMemoryStats {
         let active_neurons = self.neurons.iter().filter(|n| n.in_up_state).count();
         let avg_activity = active_neurons as f32 / self.neurons.len() as f32;
-        
+
         WorkingMemoryStats {
             stored_patterns: self.active_items,
             capacity: self.capacity,
@@ -392,7 +405,10 @@ mod tests {
 
         // Remove input -> Should persist (Bistability)
         neuron.update(1.0, 0.0, 0.0);
-        assert!(neuron.in_up_state, "Neuron should maintain UP state without input");
+        assert!(
+            neuron.in_up_state,
+            "Neuron should maintain UP state without input"
+        );
     }
 
     #[test]
@@ -403,7 +419,10 @@ mod tests {
 
         // Apply strong inhibition
         neuron.update(1.0, 0.0, 5.0);
-        assert!(!neuron.in_up_state, "Strong inhibition should knock neuron out of UP state");
+        assert!(
+            !neuron.in_up_state,
+            "Strong inhibition should knock neuron out of UP state"
+        );
     }
 
     #[test]
@@ -424,9 +443,9 @@ mod tests {
         // Retrieve with partial cue [1, 0, ...]
         let mut cue = vec![0.0; 10];
         cue[0] = 1.0;
-        
+
         let retrieved = wm.retrieve(&cue).unwrap();
-        
+
         // Should complete the pattern (index 1 should be active)
         assert!(retrieved[1] > 0.5, "Pattern completion failed");
     }
@@ -439,7 +458,7 @@ mod tests {
         // Store 3 patterns
         for i in 0..3 {
             let mut pat = vec![0.0; 10];
-            pat[i*2] = 1.0;
+            pat[i * 2] = 1.0;
             wm.store(&pat, 1.0);
         }
 

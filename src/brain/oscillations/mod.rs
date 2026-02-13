@@ -43,7 +43,7 @@ impl ThetaOscillator {
 
     /// Update theta phase
     pub fn update(&mut self, dt: f32) {
-        let delta_phase = self.frequency * dt / 1000.0;  // dt in ms
+        let delta_phase = self.frequency * dt / 1000.0; // dt in ms
         self.phase += delta_phase;
         self.phase %= 1.0;
     }
@@ -67,12 +67,12 @@ impl ThetaOscillator {
 
     /// Check if at peak (good time for encoding)
     pub fn at_peak(&self) -> bool {
-        (self.phase - 0.25).abs() < 0.05  // Peak at phase=0.25
+        (self.phase - 0.25).abs() < 0.05 // Peak at phase=0.25
     }
 
     /// Check if at trough (good time for retrieval)
     pub fn at_trough(&self) -> bool {
-        (self.phase - 0.75).abs() < 0.05  // Trough at phase=0.75
+        (self.phase - 0.75).abs() < 0.05 // Trough at phase=0.75
     }
 }
 
@@ -106,8 +106,8 @@ pub enum GammaType {
 impl GammaOscillator {
     pub fn new(gamma_type: GammaType) -> Self {
         let frequency = match gamma_type {
-            GammaType::Slow => 40.0,   // 40Hz
-            GammaType::Fast => 80.0,   // 80Hz
+            GammaType::Slow => 40.0, // 40Hz
+            GammaType::Fast => 80.0, // 80Hz
         };
 
         Self {
@@ -137,11 +137,11 @@ impl GammaOscillator {
         let theta_modulation = match self.gamma_type {
             GammaType::Slow => {
                 // Slow gamma peaks at theta trough (retrieval)
-                (theta_phase * 2.0 * PI + PI).cos()  // Peak at trough
+                (theta_phase * 2.0 * PI + PI).cos() // Peak at trough
             }
             GammaType::Fast => {
                 // Fast gamma peaks at theta peak (encoding)
-                (theta_phase * 2.0 * PI).cos()  // Peak at peak
+                (theta_phase * 2.0 * PI).cos() // Peak at peak
             }
         };
 
@@ -152,9 +152,9 @@ impl GammaOscillator {
     pub fn excitability(&self) -> f32 {
         // High excitability during rising phase
         if self.phase < 0.5 {
-            self.phase * 2.0  // 0 to 1
+            self.phase * 2.0 // 0 to 1
         } else {
-            2.0 - self.phase * 2.0  // 1 to 0
+            2.0 - self.phase * 2.0 // 1 to 0
         }
     }
 
@@ -242,11 +242,11 @@ pub struct OscillatoryCircuit {
 impl OscillatoryCircuit {
     pub fn new() -> Self {
         Self {
-            theta: ThetaOscillator::new(6.0),  // 6Hz theta
+            theta: ThetaOscillator::new(6.0), // 6Hz theta
             gamma_slow: GammaOscillator::new(GammaType::Slow),
             gamma_fast: GammaOscillator::new(GammaType::Fast),
-            alpha: AlphaBetaOscillator::new(10.0),  // 10Hz alpha
-            beta: AlphaBetaOscillator::new(15.0),   // 15Hz beta
+            alpha: AlphaBetaOscillator::new(10.0), // 10Hz alpha
+            beta: AlphaBetaOscillator::new(15.0),  // 15Hz beta
             encoding_mode: true,
             coherence_buffer: Vec::new(),
         }
@@ -289,11 +289,11 @@ impl OscillatoryCircuit {
 
         // High gain when phases are aligned (<0.1 phase difference)
         if phase_diff < 0.1 {
-            5.0  // 5× amplification
+            5.0 // 5× amplification
         } else if phase_diff < 0.3 {
-            2.0  // 2× amplification
+            2.0 // 2× amplification
         } else {
-            0.5  // Suppression when misaligned
+            0.5 // Suppression when misaligned
         }
     }
 
@@ -320,7 +320,7 @@ impl OscillatoryCircuit {
     ///
     /// Each theta cycle processes one "chunk"
     pub fn get_theta_cycle(&self) -> usize {
-        (self.theta.get_phase() * 7.0) as usize  // ~7 items per cycle (Miller's law)
+        (self.theta.get_phase() * 7.0) as usize // ~7 items per cycle (Miller's law)
     }
 
     /// Compute cross-frequency coupling strength
@@ -407,7 +407,7 @@ impl PhasePrecession {
     pub fn new() -> Self {
         Self {
             somatic_freq: 8.0,
-            dendritic_freq: 9.5,  // Interference creates ~180° precession
+            dendritic_freq: 9.5, // Interference creates ~180° precession
             somatic_phase: 0.0,
             dendritic_phase: 0.0,
             position: 0.0,
@@ -431,7 +431,7 @@ impl PhasePrecession {
         // Interference between somatic and dendritic
         // Creates ~180° phase advance over full traversal
         let interference = (self.somatic_phase + self.dendritic_phase) / 2.0;
-        let precession_shift = self.position * 0.5;  // 180° = 0.5 cycles
+        let precession_shift = self.position * 0.5; // 180° = 0.5 cycles
 
         (interference - precession_shift + 1.0) % 1.0
     }
@@ -498,9 +498,8 @@ mod tests {
         assert!(high_gain > 1.0);
 
         // Misaligned phases → low gain
-        let low_gain = circuit.phase_dependent_gain(
-            (circuit.active_gamma().get_phase() + 0.5) % 1.0
-        );
+        let low_gain =
+            circuit.phase_dependent_gain((circuit.active_gamma().get_phase() + 0.5) % 1.0);
         assert!(low_gain < 1.0);
     }
 

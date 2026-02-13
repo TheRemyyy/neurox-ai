@@ -42,18 +42,18 @@ pub struct VesiclePools {
     pub n_released: f32,
 
     /// Rate constants
-    pub k_release: f32,    // Release rate (1/ms/mM Ca²⁺)
-    pub k_recycle: f32,    // Recycling → RRP (1/ms)
-    pub k_reserve: f32,    // Reserve → Recycling (1/ms)
-    pub k_refill: f32,     // Endocytosis → Reserve (1/ms)
+    pub k_release: f32, // Release rate (1/ms/mM Ca²⁺)
+    pub k_recycle: f32,     // Recycling → RRP (1/ms)
+    pub k_reserve: f32,     // Reserve → Recycling (1/ms)
+    pub k_refill: f32,      // Endocytosis → Reserve (1/ms)
     pub k_endocytosis: f32, // Released → Reserve (1/ms)
 
     /// Pool size constraints
-    pub rrp_max: f32,      // Maximum RRP size
+    pub rrp_max: f32, // Maximum RRP size
     pub recycling_max: f32, // Maximum recycling pool size
 
     /// Calcium sensitivity
-    pub ca_threshold: f32,  // Calcium threshold for release (mM)
+    pub ca_threshold: f32, // Calcium threshold for release (mM)
     pub ca_cooperativity: f32, // Hill coefficient
 
     /// Statistics
@@ -79,17 +79,17 @@ impl VesiclePools {
             n_released: 0.0,
 
             // Rate constants from literature (Rizzoli & Betz 2005)
-            k_release: 0.5,         // Release rate (tuned for ~1-2ms latency)
-            k_recycle: 0.002,       // Recycling → RRP (500ms time constant, slower for depression)
-            k_reserve: 0.001,       // Reserve → Recycling (1s time constant)
-            k_refill: 0.0005,       // Endocytosis → Reserve (2s time constant)
-            k_endocytosis: 0.005,   // Released → pool (200ms time constant, slower endocytosis)
+            k_release: 0.5,       // Release rate (tuned for ~1-2ms latency)
+            k_recycle: 0.002,     // Recycling → RRP (500ms time constant, slower for depression)
+            k_reserve: 0.001,     // Reserve → Recycling (1s time constant)
+            k_refill: 0.0005,     // Endocytosis → Reserve (2s time constant)
+            k_endocytosis: 0.005, // Released → pool (200ms time constant, slower endocytosis)
 
-            rrp_max: n_total * 0.05,      // RRP can grow to 5% of total
+            rrp_max: n_total * 0.05,       // RRP can grow to 5% of total
             recycling_max: n_total * 0.30, // Recycling can grow to 30%
 
-            ca_threshold: 0.001,    // 1 μM threshold
-            ca_cooperativity: 4.0,  // Fourth-order calcium cooperativity
+            ca_threshold: 0.001,   // 1 μM threshold
+            ca_cooperativity: 4.0, // Fourth-order calcium cooperativity
 
             total_releases: 0,
             total_depleted: 0,
@@ -119,11 +119,15 @@ impl VesiclePools {
 
         // Recycling → RRP refill
         let n_to_rrp = self.k_recycle * self.n_recycling * dt;
-        let n_to_rrp = n_to_rrp.min(self.n_recycling).min(self.rrp_max - (self.n_rrp - n_release));
+        let n_to_rrp = n_to_rrp
+            .min(self.n_recycling)
+            .min(self.rrp_max - (self.n_rrp - n_release));
 
         // Reserve → Recycling mobilization
         let n_to_recycling = self.k_reserve * self.n_reserve * dt;
-        let n_to_recycling = n_to_recycling.min(self.n_reserve).min(self.recycling_max - (self.n_recycling - n_to_rrp + n_release));
+        let n_to_recycling = n_to_recycling
+            .min(self.n_reserve)
+            .min(self.recycling_max - (self.n_recycling - n_to_rrp + n_release));
 
         // Endocytosis: Released → Reserve
         let n_endocytosed = self.k_endocytosis * self.n_released * dt;
@@ -213,8 +217,8 @@ impl VesiclePools {
     /// Create facilitation-dominant vesicle pool (fast recycling)
     pub fn facilitation(n_total: f32) -> Self {
         let mut pools = Self::new(n_total);
-        pools.k_recycle = 0.02;     // 2× faster recycling
-        pools.k_reserve = 0.002;    // 2× faster mobilization
+        pools.k_recycle = 0.02; // 2× faster recycling
+        pools.k_reserve = 0.002; // 2× faster mobilization
         pools.rrp_max = n_total * 0.10; // Larger RRP capacity
         pools
     }
@@ -222,8 +226,8 @@ impl VesiclePools {
     /// Create depression-dominant vesicle pool (slow recycling)
     pub fn depression(n_total: f32) -> Self {
         let mut pools = Self::new(n_total);
-        pools.k_recycle = 0.005;    // 2× slower recycling
-        pools.k_reserve = 0.0005;   // 2× slower mobilization
+        pools.k_recycle = 0.005; // 2× slower recycling
+        pools.k_reserve = 0.0005; // 2× slower mobilization
         pools.n_rrp = n_total * 0.02; // Start with larger RRP
         pools
     }
@@ -255,11 +259,17 @@ mod tests {
 
         // Check conservation
         let total = pools.n_rrp + pools.n_recycling + pools.n_reserve + pools.n_released;
-        assert!((total - 200.0).abs() < 0.01, "Total vesicles should be conserved");
+        assert!(
+            (total - 200.0).abs() < 0.01,
+            "Total vesicles should be conserved"
+        );
 
         // Check typical distribution
         assert!(pools.n_rrp < 10.0, "RRP should be small (~1%)");
-        assert!(pools.n_recycling > 20.0 && pools.n_recycling < 40.0, "Recycling ~15%");
+        assert!(
+            pools.n_recycling > 20.0 && pools.n_recycling < 40.0,
+            "Recycling ~15%"
+        );
         assert!(pools.n_reserve > 150.0, "Reserve should be majority");
     }
 
@@ -328,8 +338,12 @@ mod tests {
 
             // Check conservation (allow small floating-point error accumulation)
             let total = pools.n_rrp + pools.n_recycling + pools.n_reserve + pools.n_released;
-            assert!((total - 200.0).abs() < 2.0,
-                "Vesicles should be conserved (total={} at t={})", total, i);
+            assert!(
+                (total - 200.0).abs() < 2.0,
+                "Vesicles should be conserved (total={} at t={})",
+                total,
+                i
+            );
         }
     }
 
@@ -353,9 +367,12 @@ mod tests {
         }
 
         // Facilitation variant should recover faster
-        assert!(fac.n_rrp > normal.n_rrp,
+        assert!(
+            fac.n_rrp > normal.n_rrp,
             "Facilitation variant should recover faster (fac={}, normal={})",
-            fac.n_rrp, normal.n_rrp);
+            fac.n_rrp,
+            normal.n_rrp
+        );
     }
 
     #[test]
@@ -379,8 +396,14 @@ mod tests {
         }
 
         // Both variants should be able to release vesicles
-        assert!(dep_releases > 0.0, "Depression variant should release vesicles");
-        assert!(normal_releases > 0.0, "Normal variant should release vesicles");
+        assert!(
+            dep_releases > 0.0,
+            "Depression variant should release vesicles"
+        );
+        assert!(
+            normal_releases > 0.0,
+            "Normal variant should release vesicles"
+        );
         // Depression dynamics depend on tuned parameters - just verify functionality works
     }
 
@@ -407,9 +430,12 @@ mod tests {
             let last = release_amounts[release_amounts.len() - 1];
 
             // With realistic parameters, dynamics may vary - just check that releases occurred
-            assert!(first > 0.0 && last > 0.0,
+            assert!(
+                first > 0.0 && last > 0.0,
                 "Should have releases throughout stimulation (first={}, last={})",
-                first, last);
+                first,
+                last
+            );
         }
     }
 }

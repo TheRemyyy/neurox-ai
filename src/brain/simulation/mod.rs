@@ -2,12 +2,12 @@
 
 pub mod event_queue;
 
-pub use event_queue::{EventQueue, SpikeEvent, DelayBuffer};
+pub use event_queue::{DelayBuffer, EventQueue, SpikeEvent};
 
 #[cfg(feature = "cuda")]
-use crate::brain::cuda::{CudaContext, KernelConfig};
-#[cfg(feature = "cuda")]
 use crate::brain::connectivity::SparseConnectivity;
+#[cfg(feature = "cuda")]
+use crate::brain::cuda::{CudaContext, KernelConfig};
 #[cfg(feature = "cuda")]
 use cudarc::driver::{CudaSlice, DeviceSlice};
 #[cfg(feature = "cuda")]
@@ -203,7 +203,10 @@ impl Simulator {
     }
 
     /// Step simulation forward by one timestep (event-driven)
-    pub fn step(&mut self, external_input: Option<&[f32]>) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn step(
+        &mut self,
+        external_input: Option<&[f32]>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         // Update input currents if provided
         if let Some(input) = external_input {
             assert_eq!(input.len(), self.n_neurons);
@@ -333,12 +336,12 @@ impl Simulator {
             // ✅ OPTIMIZATION: Accumulate synaptic currents directly on GPU
             // This eliminates 3 CPU↔GPU transfers.
             let config = KernelConfig::for_neurons(self.n_neurons);
-            
+
             self.cuda.accumulate_kernel().launch(
                 config,
                 &self.synaptic_currents,
                 &mut self.input_currents,
-                self.n_neurons as i32
+                self.n_neurons as i32,
             )?;
         }
 
@@ -423,7 +426,12 @@ impl Simulator {
     /// Restore neuron thresholds from saved model
     pub fn set_thresholds(&mut self, thresholds: &[f32]) -> Result<(), Box<dyn std::error::Error>> {
         if thresholds.len() != self.n_neurons {
-            return Err(format!("Threshold count mismatch: expected {}, got {}", self.n_neurons, thresholds.len()).into());
+            return Err(format!(
+                "Threshold count mismatch: expected {}, got {}",
+                self.n_neurons,
+                thresholds.len()
+            )
+            .into());
         }
         self.cuda
             .device()
@@ -434,7 +442,12 @@ impl Simulator {
     /// Restore tau_m from saved model
     pub fn set_tau_m(&mut self, tau_m: &[f32]) -> Result<(), Box<dyn std::error::Error>> {
         if tau_m.len() != self.n_neurons {
-            return Err(format!("tau_m count mismatch: expected {}, got {}", self.n_neurons, tau_m.len()).into());
+            return Err(format!(
+                "tau_m count mismatch: expected {}, got {}",
+                self.n_neurons,
+                tau_m.len()
+            )
+            .into());
         }
         self.cuda
             .device()
@@ -445,7 +458,12 @@ impl Simulator {
     /// Restore v_reset from saved model
     pub fn set_v_reset(&mut self, v_reset: &[f32]) -> Result<(), Box<dyn std::error::Error>> {
         if v_reset.len() != self.n_neurons {
-            return Err(format!("v_reset count mismatch: expected {}, got {}", self.n_neurons, v_reset.len()).into());
+            return Err(format!(
+                "v_reset count mismatch: expected {}, got {}",
+                self.n_neurons,
+                v_reset.len()
+            )
+            .into());
         }
         self.cuda
             .device()
@@ -456,7 +474,12 @@ impl Simulator {
     /// Restore membrane potentials from saved model
     pub fn set_voltages(&mut self, voltages: &[f32]) -> Result<(), Box<dyn std::error::Error>> {
         if voltages.len() != self.n_neurons {
-            return Err(format!("Voltage count mismatch: expected {}, got {}", self.n_neurons, voltages.len()).into());
+            return Err(format!(
+                "Voltage count mismatch: expected {}, got {}",
+                self.n_neurons,
+                voltages.len()
+            )
+            .into());
         }
         self.cuda
             .device()
@@ -481,7 +504,12 @@ impl Simulator {
     pub fn set_weights(&mut self, weights: &[f32]) -> Result<(), Box<dyn std::error::Error>> {
         if let Some(ref mut conn) = self.connectivity {
             if weights.len() != conn.weights.len() {
-                return Err(format!("Weight count mismatch: expected {}, got {}", conn.weights.len(), weights.len()).into());
+                return Err(format!(
+                    "Weight count mismatch: expected {}, got {}",
+                    conn.weights.len(),
+                    weights.len()
+                )
+                .into());
             }
             self.cuda
                 .device()
@@ -500,7 +528,10 @@ impl Simulator {
     /// Automatically switches to dense mode when activity exceeds threshold.
     pub fn enable_event_driven(&mut self, enabled: bool) {
         self.event_driven = enabled;
-        log::info!("Event-driven mode: {}", if enabled { "ENABLED" } else { "DISABLED" });
+        log::info!(
+            "Event-driven mode: {}",
+            if enabled { "ENABLED" } else { "DISABLED" }
+        );
     }
 
     /// Set sparsity threshold for mode switching
@@ -512,7 +543,10 @@ impl Simulator {
     /// - `threshold`: Fraction of active neurons (0.0-1.0)
     pub fn set_sparsity_threshold(&mut self, threshold: f32) {
         self.sparsity_threshold = threshold.clamp(0.0, 1.0);
-        log::info!("Sparsity threshold set to {:.1}%", self.sparsity_threshold * 100.0);
+        log::info!(
+            "Sparsity threshold set to {:.1}%",
+            self.sparsity_threshold * 100.0
+        );
     }
 
     /// Check if currently in event-driven mode

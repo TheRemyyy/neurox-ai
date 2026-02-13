@@ -37,13 +37,13 @@ impl Simplifier {
                 }
             }
             Expr::Pow(b, e) => {
-                 let sb = Self::simplify(b);
-                 let se = Self::simplify(e);
-                 match (sb, se) {
-                     (_, Expr::Number(0.0)) => Expr::Number(1.0),
-                     (x, Expr::Number(1.0)) => x,
-                     (x, y) => Expr::Pow(Box::new(x), Box::new(y)),
-                 }
+                let sb = Self::simplify(b);
+                let se = Self::simplify(e);
+                match (sb, se) {
+                    (_, Expr::Number(0.0)) => Expr::Number(1.0),
+                    (x, Expr::Number(1.0)) => x,
+                    (x, y) => Expr::Pow(Box::new(x), Box::new(y)),
+                }
             }
             _ => expr.clone(),
         }

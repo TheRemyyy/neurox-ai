@@ -46,25 +46,25 @@ pub struct SleepConsolidation {
     pub current_stage: SleepStage,
 
     /// Sleep cycle parameters
-    pub cycle_duration: f32,       // Seconds (typical: 90 minutes = 5400s)
-    pub time_in_stage: f32,        // Seconds in current stage
-    pub total_sleep_time: f32,     // Total accumulated sleep
+    pub cycle_duration: f32, // Seconds (typical: 90 minutes = 5400s)
+    pub time_in_stage: f32,    // Seconds in current stage
+    pub total_sleep_time: f32, // Total accumulated sleep
 
     /// SWR parameters
-    pub swr_frequency: f32,        // Hz (100-250)
-    pub swr_duration: f32,         // Seconds (0.05-0.15)
-    pub swr_rate: f32,             // Events per minute (1-3)
-    pub compression_factor: f32,   // Replay speedup (10-20×)
+    pub swr_frequency: f32, // Hz (100-250)
+    pub swr_duration: f32,       // Seconds (0.05-0.15)
+    pub swr_rate: f32,           // Events per minute (1-3)
+    pub compression_factor: f32, // Replay speedup (10-20×)
 
     /// Slow oscillation parameters
-    pub so_frequency: f32,         // Hz (0.5-1.0)
-    pub so_phase: f32,             // Current phase (0-2π)
-    pub up_state_duration: f32,    // Seconds (0.3-1.0)
-    pub down_state_duration: f32,  // Seconds (0.2-0.5)
+    pub so_frequency: f32, // Hz (0.5-1.0)
+    pub so_phase: f32,            // Current phase (0-2π)
+    pub up_state_duration: f32,   // Seconds (0.3-1.0)
+    pub down_state_duration: f32, // Seconds (0.2-0.5)
 
     /// Synaptic scaling
-    pub downscaling_rate: f32,     // Percentage per sleep cycle (10-20%)
-    pub scaling_threshold: f32,    // Min weight to avoid deletion
+    pub downscaling_rate: f32, // Percentage per sleep cycle (10-20%)
+    pub scaling_threshold: f32, // Min weight to avoid deletion
 
     /// Statistics
     pub total_replays: usize,
@@ -82,11 +82,11 @@ impl SleepConsolidation {
             cycle_duration: 5400.0, // 90 minutes
             time_in_stage: 0.0,
             total_sleep_time: 0.0,
-            swr_frequency: 150.0,   // 150 Hz ripples
-            swr_duration: 0.1,      // 100ms events
-            swr_rate: 2.0,          // 2 per minute
+            swr_frequency: 150.0,     // 150 Hz ripples
+            swr_duration: 0.1,        // 100ms events
+            swr_rate: 2.0,            // 2 per minute
             compression_factor: 15.0, // 15× compression
-            so_frequency: 0.75,     // 0.75 Hz
+            so_frequency: 0.75,       // 0.75 Hz
             so_phase: 0.0,
             up_state_duration: 0.5,
             down_state_duration: 0.3,
@@ -194,10 +194,10 @@ impl SleepConsolidation {
 
         let stage_durations = match self.current_stage {
             SleepStage::Awake => 0.0,
-            SleepStage::NREM1 => 100.0,   // 100 seconds (~1.7 min) - shorter for testing
-            SleepStage::NREM2 => 1200.0,  // 20 min
-            SleepStage::NREM3 => 1800.0,  // 30 min
-            SleepStage::REM => 900.0,     // 15 min
+            SleepStage::NREM1 => 100.0, // 100 seconds (~1.7 min) - shorter for testing
+            SleepStage::NREM2 => 1200.0, // 20 min
+            SleepStage::NREM3 => 1800.0, // 30 min
+            SleepStage::REM => 900.0,   // 15 min
         };
 
         if self.time_in_stage > stage_durations {
@@ -583,6 +583,9 @@ mod tests {
 
         // Should be compressed by compression_factor
         assert!(compressed.len() < pattern.len());
-        assert_eq!(compressed.len(), pattern.len() / sleep.compression_factor as usize);
+        assert_eq!(
+            compressed.len(),
+            pattern.len() / sleep.compression_factor as usize
+        );
     }
 }

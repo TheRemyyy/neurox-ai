@@ -64,9 +64,15 @@ pub struct LaminarLayer {
 impl LaminarLayer {
     pub fn new(n_neurons: usize, learning_rate: f32) -> Self {
         let layer4 = (0..n_neurons).map(|i| LIFNeuron::new(i as u32)).collect();
-        let layer2_3 = (0..n_neurons).map(|i| LIFNeuron::new((n_neurons + i) as u32)).collect();
-        let layer5 = (0..n_neurons).map(|i| LIFNeuron::new((2 * n_neurons + i) as u32)).collect();
-        let layer6 = (0..n_neurons/2).map(|i| LIFNeuron::new((3 * n_neurons + i) as u32)).collect();
+        let layer2_3 = (0..n_neurons)
+            .map(|i| LIFNeuron::new((n_neurons + i) as u32))
+            .collect();
+        let layer5 = (0..n_neurons)
+            .map(|i| LIFNeuron::new((2 * n_neurons + i) as u32))
+            .collect();
+        let layer6 = (0..n_neurons / 2)
+            .map(|i| LIFNeuron::new((3 * n_neurons + i) as u32))
+            .collect();
 
         // Create lateral connections (sparse)
         let lateral_connections = Self::create_lateral(n_neurons, 0.1);
@@ -158,7 +164,9 @@ impl LaminarLayer {
         for (i, neuron) in self.layer6.iter_mut().enumerate() {
             if i * 2 < self.n_neurons {
                 // Precision inversely related to recent error variance
-                let local_error = error[i * 2..(i * 2 + 2).min(self.n_neurons)].iter().sum::<f32>();
+                let local_error = error[i * 2..(i * 2 + 2).min(self.n_neurons)]
+                    .iter()
+                    .sum::<f32>();
                 neuron.update(dt, local_error.abs());
 
                 // Update precision (inverse of error variance)
@@ -174,7 +182,7 @@ impl LaminarLayer {
         let lateral_output = self.apply_lateral(&l4_output);
         for (i, &lat) in lateral_output.iter().enumerate() {
             if i < self.n_neurons {
-                error[i] += lat * 0.2;  // 20% lateral contribution
+                error[i] += lat * 0.2; // 20% lateral contribution
             }
         }
 
@@ -297,14 +305,18 @@ impl EnhancedPredictiveHierarchy {
 
         // Update oscillations
         if let Some(ref mut osc) = self.oscillations {
-            osc.update(dt, 0.5);  // 0.5 = medium prediction strength
+            osc.update(dt, 0.5); // 0.5 = medium prediction strength
         }
 
         // Bottom-up pass (compute errors at each level)
         for i in 0..self.n_levels {
             // Get top-down prediction from level above (if exists)
             let top_down = if i + 1 < self.n_levels {
-                self.levels[i + 1].layer5.iter().map(|n| n.state.v).collect()
+                self.levels[i + 1]
+                    .layer5
+                    .iter()
+                    .map(|n| n.state.v)
+                    .collect()
             } else {
                 vec![0.0; self.levels[i].n_neurons]
             };
@@ -344,17 +356,14 @@ impl EnhancedPredictiveHierarchy {
 
     /// Get prediction at specific level
     pub fn get_prediction(&self, level: usize) -> Option<Vec<f32>> {
-        self.levels.get(level).map(|l| {
-            l.layer5.iter().map(|n| n.state.v).collect()
-        })
+        self.levels
+            .get(level)
+            .map(|l| l.layer5.iter().map(|n| n.state.v).collect())
     }
 
     /// Get total prediction error (across all levels)
     pub fn total_error(&self) -> f32 {
-        self.levels
-            .iter()
-            .map(|l| l.average_error())
-            .sum()
+        self.levels.iter().map(|l| l.average_error()).sum()
     }
 
     /// Get level-specific error
@@ -385,7 +394,8 @@ impl EnhancedPredictiveHierarchy {
         let level_errors: Vec<f32> = self.levels.iter().map(|l| l.average_error()).collect();
         let total_error = level_errors.iter().sum();
 
-        let avg_precision: Vec<f32> = self.levels
+        let avg_precision: Vec<f32> = self
+            .levels
             .iter()
             .map(|l| l.precision.iter().sum::<f32>() / l.precision.len() as f32)
             .collect();

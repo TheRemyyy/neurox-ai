@@ -55,11 +55,7 @@ impl MotionProcessingSystem {
     ///
     /// # Returns
     /// Tuple of (heading_vector, rotation_angle, object_motion)
-    pub fn process(
-        &mut self,
-        v1_complex: &[Vec<Vec<f32>>],
-        dt: f32,
-    ) -> (MotionOutput, OpticFlow) {
+    pub fn process(&mut self, v1_complex: &[Vec<Vec<f32>>], dt: f32) -> (MotionOutput, OpticFlow) {
         // MT: Extract component motion
         let component_motion = self.mt.process(v1_complex, dt);
 
@@ -244,7 +240,8 @@ impl MiddleTemporal {
 
     /// Process V1 complex cell input to extract component motion
     pub fn process(&mut self, v1_complex: &[Vec<Vec<f32>>], dt: f32) -> ComponentMotion {
-        let mut direction_responses = vec![vec![vec![0.0; self.n_directions]; self.height]; self.width];
+        let mut direction_responses =
+            vec![vec![vec![0.0; self.n_directions]; self.height]; self.width];
         let mut speed_responses = vec![vec![0.0; self.height]; self.width];
 
         // Update direction-selective cells
@@ -430,7 +427,13 @@ impl ExpansionCell {
         }
     }
 
-    pub fn update(&mut self, component_motion: &ComponentMotion, mt_x: usize, mt_y: usize, dt: f32) {
+    pub fn update(
+        &mut self,
+        component_motion: &ComponentMotion,
+        mt_x: usize,
+        mt_y: usize,
+        dt: f32,
+    ) {
         // Radial flow detector
         let dx = mt_x as f32 - self.center_x;
         let dy = mt_y as f32 - self.center_y;
@@ -577,7 +580,13 @@ impl RotationCell {
         }
     }
 
-    pub fn update(&mut self, component_motion: &ComponentMotion, mt_x: usize, mt_y: usize, dt: f32) {
+    pub fn update(
+        &mut self,
+        component_motion: &ComponentMotion,
+        mt_x: usize,
+        mt_y: usize,
+        dt: f32,
+    ) {
         // Tangential flow detector (perpendicular to radius)
         let dx = mt_x as f32 - self.center_x;
         let dy = mt_y as f32 - self.center_y;
@@ -588,7 +597,8 @@ impl RotationCell {
         }
 
         // Tangential direction for CW rotation: perpendicular to radius
-        let tangent_angle = (dy.atan2(dx) + std::f32::consts::PI / 2.0) % (2.0 * std::f32::consts::PI);
+        let tangent_angle =
+            (dy.atan2(dx) + std::f32::consts::PI / 2.0) % (2.0 * std::f32::consts::PI);
 
         let mut tangent_evidence = 0.0;
 
@@ -633,7 +643,13 @@ impl TranslationCell {
         }
     }
 
-    pub fn update(&mut self, component_motion: &ComponentMotion, mt_x: usize, mt_y: usize, dt: f32) {
+    pub fn update(
+        &mut self,
+        component_motion: &ComponentMotion,
+        mt_x: usize,
+        mt_y: usize,
+        dt: f32,
+    ) {
         // Uniform flow detector (same direction everywhere)
         if mt_x >= component_motion.direction_responses.len()
             || mt_y >= component_motion.direction_responses[0].len()
@@ -746,7 +762,7 @@ mod tests {
         // Create radial flow pattern (expansion) with strong responses
         let mut component_motion = ComponentMotion {
             direction_responses: vec![vec![vec![0.0; 4]; 10]; 10],
-            speed_responses: vec![vec![1.0; 10]; 10],  // Add speed info
+            speed_responses: vec![vec![1.0; 10]; 10], // Add speed info
         };
 
         // Simulate flow away from center with correct direction mapping
@@ -771,7 +787,8 @@ mod tests {
                 };
 
                 // Quantize to 4 directions
-                let dir_idx = ((normalized_angle / (std::f32::consts::PI / 2.0)).round() as usize) % 4;
+                let dir_idx =
+                    ((normalized_angle / (std::f32::consts::PI / 2.0)).round() as usize) % 4;
 
                 // Stronger response for radial pattern
                 component_motion.direction_responses[x][y][dir_idx] = 2.0;
@@ -782,7 +799,7 @@ mod tests {
         for _ in 0..100 {
             for x in 0..10 {
                 for y in 0..10 {
-                    cell.update(&component_motion, x, y, 0.1 / (10.0 * 10.0));  // Distribute dt over all positions
+                    cell.update(&component_motion, x, y, 0.1 / (10.0 * 10.0)); // Distribute dt over all positions
                 }
             }
         }
@@ -790,7 +807,8 @@ mod tests {
         // Should detect expansion
         assert!(
             cell.response > 0.01,
-            "Expansion cell should respond to radial flow, got response: {}", cell.response
+            "Expansion cell should respond to radial flow, got response: {}",
+            cell.response
         );
     }
 }

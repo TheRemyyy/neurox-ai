@@ -30,7 +30,6 @@ pub mod connectivity;
 pub mod cortex;
 pub mod cuda;
 pub mod datasets;
-pub mod simulation;
 pub mod language;
 pub mod learning;
 pub mod memory;
@@ -41,6 +40,7 @@ pub mod oscillations;
 pub mod reasoning;
 pub mod semantics;
 pub mod serialization;
+pub mod simulation;
 pub mod spatial;
 pub mod synapse;
 pub mod training;
@@ -134,10 +134,10 @@ pub use self::simulation::{OptimizationStats, Simulator};
 pub use self::spatial::{GridCell, PlaceCell, SpatialSystem as SpatSystem};
 pub use self::training::{train_mnist, MNISTTrainer, TrainingConfig};
 
-#[cfg(feature = "cuda")]
-use cudarc::driver::CudaDevice;
 #[cfg(not(feature = "cuda"))]
 use crate::brain::cuda::CudaDeviceStub as CudaDevice;
+#[cfg(feature = "cuda")]
+use cudarc::driver::CudaDevice;
 use dashmap::DashMap;
 use rand::Rng;
 use serde::{Deserialize, Serialize};

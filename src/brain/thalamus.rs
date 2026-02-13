@@ -71,9 +71,9 @@ impl ThalamicNeuron {
         Self {
             id,
             nucleus,
-            v: -70.0,           // Resting potential
-            h_t: 1.0,           // T-channel inactivation
-            burst_mode: false,  // Start in tonic mode
+            v: -70.0,          // Resting potential
+            h_t: 1.0,          // T-channel inactivation
+            burst_mode: false, // Start in tonic mode
             activity: 0.0,
             attention_gain: 1.0,
             threshold: -55.0,
@@ -143,10 +143,10 @@ impl ThalamicNeuron {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Thalamus {
     /// First-order relay neurons (sensory input)
-    pub lgn_neurons: Vec<ThalamicNeuron>,  // Visual
-    pub mgn_neurons: Vec<ThalamicNeuron>,  // Auditory
-    pub vpl_neurons: Vec<ThalamicNeuron>,  // Somatosensory body
-    pub vpm_neurons: Vec<ThalamicNeuron>,  // Somatosensory face
+    pub lgn_neurons: Vec<ThalamicNeuron>, // Visual
+    pub mgn_neurons: Vec<ThalamicNeuron>, // Auditory
+    pub vpl_neurons: Vec<ThalamicNeuron>, // Somatosensory body
+    pub vpm_neurons: Vec<ThalamicNeuron>, // Somatosensory face
 
     /// Higher-order neurons (attention, cognition)
     pub pulvinar_neurons: Vec<ThalamicNeuron>,
@@ -348,7 +348,7 @@ impl Thalamus {
         for (i, neuron) in self.md_neurons.iter_mut().enumerate() {
             // MD receives from prefrontal/cognitive areas (use cortical feedback)
             let input = cortical_feedback.get(i).copied().unwrap_or(0.0);
-            neuron.set_attention(self.attention_strength);  // Cognitive attention
+            neuron.set_attention(self.attention_strength); // Cognitive attention
             if neuron.update(input, 0.0, dt) {
                 if neuron.burst_mode {
                     self.total_bursts += 1;
@@ -374,7 +374,7 @@ impl Thalamus {
                 relay_input += self.vpl_neurons[i].activity;
             }
 
-            neuron.set_attention(1.0 / self.attention_strength);  // Inverse attention (suppresses unattended)
+            neuron.set_attention(1.0 / self.attention_strength); // Inverse attention (suppresses unattended)
             if neuron.update(relay_input * 0.5, 0.0, dt) {
                 // TRN provides feedback inhibition to relay nuclei
                 // (In full implementation, would inhibit specific relay neurons)
@@ -412,7 +412,11 @@ impl Thalamus {
             0 => self.lgn_neurons.iter().map(|n| n.activity).collect(),
             1 => self.mgn_neurons.iter().map(|n| n.activity).collect(),
             2 => {
-                let mut combined = self.vpl_neurons.iter().map(|n| n.activity).collect::<Vec<_>>();
+                let mut combined = self
+                    .vpl_neurons
+                    .iter()
+                    .map(|n| n.activity)
+                    .collect::<Vec<_>>();
                 combined.extend(self.vpm_neurons.iter().map(|n| n.activity));
                 combined
             }
@@ -480,7 +484,10 @@ mod tests {
 
         // Should enter burst mode
         neuron.update(0.0, 0.0, 0.1);
-        assert!(neuron.burst_mode, "Hyperpolarized neuron should enter burst mode");
+        assert!(
+            neuron.burst_mode,
+            "Hyperpolarized neuron should enter burst mode"
+        );
     }
 
     #[test]
@@ -514,7 +521,10 @@ mod tests {
 
         // Should have some activity
         let lgn_output = thalamus.get_relay_output(0);
-        assert!(lgn_output.iter().any(|&x| x > 0.0), "LGN should relay visual input");
+        assert!(
+            lgn_output.iter().any(|&x| x > 0.0),
+            "LGN should relay visual input"
+        );
     }
 
     #[test]

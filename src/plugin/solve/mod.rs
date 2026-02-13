@@ -5,5 +5,5 @@
 pub mod chemistry;
 pub mod math;
 
-pub use chemistry::{BalancedEquation, ChemistrySolver, ChemicalAnalysis};
-pub use math::{MathResult, MathSolver, MathAnalysis};
+pub use chemistry::{BalancedEquation, ChemicalAnalysis, ChemistrySolver};
+pub use math::{MathAnalysis, MathResult, MathSolver};

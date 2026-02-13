@@ -428,7 +428,9 @@ impl VectorAccumulateKernel {
     pub fn new(device: Arc<CudaDevice>) -> Result<Self, Box<dyn std::error::Error>> {
         let ptx = cudarc::nvrtc::compile_ptx(VECTOR_ACCUMULATE_KERNEL)?;
         device.load_ptx(ptx, "neurox_accumulate", &["vector_accumulate"])?;
-        let function = device.get_func("neurox_accumulate", "vector_accumulate").unwrap();
+        let function = device
+            .get_func("neurox_accumulate", "vector_accumulate")
+            .unwrap();
         Ok(Self { device, function })
     }
 
@@ -441,7 +443,9 @@ impl VectorAccumulateKernel {
     ) -> Result<(), cudarc::driver::DriverError> {
         let params = (src, dest, n);
         unsafe {
-            self.function.clone().launch(config.to_launch_config(), params)?;
+            self.function
+                .clone()
+                .launch(config.to_launch_config(), params)?;
         }
         Ok(())
     }
@@ -591,9 +595,7 @@ impl STDPTraceDecayKernel {
     pub fn new(device: Arc<CudaDevice>) -> Result<Self, Box<dyn std::error::Error>> {
         let ptx = cudarc::nvrtc::compile_ptx(STDP_TRACE_DECAY_KERNEL)?;
         device.load_ptx(ptx, "neurox_trace", &["stdp_trace_decay"])?;
-        let function = device
-            .get_func("neurox_trace", "stdp_trace_decay")
-            .unwrap();
+        let function = device.get_func("neurox_trace", "stdp_trace_decay").unwrap();
 
         Ok(Self { device, function })
     }

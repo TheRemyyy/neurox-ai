@@ -2,24 +2,26 @@
 //!
 //! Implements biologically-inspired spiking neuron models with GPU-optimized data layouts.
 
-pub mod lif;
+pub mod cadex;
+pub mod dendritic;
 pub mod hierarchical;
 pub mod interneurons;
-pub mod dendritic;
 pub mod izhikevich;
-pub mod cadex;
+pub mod lif;
 
-pub use lif::LIFNeuron;
 pub use cadex::CAdExNeuron;
-pub use hierarchical::{NeuronLevel, RegionGroup, MeanFieldRegion, HierarchicalBrain, StreamingBuffer};
-pub use interneurons::{
-    PVInterneuron, SSTInterneuron, VIPInterneuron, InterneuronCircuit, InterneuronStats,
-};
 pub use dendritic::{
-    DendriticBranch, DendriticNeuron, DendriticLayer, DendriticNeuronStats, DendriticLayerStats,
-    PMSNCompartment, CompartmentType, PMSNeuron, CompartmentInputs,
+    CompartmentInputs, CompartmentType, DendriticBranch, DendriticLayer, DendriticLayerStats,
+    DendriticNeuron, DendriticNeuronStats, PMSNCompartment, PMSNeuron,
+};
+pub use hierarchical::{
+    HierarchicalBrain, MeanFieldRegion, NeuronLevel, RegionGroup, StreamingBuffer,
+};
+pub use interneurons::{
+    InterneuronCircuit, InterneuronStats, PVInterneuron, SSTInterneuron, VIPInterneuron,
 };
 pub use izhikevich::{IzhikevichNeuron, MemristiveIzhikevichNeuron};
+pub use lif::LIFNeuron;
 
 use serde::{Deserialize, Serialize};
 
@@ -56,10 +58,10 @@ impl NeuronState {
     /// Create new neuron state with biological defaults
     pub fn new(id: u32) -> Self {
         Self {
-            v: -70.0,              // Resting potential
-            threshold: -55.0,      // Spike threshold
-            tau_m: 20.0,          // 20ms membrane time constant
-            v_reset: -70.0,       // Reset to resting
+            v: -70.0,         // Resting potential
+            threshold: -55.0, // Spike threshold
+            tau_m: 20.0,      // 20ms membrane time constant
+            v_reset: -70.0,   // Reset to resting
             last_spike: 0,
             refractory_counter: 0,
             id,

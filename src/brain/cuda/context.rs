@@ -3,7 +3,10 @@
 //! Handles GPU device initialization, memory allocation, and resource cleanup.
 
 use super::GpuMemoryInfo;
-use crate::brain::cuda::kernels::{LIFUpdateKernel, SpikePropagationKernel, TripletSTDPKernel, STDPTraceDecayKernel, VectorAccumulateKernel};
+use crate::brain::cuda::kernels::{
+    LIFUpdateKernel, STDPTraceDecayKernel, SpikePropagationKernel, TripletSTDPKernel,
+    VectorAccumulateKernel,
+};
 use cudarc::driver::{CudaDevice, CudaSlice};
 use std::sync::Arc;
 
@@ -106,11 +109,7 @@ impl CudaContext {
 
         let used = total.saturating_sub(free);
 
-        Ok(GpuMemoryInfo {
-            total,
-            free,
-            used,
-        })
+        Ok(GpuMemoryInfo { total, free, used })
     }
 
     /// Allocate GPU memory
@@ -167,8 +166,8 @@ impl Drop for CudaContext {
 
 #[cfg(test)]
 mod tests {
-    use cudarc::driver::DeviceSlice;
     use super::*;
+    use cudarc::driver::DeviceSlice;
 
     #[test]
     #[ignore] // Only run if CUDA is available

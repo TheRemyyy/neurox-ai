@@ -40,8 +40,8 @@ pub struct ETDP {
     pub window_size: f32,
 
     /// Voltage sensitivity parameters
-    pub alpha_pre: f32,   // Pre-synaptic voltage scaling
-    pub alpha_post: f32,  // Post-synaptic voltage scaling
+    pub alpha_pre: f32, // Pre-synaptic voltage scaling
+    pub alpha_post: f32, // Post-synaptic voltage scaling
 
     /// Nonlinearity exponent for voltage-dependent factors
     pub voltage_exponent: f32,
@@ -59,13 +59,13 @@ impl ETDP {
     pub fn new(eta: f32) -> Self {
         Self {
             eta,
-            voltage_threshold: 5.0,    // 5 mV above baseline triggers event
-            tau_plus: 20.0,            // LTP time constant
-            tau_minus: 20.0,           // LTD time constant
-            window_size: 50.0,         // 50 ms learning window
-            alpha_pre: 0.1,            // Pre-synaptic voltage scaling
-            alpha_post: 0.2,           // Post-synaptic voltage scaling
-            voltage_exponent: 2.0,     // Quadratic voltage dependence
+            voltage_threshold: 5.0, // 5 mV above baseline triggers event
+            tau_plus: 20.0,         // LTP time constant
+            tau_minus: 20.0,        // LTD time constant
+            window_size: 50.0,      // 50 ms learning window
+            alpha_pre: 0.1,         // Pre-synaptic voltage scaling
+            alpha_post: 0.2,        // Post-synaptic voltage scaling
+            voltage_exponent: 2.0,  // Quadratic voltage dependence
             pre_events: Vec::new(),
             post_events: Vec::new(),
             current_time: 0.0,
@@ -135,7 +135,7 @@ impl ETDP {
                     (-(dt / self.tau_plus)).exp()
                 } else {
                     // Anti-causal: pre after post (LTD)
-                    -((dt.abs() / self.tau_minus)).exp()
+                    -(dt.abs() / self.tau_minus).exp()
                 };
 
                 // Combine factors
@@ -225,11 +225,11 @@ mod tests {
 
         // Pre-synaptic event at t=0
         etdp.current_time = 0.0;
-        etdp.detect_event(0, 20.0, true);  // Pre neuron 0
+        etdp.detect_event(0, 20.0, true); // Pre neuron 0
 
         // Post-synaptic event at t=10ms (causal)
         etdp.current_time = 10.0;
-        etdp.detect_event(1, 25.0, false);  // Post neuron 1
+        etdp.detect_event(1, 25.0, false); // Post neuron 1
 
         // Compute weight change
         let dw = etdp.compute_weight_change(0, 1);
@@ -244,11 +244,11 @@ mod tests {
 
         // Post-synaptic event at t=0
         etdp.current_time = 0.0;
-        etdp.detect_event(1, 25.0, false);  // Post neuron 1
+        etdp.detect_event(1, 25.0, false); // Post neuron 1
 
         // Pre-synaptic event at t=10ms (anti-causal)
         etdp.current_time = 10.0;
-        etdp.detect_event(0, 20.0, true);  // Pre neuron 0
+        etdp.detect_event(0, 20.0, true); // Pre neuron 0
 
         // Compute weight change
         let dw = etdp.compute_weight_change(0, 1);
@@ -279,15 +279,18 @@ mod tests {
         let dw_strong = etdp.compute_weight_change(0, 1);
 
         // Stronger voltage should cause larger weight change
-        assert!(dw_strong.abs() > dw_weak.abs(),
+        assert!(
+            dw_strong.abs() > dw_weak.abs(),
             "Stronger voltage should cause larger plasticity (weak={}, strong={})",
-            dw_weak, dw_strong);
+            dw_weak,
+            dw_strong
+        );
     }
 
     #[test]
     fn test_window_pruning() {
         let mut etdp = ETDP::new(0.01);
-        etdp.window_size = 20.0;  // 20ms window
+        etdp.window_size = 20.0; // 20ms window
 
         // Add event at t=0
         etdp.current_time = 0.0;
@@ -307,7 +310,7 @@ mod tests {
 
         // Subthreshold EPSP (just above threshold)
         etdp.current_time = 0.0;
-        etdp.detect_event(0, 6.0, true);   // 6mV (just above 5mV threshold)
+        etdp.detect_event(0, 6.0, true); // 6mV (just above 5mV threshold)
         etdp.current_time = 5.0;
         etdp.detect_event(1, 6.0, false);
         let dw_subthreshold = etdp.compute_weight_change(0, 1);
@@ -317,15 +320,18 @@ mod tests {
 
         // Suprathreshold spike (strong)
         etdp.current_time = 0.0;
-        etdp.detect_event(0, 50.0, true);  // 50mV (spike-like)
+        etdp.detect_event(0, 50.0, true); // 50mV (spike-like)
         etdp.current_time = 5.0;
         etdp.detect_event(1, 50.0, false);
         let dw_spike = etdp.compute_weight_change(0, 1);
 
         // Both should cause plasticity, but spike should be much stronger
         assert!(dw_subthreshold > 0.0, "Subthreshold should cause some LTP");
-        assert!(dw_spike > dw_subthreshold * 5.0,
+        assert!(
+            dw_spike > dw_subthreshold * 5.0,
             "Spike should cause much stronger plasticity (subthreshold={}, spike={})",
-            dw_subthreshold, dw_spike);
+            dw_subthreshold,
+            dw_spike
+        );
     }
 }

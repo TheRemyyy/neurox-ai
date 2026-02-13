@@ -1,6 +1,6 @@
-use crate::brain::NeuromorphicBrain;
 use crate::brain::datasets::{JsonDataset, TextDataset};
 use crate::brain::language::{IntentType, PartOfSpeech, PragmaticRule, SentenceTemplate};
+use crate::brain::NeuromorphicBrain;
 use std::error::Error;
 use std::io::{stdout, Write};
 
@@ -218,10 +218,12 @@ impl BrainLoader {
                         .filter(|c| c.is_alphanumeric())
                         .collect();
                     if !clean.is_empty() && brain.lexicon.get_by_text(&clean).is_none() {
-                        brain.lexicon.add_word(crate::brain::language::AnnotatedWord::new(
-                            &clean,
-                            PartOfSpeech::Unknown,
-                        ));
+                        brain
+                            .lexicon
+                            .add_word(crate::brain::language::AnnotatedWord::new(
+                                &clean,
+                                PartOfSpeech::Unknown,
+                            ));
                     }
                 }
             };

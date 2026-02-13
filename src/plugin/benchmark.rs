@@ -44,70 +44,70 @@ impl BenchmarkPlugin {
 
         #[cfg(feature = "cuda")]
         {
-        // Use CLI args or config defaults
-        let data_dir = data_dir.unwrap_or(&self.config.data_dir);
-        let epochs = epochs.unwrap_or(self.config.epochs);
-        let bits = bits.unwrap_or(self.config.bits);
-        let neurons = neurons.unwrap_or(self.config.neurons);
-        let duration = duration.unwrap_or(self.config.presentation_duration);
-        let isi = isi.unwrap_or(self.config.isi);
+            // Use CLI args or config defaults
+            let data_dir = data_dir.unwrap_or(&self.config.data_dir);
+            let epochs = epochs.unwrap_or(self.config.epochs);
+            let bits = bits.unwrap_or(self.config.bits);
+            let neurons = neurons.unwrap_or(self.config.neurons);
+            let duration = duration.unwrap_or(self.config.presentation_duration);
+            let isi = isi.unwrap_or(self.config.isi);
 
-        println!(
-            "{}╔════════════════════════════════════════════════════════════╗",
-            COLOR_LIGHT_BLUE
-        );
-        println!("║  NeuroxAI MNIST Benchmark                                  ║");
-        println!(
-            "╚════════════════════════════════════════════════════════════╝{}",
-            COLOR_RESET
-        );
-        println!();
-
-        // Handle auto download mode
-        let actual_data_dir = if data_dir == "auto" {
             println!(
-                "{}Auto-downloading MNIST dataset...{}",
-                COLOR_GRAY, COLOR_RESET
+                "{}╔════════════════════════════════════════════════════════════╗",
+                COLOR_LIGHT_BLUE
             );
-            let download_path = "./data/mnist";
-            download_mnist(download_path)?;
+            println!("║  NeuroxAI MNIST Benchmark                                  ║");
+            println!(
+                "╚════════════════════════════════════════════════════════════╝{}",
+                COLOR_RESET
+            );
             println!();
-            download_path.to_string()
-        } else {
-            data_dir.to_string()
-        };
 
-        println!("{}Configuration:{}", BOLD, COLOR_RESET);
-        println!("  Data directory: {}", actual_data_dir);
-        println!("  Epochs: {}", epochs);
-        println!("  Quantization: {}-bit", bits);
-        println!("  Hidden Neurons: {}", neurons);
-        println!("  Presentation: {:.1}ms", duration);
-        println!("  ISI: {:.1}ms", isi);
-        println!();
+            // Handle auto download mode
+            let actual_data_dir = if data_dir == "auto" {
+                println!(
+                    "{}Auto-downloading MNIST dataset...{}",
+                    COLOR_GRAY, COLOR_RESET
+                );
+                let download_path = "./data/mnist";
+                download_mnist(download_path)?;
+                println!();
+                download_path.to_string()
+            } else {
+                data_dir.to_string()
+            };
 
-        // Architecture
-        let n_input = self.config.n_input;
-        let n_hidden = neurons;
-        let n_output = self.config.n_output;
-        let n_neurons = n_input + n_hidden + n_output;
+            println!("{}Configuration:{}", BOLD, COLOR_RESET);
+            println!("  Data directory: {}", actual_data_dir);
+            println!("  Epochs: {}", epochs);
+            println!("  Quantization: {}-bit", bits);
+            println!("  Hidden Neurons: {}", neurons);
+            println!("  Presentation: {:.1}ms", duration);
+            println!("  ISI: {:.1}ms", isi);
+            println!();
 
-        // GPU-based benchmark (synthetic or real MNIST)
-        if actual_data_dir == "synthetic" {
-            self.run_synthetic_benchmark(epochs, bits, neurons, duration, isi, n_neurons)?;
-        } else {
-            self.run_real_benchmark(
-                &actual_data_dir,
-                epochs,
-                bits,
-                neurons,
-                duration,
-                isi,
-                n_neurons,
-            )?;
-        }
+            // Architecture
+            let n_input = self.config.n_input;
+            let n_hidden = neurons;
+            let n_output = self.config.n_output;
+            let n_neurons = n_input + n_hidden + n_output;
 
-        Ok(())
+            // GPU-based benchmark (synthetic or real MNIST)
+            if actual_data_dir == "synthetic" {
+                self.run_synthetic_benchmark(epochs, bits, neurons, duration, isi, n_neurons)?;
+            } else {
+                self.run_real_benchmark(
+                    &actual_data_dir,
+                    epochs,
+                    bits,
+                    neurons,
+                    duration,
+                    isi,
+                    n_neurons,
+                )?;
+            }
+
+            Ok(())
         }
     }
 

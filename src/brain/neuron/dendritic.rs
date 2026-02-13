@@ -92,12 +92,12 @@ impl DendriticBranch {
             id,
             synapses,
             calcium: 0.0,
-            tau_calcium: 100.0,  // 100ms calcium decay
-            nmda_threshold: 10,  // 10 coincident inputs
+            tau_calcium: 100.0, // 100ms calcium decay
+            nmda_threshold: 10, // 10 coincident inputs
             plateau_potential: 0.0,
-            plateau_duration: 100.0,  // 100ms plateau
+            plateau_duration: 100.0, // 100ms plateau
             plateau_timer: 0.0,
-            amplification: 3.0,  // 3× amplification
+            amplification: 3.0, // 3× amplification
             learning_rate: 0.01,
             spike_buffer: Vec::new(),
             spatial_extent,
@@ -139,8 +139,9 @@ impl DendriticBranch {
         }
 
         // Check for coincident inputs (NMDA spike)
-        self.spike_buffer.extend(recent_spikes.iter().map(|(t, _)| *t));
-        self.spike_buffer.retain(|&t| current_time - t < 50.0);  // 50ms window
+        self.spike_buffer
+            .extend(recent_spikes.iter().map(|(t, _)| *t));
+        self.spike_buffer.retain(|&t| current_time - t < 50.0); // 50ms window
 
         // Detect spatiotemporal clustering
         let clustered_spikes = self.detect_cluster(&recent_spikes, current_time);
@@ -178,7 +179,7 @@ impl DendriticBranch {
             let mut local_count = 1;
             for (j, (time2, pos2)) in recent_spikes.iter().enumerate() {
                 if i == j {
-                    continue;  // Skip self
+                    continue; // Skip self
                 }
 
                 let spatial_dist = (pos1 - pos2).abs() * self.spatial_extent;
@@ -345,20 +346,16 @@ impl DendriticNeuron {
 
     /// Get statistics
     pub fn stats(&self) -> DendriticNeuronStats {
-        let active_branches = self.branches
+        let active_branches = self
+            .branches
             .iter()
             .filter(|b| b.plateau_potential > 0.0)
             .count();
 
-        let avg_calcium = self.branches
-            .iter()
-            .map(|b| b.calcium)
-            .sum::<f32>() / self.n_branches as f32;
+        let avg_calcium =
+            self.branches.iter().map(|b| b.calcium).sum::<f32>() / self.n_branches as f32;
 
-        let total_synapses: usize = self.branches
-            .iter()
-            .map(|b| b.synapses.len())
-            .sum();
+        let total_synapses: usize = self.branches.iter().map(|b| b.synapses.len()).sum();
 
         DendriticNeuronStats {
             n_branches: self.n_branches,
@@ -410,14 +407,21 @@ impl DendriticLayer {
 
     /// Get layer statistics
     pub fn stats(&self) -> DendriticLayerStats {
-        let spiking = self.neurons
+        let spiking = self
+            .neurons
             .iter()
             .filter(|n| n.soma.v > n.soma.threshold - 10.0)
             .count();
 
-        let total_active_branches: usize = self.neurons
+        let total_active_branches: usize = self
+            .neurons
             .iter()
-            .map(|n| n.branches.iter().filter(|b| b.plateau_potential > 0.0).count())
+            .map(|n| {
+                n.branches
+                    .iter()
+                    .filter(|b| b.plateau_potential > 0.0)
+                    .count()
+            })
             .sum();
 
         DendriticLayerStats {
@@ -482,10 +486,10 @@ pub struct PMSNCompartment {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub enum CompartmentType {
-    Soma,        // Soma - spike initiation
-    Proximal,    // Proximal dendrite - strong coupling to soma
-    Distal,      // Distal dendrite - weaker coupling, NMDA spikes
-    Apical,      // Apical tuft - top-down modulation
+    Soma,     // Soma - spike initiation
+    Proximal, // Proximal dendrite - strong coupling to soma
+    Distal,   // Distal dendrite - weaker coupling, NMDA spikes
+    Apical,   // Apical tuft - top-down modulation
 }
 
 impl PMSNCompartment {
@@ -603,9 +607,9 @@ impl PMSNeuron {
 
         // Build compartment ordering for cable equation
         let mut compartments = vec![0]; // soma
-        compartments.extend(1..5);      // proximal
-        compartments.extend(5..11);     // distal
-        compartments.extend(11..13);    // apical
+        compartments.extend(1..5); // proximal
+        compartments.extend(5..11); // distal
+        compartments.extend(11..13); // apical
 
         Self {
             id,
@@ -672,8 +676,15 @@ impl PMSNeuron {
 
         // Update proximal compartments
         for (i, comp) in self.proximal.iter_mut().enumerate() {
-            let v_prev = if i == 0 { Some(soma_v) } else { proximal_v.get(i - 1).copied() };
-            let v_next = proximal_v.get(i + 1).copied().or_else(|| distal_v.first().copied());
+            let v_prev = if i == 0 {
+                Some(soma_v)
+            } else {
+                proximal_v.get(i - 1).copied()
+            };
+            let v_next = proximal_v
+                .get(i + 1)
+                .copied()
+                .or_else(|| distal_v.first().copied());
 
             comp.input_current = inputs.proximal_currents.get(i).copied().unwrap_or(0.0);
             comp.update(dt, v_next, v_prev, 0.0);
@@ -686,7 +697,10 @@ impl PMSNeuron {
             } else {
                 distal_v.get(i - 1).copied()
             };
-            let v_next = distal_v.get(i + 1).copied().or_else(|| apical_v.first().copied());
+            let v_next = distal_v
+                .get(i + 1)
+                .copied()
+                .or_else(|| apical_v.first().copied());
 
             comp.input_current = inputs.distal_currents.get(i).copied().unwrap_or(0.0);
             let nmda = inputs.nmda_currents.get(i).copied().unwrap_or(0.0);
@@ -782,7 +796,11 @@ mod tests {
 
         // Create branch inputs
         let branch_inputs: Vec<Vec<bool>> = (0..5)
-            .map(|_| vec![true, false, true, false, true, false, true, false, false, false])
+            .map(|_| {
+                vec![
+                    true, false, true, false, true, false, true, false, false, false,
+                ]
+            })
             .collect();
 
         // Update should integrate dendritic currents
@@ -797,9 +815,9 @@ mod tests {
         let mut branch = DendriticBranch::new(0, 40, 100.0);
 
         // Position synapses close together for clustering and set lower threshold
-        branch.nmda_threshold = 8;  // Lower threshold for testing
+        branch.nmda_threshold = 8; // Lower threshold for testing
         for syn in &mut branch.synapses {
-            syn.position = 0.5;  // All at same location
+            syn.position = 0.5; // All at same location
         }
 
         // Activate many synapses simultaneously
@@ -807,7 +825,11 @@ mod tests {
         branch.update(0.1, 0.0, &inputs);
 
         // Should trigger plateau
-        assert!(branch.plateau_potential > 0.0, "NMDA spike should trigger plateau potential with {} coincident inputs", inputs.len());
+        assert!(
+            branch.plateau_potential > 0.0,
+            "NMDA spike should trigger plateau potential with {} coincident inputs",
+            inputs.len()
+        );
     }
 
     #[test]
@@ -823,7 +845,8 @@ mod tests {
         branch.learn(true);
 
         // Weights should have changed
-        let changed = branch.synapses
+        let changed = branch
+            .synapses
             .iter()
             .zip(initial_weights.iter())
             .any(|(s, &w)| (s.weight - w).abs() > 0.001);
@@ -837,9 +860,7 @@ mod tests {
 
         // Create dummy inputs
         let inputs: Vec<Vec<Vec<bool>>> = (0..10)
-            .map(|_| {
-                (0..5).map(|_| vec![false; 10]).collect()
-            })
+            .map(|_| (0..5).map(|_| vec![false; 10]).collect())
             .collect();
 
         let spikes = layer.update(0.1, &inputs);
@@ -861,7 +882,11 @@ mod tests {
         }
 
         // Should decay significantly from -30 toward 0
-        assert!(comp.v > -30.0 && comp.v < 0.0, "Voltage should decay from -30 toward 0, got {}", comp.v);
+        assert!(
+            comp.v > -30.0 && comp.v < 0.0,
+            "Voltage should decay from -30 toward 0, got {}",
+            comp.v
+        );
     }
 
     #[test]
@@ -881,7 +906,10 @@ mod tests {
         let diff_before = (-50.0_f32 - (-70.0_f32)).abs();
         let diff_after = (soma.v - dendrite.v).abs();
 
-        assert!(diff_after < diff_before, "Coupling should reduce voltage difference");
+        assert!(
+            diff_after < diff_before,
+            "Coupling should reduce voltage difference"
+        );
     }
 
     #[test]
@@ -941,7 +969,9 @@ mod tests {
 
         let final_calcium = neuron.total_calcium();
 
-        assert!(final_calcium > initial_calcium,
-            "NMDA currents should increase calcium");
+        assert!(
+            final_calcium > initial_calcium,
+            "NMDA currents should increase calcium"
+        );
     }
 }

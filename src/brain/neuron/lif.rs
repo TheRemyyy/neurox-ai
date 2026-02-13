@@ -25,8 +25,8 @@ impl LIFNeuron {
     pub fn new(id: u32) -> Self {
         Self {
             state: NeuronState::new(id),
-            r_m: 10.0,              // 10 MΩ typical for cortical neurons
-            refractory_period: 20,  // 2ms @ 0.1ms timestep
+            r_m: 10.0,             // 10 MΩ typical for cortical neurons
+            refractory_period: 20, // 2ms @ 0.1ms timestep
         }
     }
 
@@ -155,10 +155,10 @@ impl CAdExNeuron {
     /// Create new CAdEx neuron with biological defaults for cortical excitatory neurons
     pub fn new(id: u32) -> Self {
         let mut state = NeuronState::new(id);
-        state.v = -70.0;           // Resting at E_L
-        state.threshold = -50.0;    // Spike threshold
-        state.v_reset = -70.0;      // Reset to E_L
-        state.tau_m = 20.0;         // Not directly used, but kept for compatibility
+        state.v = -70.0; // Resting at E_L
+        state.threshold = -50.0; // Spike threshold
+        state.v_reset = -70.0; // Reset to E_L
+        state.tau_m = 20.0; // Not directly used, but kept for compatibility
 
         Self {
             state,
@@ -179,9 +179,9 @@ impl CAdExNeuron {
     /// Create fast-spiking interneuron variant (PV-like)
     pub fn fast_spiking(id: u32) -> Self {
         let mut neuron = Self::new(id);
-        neuron.tau_w = 50.0;       // Faster adaptation
-        neuron.a = 2.0;            // Less subthreshold adaptation
-        neuron.b = 20.0;           // Less spike-triggered adaptation
+        neuron.tau_w = 50.0; // Faster adaptation
+        neuron.a = 2.0; // Less subthreshold adaptation
+        neuron.b = 20.0; // Less spike-triggered adaptation
         neuron.refractory_period = 10; // 1ms refractory
         neuron
     }
@@ -189,9 +189,9 @@ impl CAdExNeuron {
     /// Create adapting interneuron variant (SST-like)
     pub fn adapting(id: u32) -> Self {
         let mut neuron = Self::new(id);
-        neuron.tau_w = 200.0;      // Slow adaptation
-        neuron.a = 8.0;            // More subthreshold adaptation
-        neuron.b = 120.0;          // Strong spike-triggered adaptation
+        neuron.tau_w = 200.0; // Slow adaptation
+        neuron.a = 8.0; // More subthreshold adaptation
+        neuron.b = 120.0; // Strong spike-triggered adaptation
         neuron
     }
 
@@ -214,7 +214,8 @@ impl CAdExNeuron {
             -self.g_l * (v - self.e_l)           // Leak current
             + exp_term                            // Exponential spike generation
             - self.g_w * (v - self.e_k)          // Adaptation current (conductance-based)
-            + input_current                       // External input
+            + input_current
+            // External input
         ) / self.c;
 
         self.state.v += dv * dt;
@@ -245,7 +246,7 @@ impl Neuron for CAdExNeuron {
         // Check for spike
         if self.state.should_spike() {
             self.state.v = self.state.v_reset;
-            self.g_w += self.b;  // Spike-triggered adaptation increment
+            self.g_w += self.b; // Spike-triggered adaptation increment
             self.state.refractory_counter = self.refractory_period;
             return true;
         }

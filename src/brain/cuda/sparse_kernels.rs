@@ -2,7 +2,7 @@
 //!
 //! Saves 90%+ memory by storing only non-zero values
 
-use cudarc::driver::{CudaDevice, CudaFunction, LaunchAsync, CudaSlice, DeviceSlice};
+use cudarc::driver::{CudaDevice, CudaFunction, CudaSlice, DeviceSlice, LaunchAsync};
 use std::sync::Arc;
 
 /// Sparse transition matrix update kernel (CSR format)
@@ -154,7 +154,9 @@ impl SparseTransitionMatrix {
         // Compile kernels
         let update_ptx = cudarc::nvrtc::compile_ptx(SPARSE_TRANSITION_UPDATE_KERNEL)?;
         device.load_ptx(update_ptx, "sparse_update", &["sparse_transition_update"])?;
-        let update_kernel = device.get_func("sparse_update", "sparse_transition_update").unwrap();
+        let update_kernel = device
+            .get_func("sparse_update", "sparse_transition_update")
+            .unwrap();
 
         let normalize_ptx = cudarc::nvrtc::compile_ptx(SPARSE_NORMALIZE_KERNEL)?;
         device.load_ptx(normalize_ptx, "sparse_norm", &["sparse_normalize"])?;
@@ -162,14 +164,25 @@ impl SparseTransitionMatrix {
 
         let lookup_ptx = cudarc::nvrtc::compile_ptx(SPARSE_LOOKUP_KERNEL)?;
         device.load_ptx(lookup_ptx, "sparse_lookup", &["sparse_lookup_row"])?;
-        let lookup_kernel = device.get_func("sparse_lookup", "sparse_lookup_row").unwrap();
+        let lookup_kernel = device
+            .get_func("sparse_lookup", "sparse_lookup_row")
+            .unwrap();
 
         let initial_mb = (initial_nnz * 12) / (1024 * 1024);
         let max_mb = (max_nnz * 12) / (1024 * 1024);
-        log::info!("Sparse transition matrix: {} MB initial, {} MB max", initial_mb, max_mb);
-        log::info!("Dynamic growth: starts at {}% capacity", (initial_nnz * 100) / max_nnz);
-        log::info!("Memory savings vs dense: {}%",
-            100 - (max_mb * 100) / ((vocab_size * vocab_size * 4) / (1024 * 1024)));
+        log::info!(
+            "Sparse transition matrix: {} MB initial, {} MB max",
+            initial_mb,
+            max_mb
+        );
+        log::info!(
+            "Dynamic growth: starts at {}% capacity",
+            (initial_nnz * 100) / max_nnz
+        );
+        log::info!(
+            "Memory savings vs dense: {}%",
+            100 - (max_mb * 100) / ((vocab_size * vocab_size * 4) / (1024 * 1024))
+        );
 
         Ok(Self {
             device,
@@ -195,10 +208,13 @@ impl SparseTransitionMatrix {
         if usage_percent >= 80 && current_capacity < self.max_nnz {
             let new_capacity = (current_capacity * 2).min(self.max_nnz);
 
-            log::info!("Growing sparse matrix: {} → {} entries ({} MB → {} MB)",
-                current_capacity, new_capacity,
+            log::info!(
+                "Growing sparse matrix: {} → {} entries ({} MB → {} MB)",
+                current_capacity,
+                new_capacity,
                 (current_capacity * 12) / (1024 * 1024),
-                (new_capacity * 12) / (1024 * 1024));
+                (new_capacity * 12) / (1024 * 1024)
+            );
 
             // Download existing data
             let old_col_idx = self.device.dtoh_sync_copy(&self.col_idx)?;
@@ -223,7 +239,12 @@ impl SparseTransitionMatrix {
     }
 
     /// Update with new transitions (with automatic growth)
-    pub fn update(&mut self, tokens: &CudaSlice<i32>, n_tokens: i32, learning_rate: f32) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn update(
+        &mut self,
+        tokens: &CudaSlice<i32>,
+        n_tokens: i32,
+        learning_rate: f32,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         // Check if we need to grow before updating
         self.grow_if_needed()?;
 
@@ -241,7 +262,9 @@ impl SparseTransitionMatrix {
         );
 
         unsafe {
-            self.update_kernel.clone().launch(config.to_launch_config(), params)?;
+            self.update_kernel
+                .clone()
+                .launch(config.to_launch_config(), params)?;
         }
 
         self.device.synchronize()?;
@@ -265,7 +288,9 @@ impl SparseTransitionMatrix {
         );
 
         unsafe {
-            self.normalize_kernel.clone().launch(config.to_launch_config(), params)?;
+            self.normalize_kernel
+                .clone()
+                .launch(config.to_launch_config(), params)?;
         }
 
         self.device.synchronize()?;
@@ -273,7 +298,11 @@ impl SparseTransitionMatrix {
     }
 
     /// Lookup row (for generation)
-    pub fn lookup_row(&self, row_idx: i32, output: &mut CudaSlice<f32>) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn lookup_row(
+        &self,
+        row_idx: i32,
+        output: &mut CudaSlice<f32>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let config = crate::brain::cuda::KernelConfig::for_neurons(self.vocab_size);
 
         let params = (
@@ -286,7 +315,9 @@ impl SparseTransitionMatrix {
         );
 
         unsafe {
-            self.lookup_kernel.clone().launch(config.to_launch_config(), params)?;
+            self.lookup_kernel
+                .clone()
+                .launch(config.to_launch_config(), params)?;
         }
 
         self.device.synchronize()?;

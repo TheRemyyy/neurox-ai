@@ -135,9 +135,9 @@ impl QuantizedWeights {
     /// Memory footprint in bytes
     pub fn memory_footprint(&self) -> usize {
         match self.config.bits {
-            8 => self.values.len(),          // 1 byte per weight
-            4 => self.values.len() / 2,      // 0.5 bytes per weight
-            2 => self.values.len() / 4,      // 0.25 bytes per weight
+            8 => self.values.len(),     // 1 byte per weight
+            4 => self.values.len() / 2, // 0.5 bytes per weight
+            2 => self.values.len() / 4, // 0.25 bytes per weight
             _ => self.values.len(),
         }
     }
@@ -202,9 +202,14 @@ mod tests {
 
         for (original, deq) in weights.iter().zip(dequantized.iter()) {
             // INT8 quantization has scale of 2.0/255 ≈ 0.0078, so error should be < 0.01
-            assert!((original - deq).abs() < 0.01,
+            assert!(
+                (original - deq).abs() < 0.01,
                 "Quantization error too large: original={}, deq={}, diff={}, quantized={:?}",
-                original, deq, (original - deq).abs(), quantized);
+                original,
+                deq,
+                (original - deq).abs(),
+                quantized
+            );
         }
     }
 

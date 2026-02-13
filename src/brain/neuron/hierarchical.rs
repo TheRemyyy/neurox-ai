@@ -145,9 +145,7 @@ impl HierarchicalBrain {
         log::info!("  Medium: {} regions (~1B neurons)", MEDIUM_REGIONS);
         log::info!("  Abstract: {} regions (~85B neurons)", ABSTRACT_REGIONS);
 
-        let detailed_neurons = (0..DETAILED)
-            .map(|i| LIFNeuron::new(i as u32))
-            .collect();
+        let detailed_neurons = (0..DETAILED).map(|i| LIFNeuron::new(i as u32)).collect();
 
         let medium_regions = (0..MEDIUM_REGIONS)
             .map(|i| RegionGroup::new(i as u32, 100_000))
@@ -313,11 +311,7 @@ mod tests {
     fn test_region_group_update() {
         let mut region = RegionGroup::new(0, 3);
 
-        let neurons = vec![
-            LIFNeuron::new(0),
-            LIFNeuron::new(1),
-            LIFNeuron::new(2),
-        ];
+        let neurons = vec![LIFNeuron::new(0), LIFNeuron::new(1), LIFNeuron::new(2)];
 
         region.update_from_neurons(&neurons);
 
@@ -341,7 +335,7 @@ mod tests {
 
         assert_eq!(brain.detailed_neurons.len(), 1000);
         assert_eq!(brain.medium_regions.len(), 100); // 10% of detailed
-        assert_eq!(brain.abstract_regions.len(), 10);  // 1% of detailed
+        assert_eq!(brain.abstract_regions.len(), 10); // 1% of detailed
         assert_eq!(brain.total_neurons, 3000); // 3 layers * 1000
     }
 
@@ -383,12 +377,16 @@ mod tests {
 
         // Medium regions should reflect averaged detailed neurons
         // Check that at least some regions have updated values
-        let updated_regions = brain.medium_regions.iter()
+        let updated_regions = brain
+            .medium_regions
+            .iter()
             .filter(|r| r.avg_v > -68.0 && r.avg_v < -62.0)
             .count();
 
-        assert!(updated_regions > 0,
-            "At least some regions should have updated values near -65.0");
+        assert!(
+            updated_regions > 0,
+            "At least some regions should have updated values near -65.0"
+        );
     }
 
     #[test]
@@ -522,17 +520,17 @@ mod tests {
 
         // Should be able to create all three levels
         match detailed {
-            NeuronLevel::Detailed(_) => {},
+            NeuronLevel::Detailed(_) => {}
             _ => panic!("Expected Detailed variant"),
         }
 
         match medium {
-            NeuronLevel::Medium(_) => {},
+            NeuronLevel::Medium(_) => {}
             _ => panic!("Expected Medium variant"),
         }
 
         match abstract_level {
-            NeuronLevel::Abstract(_) => {},
+            NeuronLevel::Abstract(_) => {}
             _ => panic!("Expected Abstract variant"),
         }
     }
@@ -543,8 +541,10 @@ mod tests {
 
         // All detailed neurons should start near biological resting potential
         for neuron in &brain.detailed_neurons {
-            assert!(neuron.state.v >= -80.0 && neuron.state.v <= -60.0,
-                "Membrane potential should be in biological range");
+            assert!(
+                neuron.state.v >= -80.0 && neuron.state.v <= -60.0,
+                "Membrane potential should be in biological range"
+            );
         }
     }
 
@@ -554,14 +554,18 @@ mod tests {
 
         // Medium regions should have biologically plausible firing rates
         for region in &brain.medium_regions {
-            assert!(region.avg_rate >= 0.0 && region.avg_rate <= 100.0,
-                "Firing rate should be in biological range (0-100 Hz)");
+            assert!(
+                region.avg_rate >= 0.0 && region.avg_rate <= 100.0,
+                "Firing rate should be in biological range (0-100 Hz)"
+            );
         }
 
         // Abstract regions should have biologically plausible firing rates
         for region in &brain.abstract_regions {
-            assert!(region.mean_rate >= 0.0 && region.mean_rate <= 100.0,
-                "Mean rate should be in biological range (0-100 Hz)");
+            assert!(
+                region.mean_rate >= 0.0 && region.mean_rate <= 100.0,
+                "Mean rate should be in biological range (0-100 Hz)"
+            );
         }
     }
 
@@ -584,6 +588,9 @@ mod tests {
         // Medium regions should show increased activity
         let avg_medium_v: f32 = brain.medium_regions.iter().map(|r| r.avg_v).sum::<f32>()
             / brain.medium_regions.len() as f32;
-        assert!(avg_medium_v > -70.0, "Medium regions should reflect detailed activity");
+        assert!(
+            avg_medium_v > -70.0,
+            "Medium regions should reflect detailed activity"
+        );
     }
 }

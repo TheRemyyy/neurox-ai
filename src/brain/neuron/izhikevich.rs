@@ -48,7 +48,7 @@ impl IzhikevichNeuron {
 
         Self {
             state,
-            u: -13.0,  // b * V
+            u: -13.0, // b * V
             a: 0.02,
             b: 0.2,
             c: -65.0,
@@ -67,7 +67,7 @@ impl IzhikevichNeuron {
             u: -13.0,
             a: 0.02,
             b: 0.2,
-            c: -55.0,  // Higher reset → bursting
+            c: -55.0, // Higher reset → bursting
             d: 4.0,
         }
     }
@@ -83,7 +83,7 @@ impl IzhikevichNeuron {
             u: -13.0,
             a: 0.02,
             b: 0.2,
-            c: -50.0,  // Even higher reset → chattering
+            c: -50.0, // Even higher reset → chattering
             d: 2.0,
         }
     }
@@ -96,8 +96,8 @@ impl IzhikevichNeuron {
 
         Self {
             state,
-            u: -6.5,  // b * V with b=0.1
-            a: 0.1,   // Fast recovery
+            u: -6.5, // b * V with b=0.1
+            a: 0.1,  // Fast recovery
             b: 0.2,
             c: -65.0,
             d: 2.0,
@@ -114,7 +114,7 @@ impl IzhikevichNeuron {
             state,
             u: -16.25, // b * V with b=0.25
             a: 0.02,
-            b: 0.25,   // Higher sensitivity
+            b: 0.25, // Higher sensitivity
             c: -65.0,
             d: 2.0,
         }
@@ -132,7 +132,7 @@ impl IzhikevichNeuron {
             a: 0.02,
             b: 0.25,
             c: -65.0,
-            d: 0.05,   // Small d → resonance
+            d: 0.05, // Small d → resonance
         }
     }
 
@@ -146,7 +146,7 @@ impl IzhikevichNeuron {
             state,
             u: -6.5,
             a: 0.1,
-            b: 0.26,   // b > a → resonance
+            b: 0.26, // b > a → resonance
             c: -65.0,
             d: 2.0,
         }
@@ -179,8 +179,8 @@ impl Neuron for IzhikevichNeuron {
 
         // Check for spike (V >= 30mV)
         if self.state.v >= self.state.threshold {
-            self.state.v = self.c;      // Reset voltage
-            self.u += self.d;            // Increment recovery
+            self.state.v = self.c; // Reset voltage
+            self.u += self.d; // Increment recovery
             return true;
         }
 
@@ -245,12 +245,12 @@ impl MemristiveIzhikevichNeuron {
     pub fn gap_junction(id: u32, coupled_id: u32) -> Self {
         Self {
             base: IzhikevichNeuron::regular_spiking(id),
-            w: 0.5,         // Initial coupling strength
-            k: 0.1,         // Coupling coefficient
-            alpha: 0.01,    // Decay rate
-            beta: 0.001,    // Baseline decay
-            gamma: 0.05,    // Activity-dependent decay
-            delta: 0.02,    // Potentiation rate
+            w: 0.5,      // Initial coupling strength
+            k: 0.1,      // Coupling coefficient
+            alpha: 0.01, // Decay rate
+            beta: 0.001, // Baseline decay
+            gamma: 0.05, // Activity-dependent decay
+            delta: 0.02, // Potentiation rate
             coupled_neuron_id: Some(coupled_id),
         }
     }
@@ -260,9 +260,8 @@ impl MemristiveIzhikevichNeuron {
         let v_diff = (self.base.state.v - v_coupled).abs();
 
         // dW/dt = -α(β + γ|V₁ - V₂|)W + δ|V₁ - V₂|
-        let dw = (-self.alpha * (self.beta + self.gamma * v_diff) * self.w
-            + self.delta * v_diff)
-            * dt;
+        let dw =
+            (-self.alpha * (self.beta + self.gamma * v_diff) * self.w + self.delta * v_diff) * dt;
 
         self.w += dw;
 
@@ -320,8 +319,11 @@ mod tests {
         }
 
         // Should spike regularly
-        assert!(spike_count >= 3 && spike_count <= 60,
-            "Regular spiking should produce moderate spike count, got {}", spike_count);
+        assert!(
+            spike_count >= 3 && spike_count <= 60,
+            "Regular spiking should produce moderate spike count, got {}",
+            spike_count
+        );
     }
 
     #[test]
@@ -338,17 +340,17 @@ mod tests {
 
         // Bursting should have clusters of spikes
         if spike_times.len() >= 2 {
-            let mut isi_values: Vec<_> = spike_times.windows(2)
-                .map(|w| w[1] - w[0])
-                .collect();
+            let mut isi_values: Vec<_> = spike_times.windows(2).map(|w| w[1] - w[0]).collect();
 
             // Should have both short ISIs (within burst) and long ISIs (between bursts)
             isi_values.sort();
             let min_isi = isi_values[0];
             let max_isi = isi_values[isi_values.len() - 1];
 
-            assert!(max_isi > 3 * min_isi,
-                "Bursting should show mix of short and long inter-spike intervals");
+            assert!(
+                max_isi > 3 * min_isi,
+                "Bursting should show mix of short and long inter-spike intervals"
+            );
         }
     }
 
@@ -370,8 +372,10 @@ mod tests {
         }
 
         // Fast spiking should spike more frequently
-        assert!(fast_spikes > regular_spikes,
-            "Fast spiking neuron should spike more than regular spiking");
+        assert!(
+            fast_spikes > regular_spikes,
+            "Fast spiking neuron should spike more than regular spiking"
+        );
     }
 
     #[test]
@@ -394,8 +398,10 @@ mod tests {
 
         // Coupling should bring voltages closer
         let final_diff = (n1.voltage() - n2.voltage()).abs();
-        assert!(final_diff < 15.0,
-            "Coupling should reduce voltage difference");
+        assert!(
+            final_diff < 15.0,
+            "Coupling should reduce voltage difference"
+        );
     }
 
     #[test]
@@ -424,7 +430,10 @@ mod tests {
             }
         }
 
-        assert!(crossings >= 1,
-            "Resonator should show oscillations (baseline crossings), got {} crossings", crossings);
+        assert!(
+            crossings >= 1,
+            "Resonator should show oscillations (baseline crossings), got {} crossings",
+            crossings
+        );
     }
 }

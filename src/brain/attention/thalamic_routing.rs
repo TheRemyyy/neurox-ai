@@ -91,7 +91,11 @@ impl DynamicConnectivity {
         let max_gain = self.gains.iter().copied().fold(f32::NEG_INFINITY, f32::max);
         let min_gain = self.gains.iter().copied().fold(f32::INFINITY, f32::min);
 
-        let modulated = self.gains.iter().filter(|&&g| (g - 1.0).abs() > 0.1).count();
+        let modulated = self
+            .gains
+            .iter()
+            .filter(|&&g| (g - 1.0).abs() > 0.1)
+            .count();
 
         DynamicConnectivityStats {
             avg_gain,
@@ -206,7 +210,8 @@ impl AttentionSystem {
     ///
     /// Modulates the pathway gain to enhance/suppress specific connections.
     pub fn route(&mut self, source: usize, target: usize, strength: f32) {
-        self.routing_matrix.modulate_pathway(source, target, strength);
+        self.routing_matrix
+            .modulate_pathway(source, target, strength);
     }
 
     /// Update salience map based on inputs
@@ -316,10 +321,7 @@ impl AttentionSystem {
     /// Softmax normalization (spike-based approximation)
     fn softmax(scores: &mut [f32]) {
         // Find max for numerical stability
-        let max_score = scores
-            .iter()
-            .copied()
-            .fold(f32::NEG_INFINITY, f32::max);
+        let max_score = scores.iter().copied().fold(f32::NEG_INFINITY, f32::max);
 
         // Exp
         for score in scores.iter_mut() {

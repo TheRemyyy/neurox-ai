@@ -37,10 +37,10 @@ pub struct StructuralPlasticity {
     pub synapse_map: HashMap<(usize, usize), usize>,
 
     /// Formation parameters
-    pub eta_form: f32,      // Formation rate
-    pub theta_form: f32,    // Formation threshold
-    pub eta_remove: f32,    // Removal rate
-    pub theta_remove: f32,  // Weak synapse threshold
+    pub eta_form: f32, // Formation rate
+    pub theta_form: f32,   // Formation threshold
+    pub eta_remove: f32,   // Removal rate
+    pub theta_remove: f32, // Weak synapse threshold
 
     /// Distance penalty for DEEP R
     pub distance_penalty: f32,
@@ -62,8 +62,8 @@ pub struct Synapse {
     pub pre_neuron: usize,
     pub post_neuron: usize,
     pub weight: f32,
-    pub age: u32,           // Timesteps since creation
-    pub last_active: u32,   // Last time either neuron spiked
+    pub age: u32,         // Timesteps since creation
+    pub last_active: u32, // Last time either neuron spiked
 }
 
 impl StructuralPlasticity {
@@ -73,7 +73,11 @@ impl StructuralPlasticity {
     /// - `n_neurons`: Number of neurons
     /// - `initial_connectivity`: Initial synapse probability (e.g., 0.1 for 10%)
     /// - `max_synapses_per_neuron`: Maximum synapses per neuron
-    pub fn new(n_neurons: usize, initial_connectivity: f32, max_synapses_per_neuron: usize) -> Self {
+    pub fn new(
+        n_neurons: usize,
+        initial_connectivity: f32,
+        max_synapses_per_neuron: usize,
+    ) -> Self {
         let max_synapses = n_neurons * max_synapses_per_neuron;
 
         // Generate initial random connectivity
@@ -181,7 +185,7 @@ impl StructuralPlasticity {
         let n_neurons = pre_activity.len();
 
         // Sample random neuron pairs (don't check all N^2 pairs - too expensive)
-        let n_samples = (n_neurons as f32 * 10.0) as usize;  // Sample 10× neurons
+        let n_samples = (n_neurons as f32 * 10.0) as usize; // Sample 10× neurons
 
         for _ in 0..n_samples {
             let pre = rng.gen_range(0..n_neurons);
@@ -200,13 +204,13 @@ impl StructuralPlasticity {
             let activity_product = pre_activity[pre] * post_activity[post];
 
             if activity_product < self.theta_form {
-                continue;  // Insufficient activity correlation
+                continue; // Insufficient activity correlation
             }
 
             // Distance penalty (DEEP R mechanism)
             let distance = self.euclidean_distance(pre, post);
             if distance > self.max_distance {
-                continue;  // Too far
+                continue; // Too far
             }
 
             let distance_factor = 1.0 - (distance / self.max_distance * self.distance_penalty);
@@ -224,14 +228,14 @@ impl StructuralPlasticity {
     fn form_synapse(&mut self, pre: usize, post: usize, timestep: u32) {
         // Check capacity
         if self.active_synapses.len() >= self.max_synapses {
-            return;  // Pool full
+            return; // Pool full
         }
 
         // Create new synapse with small initial weight
         let synapse = Synapse {
             pre_neuron: pre,
             post_neuron: post,
-            weight: 0.1,  // Small initial weight
+            weight: 0.1, // Small initial weight
             age: 0,
             last_active: timestep,
         };
@@ -376,8 +380,10 @@ mod tests {
 
         // Should have ~10% of 100*100 = 10,000 possible synapses
         // (minus 100 self-connections) = ~990 synapses
-        assert!(stats.active_synapses > 500 && stats.active_synapses < 1500,
-            "Initial connectivity should be around 10%");
+        assert!(
+            stats.active_synapses > 500 && stats.active_synapses < 1500,
+            "Initial connectivity should be around 10%"
+        );
     }
 
     #[test]
@@ -386,7 +392,7 @@ mod tests {
 
         // Set all weights to be below removal threshold
         for synapse in &mut sp.active_synapses {
-            synapse.weight = 0.05;  // Below theta_remove = 0.1
+            synapse.weight = 0.05; // Below theta_remove = 0.1
         }
 
         let initial_count = sp.active_synapses.len();
@@ -399,8 +405,10 @@ mod tests {
 
         let final_count = sp.active_synapses.len();
 
-        assert!(final_count < initial_count,
-            "Weak synapses should be removed");
+        assert!(
+            final_count < initial_count,
+            "Weak synapses should be removed"
+        );
     }
 
     #[test]
@@ -408,9 +416,9 @@ mod tests {
         let mut sp = StructuralPlasticity::new(50, 0.05, 50);
 
         // Increase formation rate and lower threshold for faster synapse formation in test
-        sp.eta_form = 0.1;       // Very high formation rate (10% instead of 0.1%)
-        sp.theta_form = 0.1;     // Very low threshold for easier formation
-        sp.max_distance = 2.0;   // Allow distant connections (positions are random [0,1])
+        sp.eta_form = 0.1; // Very high formation rate (10% instead of 0.1%)
+        sp.theta_form = 0.1; // Very low threshold for easier formation
+        sp.max_distance = 2.0; // Allow distant connections (positions are random [0,1])
 
         // High activity on ALL neurons (ensures random sampling finds active pairs)
         // With only 3 active neurons, probability of sampling active pair is (3/50)² = 0.36%
@@ -439,7 +447,7 @@ mod tests {
         let (row_ptr, col_idx, weights) = sp.to_csr(10);
 
         // Check CSR validity
-        assert_eq!(row_ptr.len(), 11);  // n_neurons + 1
+        assert_eq!(row_ptr.len(), 11); // n_neurons + 1
         assert_eq!(col_idx.len(), weights.len());
         assert_eq!(col_idx.len(), sp.active_synapses.len());
 
@@ -454,9 +462,9 @@ mod tests {
         let mut sp = StructuralPlasticity::new(100, 0.05, 50);
 
         // Increase distance penalty for stronger local connectivity bias
-        sp.distance_penalty = 0.9;   // Strong preference for nearby connections
-        sp.eta_form = 0.01;           // Higher formation rate for better statistics
-        sp.theta_form = 0.2;          // Lower threshold
+        sp.distance_penalty = 0.9; // Strong preference for nearby connections
+        sp.eta_form = 0.01; // Higher formation rate for better statistics
+        sp.theta_form = 0.2; // Lower threshold
 
         // Place neurons in a line
         for i in 0..100 {
@@ -485,7 +493,9 @@ mod tests {
         }
 
         // Should have more nearby than distant connections
-        assert!(nearby_count > distant_count,
-            "Distance penalty should favor nearby connections");
+        assert!(
+            nearby_count > distant_count,
+            "Distance penalty should favor nearby connections"
+        );
     }
 }

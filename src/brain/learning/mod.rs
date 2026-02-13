@@ -3,24 +3,22 @@
 //! Implements STDP, homeostatic plasticity, STP, quantization, metaplasticity,
 //! calcium-based plasticity, burst-dependent STDP, heterosynaptic plasticity, ETDP, and R-STDP.
 
-pub mod stdp;
-pub mod quantization;
-pub mod metaplasticity;
-pub mod heterosynaptic;
 pub mod etdp;
+pub mod heterosynaptic;
+pub mod metaplasticity;
+pub mod quantization;
 pub mod rstdp;
+pub mod stdp;
 
-pub use stdp::{
-    TripletSTDP, HomeostaticPlasticity, CalciumBasedPlasticity, BurstDependentSTDP,
-};
-pub use quantization::{QuantizationConfig, QuantizedWeights, QATSimulator};
-pub use metaplasticity::{
-    BCMMetaplasticity, SynapticScaling, CriticalityHomeostasis, IntrinsicPlasticity,
-    HomeostaticSystem, HomeostaticStats,
-};
+pub use etdp::{ETDPStats, ETDP};
 pub use heterosynaptic::{HeterosynapticPlasticity, HeterosynapticStats};
-pub use etdp::{ETDP, ETDPStats};
-pub use rstdp::{RSTDPSystem, RSTDPSynapse, RSTDPStats};
+pub use metaplasticity::{
+    BCMMetaplasticity, CriticalityHomeostasis, HomeostaticStats, HomeostaticSystem,
+    IntrinsicPlasticity, SynapticScaling,
+};
+pub use quantization::{QATSimulator, QuantizationConfig, QuantizedWeights};
+pub use rstdp::{RSTDPStats, RSTDPSynapse, RSTDPSystem};
+pub use stdp::{BurstDependentSTDP, CalciumBasedPlasticity, HomeostaticPlasticity, TripletSTDP};
 
 use serde::{Deserialize, Serialize};
 
@@ -116,10 +114,10 @@ impl Default for STPDynamics {
         Self {
             u_s: 0.5,
             x_s: 1.0,
-            tau_f: 100.0,  // 100ms facilitation
-            tau_d: 200.0,  // 200ms depression
+            tau_f: 100.0, // 100ms facilitation
+            tau_d: 200.0, // 200ms depression
             u_0: 0.5,
-            k: 9.0,        // Mid-range scaling factor
+            k: 9.0, // Mid-range scaling factor
         }
     }
 }
@@ -166,10 +164,10 @@ impl STPDynamics {
         Self {
             u_s: 0.3,
             x_s: 1.0,
-            tau_f: 50.0,   // Fast facilitation
-            tau_d: 500.0,  // Slow depression
+            tau_f: 50.0,  // Fast facilitation
+            tau_d: 500.0, // Slow depression
             u_0: 0.3,
-            k: 10.0,       // Strong STP effect
+            k: 10.0, // Strong STP effect
         }
     }
 
@@ -178,8 +176,8 @@ impl STPDynamics {
         Self {
             u_s: 0.8,
             x_s: 1.0,
-            tau_f: 200.0,  // Slow facilitation
-            tau_d: 100.0,  // Fast depression
+            tau_f: 200.0, // Slow facilitation
+            tau_d: 100.0, // Fast depression
             u_0: 0.8,
             k: 8.0,
         }

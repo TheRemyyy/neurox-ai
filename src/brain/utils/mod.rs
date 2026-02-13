@@ -36,11 +36,8 @@ pub fn firing_rate_stats(spikes: &[f32]) -> (f32, f32, f32) {
     let n_spikes: f32 = spikes.iter().sum();
     let mean = n_spikes / spikes.len() as f32;
 
-    let variance: f32 = spikes
-        .iter()
-        .map(|&s| (s - mean).powi(2))
-        .sum::<f32>()
-        / spikes.len() as f32;
+    let variance: f32 =
+        spikes.iter().map(|&s| (s - mean).powi(2)).sum::<f32>() / spikes.len() as f32;
 
     let std = variance.sqrt();
 

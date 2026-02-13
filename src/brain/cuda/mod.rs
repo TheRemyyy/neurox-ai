@@ -29,11 +29,11 @@ pub use context::CudaContext;
 #[cfg(feature = "cuda")]
 pub use motion_kernels::GpuMotionOutput;
 #[cfg(feature = "cuda")]
+pub use motion_kernels::GpuMotionSystem;
+#[cfg(feature = "cuda")]
 pub use spiking_conv_kernels::{GpuSpikeMaxPool, GpuSpikingConv2D};
 #[cfg(feature = "cuda")]
 pub use v1_kernels::GpuV1OrientationSystem;
-#[cfg(feature = "cuda")]
-pub use motion_kernels::GpuMotionSystem;
 
 #[cfg(feature = "cuda")]
 use cudarc::driver::LaunchConfig;

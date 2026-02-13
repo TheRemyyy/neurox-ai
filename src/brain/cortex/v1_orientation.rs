@@ -68,7 +68,7 @@ pub struct RelayLayer {
     pub neurons: Vec<Vec<LIFNeuron>>,
 
     // Center-surround receptive fields
-    pub center_weights: Vec<Vec<Vec<f32>>>,   // 2D Gaussian center
+    pub center_weights: Vec<Vec<Vec<f32>>>, // 2D Gaussian center
     pub surround_weights: Vec<Vec<Vec<f32>>>, // 2D Gaussian surround
 }
 
@@ -90,7 +90,7 @@ pub struct V1Layer {
     pub interneurons: Vec<Vec<Vec<InhibitoryInterneuron>>>,
 
     // Orientation preference for each column
-    pub orientation_map: Vec<Vec<f32>>,  // 0 to π
+    pub orientation_map: Vec<Vec<f32>>, // 0 to π
 }
 
 /// Simple cell (orientation-selective)
@@ -99,9 +99,9 @@ pub struct SimpleCell {
     pub neuron: LIFNeuron,
     pub x: usize,
     pub y: usize,
-    pub preferred_orientation: f32,  // radians
-    pub spatial_frequency: f32,       // cycles per degree
-    pub phase: f32,                   // 0 or π/2 for quadrature pair
+    pub preferred_orientation: f32, // radians
+    pub spatial_frequency: f32,     // cycles per degree
+    pub phase: f32,                 // 0 or π/2 for quadrature pair
 
     // Gabor-like receptive field (learned via recurrent inhibition)
     pub receptive_field: Vec<Vec<f32>>,
@@ -121,7 +121,7 @@ pub struct ComplexCell {
     pub preferred_orientation: f32,
 
     // Pools responses from multiple simple cells
-    pub simple_cell_indices: Vec<(usize, usize)>,  // (x, y) of simple cells
+    pub simple_cell_indices: Vec<(usize, usize)>, // (x, y) of simple cells
 
     pub response: f32,
 }
@@ -134,7 +134,7 @@ pub struct InhibitoryInterneuron {
     pub y: usize,
 
     // Clustered inhibition (inhibits nearby neurons with different orientations)
-    pub inhibition_radius: f32,  // pixels
+    pub inhibition_radius: f32, // pixels
     pub inhibition_strength: f32,
 
     pub activity: f32,
@@ -166,12 +166,7 @@ impl V1OrientationSystem {
     ///
     /// # Returns
     /// Orientation energy maps [width][height][orientation]
-    pub fn process(
-        &mut self,
-        dt: f32,
-        input: &[Vec<f32>],
-        timestep: u32,
-    ) -> Vec<Vec<Vec<f32>>> {
+    pub fn process(&mut self, dt: f32, input: &[Vec<f32>], timestep: u32) -> Vec<Vec<Vec<f32>>> {
         // 1. Retina processing (ON/OFF decomposition)
         self.retina.process(input, timestep);
 
@@ -229,7 +224,11 @@ impl RetinaLayer {
     fn process(&mut self, input: &[Vec<f32>], timestep: u32) {
         for x in 0..self.width {
             for y in 0..self.height {
-                let pixel = input.get(x).and_then(|row| row.get(y)).copied().unwrap_or(0.0);
+                let pixel = input
+                    .get(x)
+                    .and_then(|row| row.get(y))
+                    .copied()
+                    .unwrap_or(0.0);
 
                 // ON cells: respond to bright
                 if pixel > 0.5 {
@@ -266,13 +265,8 @@ impl RelayLayer {
         let sigma_center = 1.0;
         let sigma_surround = 2.0;
 
-        let (center_weights, surround_weights) = Self::create_center_surround_rf(
-            width,
-            height,
-            rf_size,
-            sigma_center,
-            sigma_surround,
-        );
+        let (center_weights, surround_weights) =
+            Self::create_center_surround_rf(width, height, rf_size, sigma_center, sigma_surround);
 
         Self {
             width,
@@ -308,10 +302,12 @@ impl RelayLayer {
                         let dist_sq = dx * dx + dy * dy;
 
                         // Gaussian center (excitatory)
-                        center_weights[idx][i][j] = (-dist_sq / (2.0 * sigma_center * sigma_center)).exp();
+                        center_weights[idx][i][j] =
+                            (-dist_sq / (2.0 * sigma_center * sigma_center)).exp();
 
                         // Gaussian surround (inhibitory)
-                        surround_weights[idx][i][j] = (-dist_sq / (2.0 * sigma_surround * sigma_surround)).exp();
+                        surround_weights[idx][i][j] =
+                            (-dist_sq / (2.0 * sigma_surround * sigma_surround)).exp();
                     }
                 }
             }
@@ -354,7 +350,7 @@ impl RelayLayer {
                 if self.neurons[x][y].update(dt, net_input * 10.0) {
                     output[x][y] = 1.0;
                 } else {
-                    output[x][y] = self.neurons[x][y].voltage() + 70.0;  // Normalize to 0-1
+                    output[x][y] = self.neurons[x][y].voltage() + 70.0; // Normalize to 0-1
                     output[x][y] = (output[x][y] / 15.0).clamp(0.0, 1.0);
                 }
             }
@@ -371,7 +367,7 @@ impl V1Layer {
         let mut interneurons = vec![vec![vec![]; height]; width];
         let mut orientation_map = vec![vec![0.0; height]; width];
 
-        let rf_size = 11;  // 11×11 receptive field
+        let rf_size = 11; // 11×11 receptive field
 
         for x in 0..width {
             for y in 0..height {
@@ -388,7 +384,7 @@ impl V1Layer {
                             x,
                             y,
                             orientation,
-                            0.1,  // spatial frequency
+                            0.1, // spatial frequency
                             phase,
                             rf_size,
                         );
@@ -401,7 +397,7 @@ impl V1Layer {
                         x,
                         y,
                         preferred_orientation: orientation,
-                        simple_cell_indices: vec![(x, y)],  // Simplified
+                        simple_cell_indices: vec![(x, y)], // Simplified
                         response: 0.0,
                     };
                     complex_cells[x][y].push(complex);
@@ -431,13 +427,9 @@ impl V1Layer {
         }
     }
 
-    fn process(
-        &mut self,
-        dt: f32,
-        relay_input: &[Vec<f32>],
-        timestep: u32,
-    ) -> Vec<Vec<Vec<f32>>> {
-        let mut orientation_energy = vec![vec![vec![0.0; self.n_orientations]; self.height]; self.width];
+    fn process(&mut self, dt: f32, relay_input: &[Vec<f32>], timestep: u32) -> Vec<Vec<Vec<f32>>> {
+        let mut orientation_energy =
+            vec![vec![vec![0.0; self.n_orientations]; self.height]; self.width];
 
         // Update simple cells with recurrent inhibition
         for x in 0..self.width {
@@ -448,7 +440,8 @@ impl V1Layer {
 
                 for cell in &self.simple_cells[x][y] {
                     let ff_input = self.compute_gabor_response(cell, relay_input);
-                    let inhibition = self.compute_recurrent_inhibition(x, y, cell.preferred_orientation);
+                    let inhibition =
+                        self.compute_recurrent_inhibition(x, y, cell.preferred_orientation);
                     ff_inputs.push(ff_input);
                     inhibitions.push(inhibition);
                 }
@@ -470,7 +463,7 @@ impl V1Layer {
                     }
 
                     // Accumulate orientation energy (quadrature energy)
-                    let ori_channel = ori_idx / 2;  // 2 phases per orientation
+                    let ori_channel = ori_idx / 2; // 2 phases per orientation
                     if ori_channel < self.n_orientations {
                         orientation_energy[x][y][ori_channel] += cell.response * cell.response;
                     }
@@ -481,7 +474,9 @@ impl V1Layer {
                     // Sum squared responses from simple cells (energy)
                     let mut energy = 0.0;
                     for simple in &self.simple_cells[x][y] {
-                        if (simple.preferred_orientation - complex.preferred_orientation).abs() < 0.1 {
+                        if (simple.preferred_orientation - complex.preferred_orientation).abs()
+                            < 0.1
+                        {
                             energy += simple.response * simple.response;
                         }
                     }
@@ -492,12 +487,18 @@ impl V1Layer {
                 // Update interneurons
                 for inter in &mut self.interneurons[x][y] {
                     // Driven by local simple cell activity
-                    let local_activity: f32 = self.simple_cells[x][y].iter()
+                    let local_activity: f32 = self.simple_cells[x][y]
+                        .iter()
                         .map(|c| c.response)
-                        .sum::<f32>() / self.simple_cells[x][y].len() as f32;
+                        .sum::<f32>()
+                        / self.simple_cells[x][y].len() as f32;
 
                     inter.neuron.update(dt, local_activity * 5.0);
-                    inter.activity = if inter.neuron.voltage() > -60.0 { 1.0 } else { 0.0 };
+                    inter.activity = if inter.neuron.voltage() > -60.0 {
+                        1.0
+                    } else {
+                        0.0
+                    };
                 }
             }
         }
@@ -650,12 +651,18 @@ mod tests {
         println!("Gabor RF center: {}", center_value);
 
         // Should have both positive and negative lobes
-        let has_positive = cell.receptive_field.iter()
+        let has_positive = cell
+            .receptive_field
+            .iter()
             .any(|row| row.iter().any(|&v| v > 0.05));
-        let has_negative = cell.receptive_field.iter()
+        let has_negative = cell
+            .receptive_field
+            .iter()
             .any(|row| row.iter().any(|&v| v < -0.05));
 
-        assert!(has_positive && has_negative,
-            "Gabor RF should have both positive and negative lobes");
+        assert!(
+            has_positive && has_negative,
+            "Gabor RF should have both positive and negative lobes"
+        );
     }
 }

@@ -21,8 +21,8 @@
 //! - Reproduces spike-frequency adaptation
 //! - Realistic burst dynamics
 
+use crate::brain::neuron::{Neuron, NeuronState};
 use serde::{Deserialize, Serialize};
-use crate::brain::neuron::{NeuronState, Neuron};
 
 /// Conductance-based Adaptive Exponential neuron
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -72,52 +72,52 @@ impl CAdExNeuron {
     pub fn new(id: u32) -> Self {
         Self {
             state: NeuronState::new(id),
-            c: 281.0,          // pF (typical cortical pyramidal)
-            g_l: 30.0,         // nS
-            e_l: -70.6,        // mV
-            delta_t: 2.0,      // mV (sharpness of spike initiation)
-            v_t: -50.4,        // mV (spike threshold)
-            g_w: 0.0,          // nS (adaptation conductance, starts at 0)
-            e_k: -100.0,       // mV (potassium reversal)
-            tau_w: 144.0,      // ms (adaptation time constant)
-            a: 4.0,            // nS/mV (subthreshold adaptation)
-            b: 80.5,           // nS (spike-triggered adaptation)
+            c: 281.0,     // pF (typical cortical pyramidal)
+            g_l: 30.0,    // nS
+            e_l: -70.6,   // mV
+            delta_t: 2.0, // mV (sharpness of spike initiation)
+            v_t: -50.4,   // mV (spike threshold)
+            g_w: 0.0,     // nS (adaptation conductance, starts at 0)
+            e_k: -100.0,  // mV (potassium reversal)
+            tau_w: 144.0, // ms (adaptation time constant)
+            a: 4.0,       // nS/mV (subthreshold adaptation)
+            b: 80.5,      // nS (spike-triggered adaptation)
             refract_counter: 0,
-            refractory_period: 20,  // 2ms @ 0.1ms timestep
+            refractory_period: 20, // 2ms @ 0.1ms timestep
         }
     }
 
     /// Create fast-spiking CAdEx neuron (PV-like interneuron)
     pub fn fast_spiking(id: u32) -> Self {
         let mut neuron = Self::new(id);
-        neuron.tau_w = 50.0;   // Faster adaptation
-        neuron.a = 1.0;        // Weaker subthreshold adaptation
-        neuron.b = 20.0;       // Weaker spike-triggered adaptation
-        neuron.state.tau_m = 5.0;  // Fast membrane dynamics
+        neuron.tau_w = 50.0; // Faster adaptation
+        neuron.a = 1.0; // Weaker subthreshold adaptation
+        neuron.b = 20.0; // Weaker spike-triggered adaptation
+        neuron.state.tau_m = 5.0; // Fast membrane dynamics
         neuron
     }
 
     /// Create adapting CAdEx neuron (SST-like interneuron)
     pub fn adapting(id: u32) -> Self {
         let mut neuron = Self::new(id);
-        neuron.tau_w = 300.0;  // Slower adaptation (stronger effect)
-        neuron.a = 8.0;        // Stronger subthreshold adaptation
-        neuron.b = 150.0;      // Stronger spike-triggered adaptation
+        neuron.tau_w = 300.0; // Slower adaptation (stronger effect)
+        neuron.a = 8.0; // Stronger subthreshold adaptation
+        neuron.b = 150.0; // Stronger spike-triggered adaptation
         neuron
     }
 
     /// Create bursting CAdEx neuron
     pub fn bursting(id: u32) -> Self {
         let mut neuron = Self::new(id);
-        neuron.delta_t = 3.0;  // Sharper exponential
-        neuron.tau_w = 100.0;  // Medium adaptation timescale
-        neuron.b = 200.0;      // Strong spike-triggered adaptation for bursts
+        neuron.delta_t = 3.0; // Sharper exponential
+        neuron.tau_w = 100.0; // Medium adaptation timescale
+        neuron.b = 200.0; // Strong spike-triggered adaptation for bursts
         neuron
     }
 
     /// Create regular spiking CAdEx neuron (standard cortical excitatory)
     pub fn regular_spiking(id: u32) -> Self {
-        Self::new(id)  // Defaults are already regular spiking
+        Self::new(id) // Defaults are already regular spiking
     }
 }
 
@@ -126,7 +126,11 @@ impl Neuron for CAdExNeuron {
         // Check refractory period
         if self.refract_counter > 0 {
             self.refract_counter -= 1;
-            self.state.last_spike = if self.refract_counter > 0 { self.refract_counter as u16 } else { 0 };
+            self.state.last_spike = if self.refract_counter > 0 {
+                self.refract_counter as u16
+            } else {
+                0
+            };
             return false;
         }
 
@@ -143,9 +147,9 @@ impl Neuron for CAdExNeuron {
         let exp_arg = (v - self.v_t) / self.delta_t;
         let i_exp = if exp_arg > 10.0 {
             // Prevent overflow: exp(>10) is huge, just use large value
-            self.g_l * self.delta_t * 22026.0  // exp(10) ≈ 22026
+            self.g_l * self.delta_t * 22026.0 // exp(10) ≈ 22026
         } else if exp_arg < -10.0 {
-            0.0  // exp(<-10) ≈ 0
+            0.0 // exp(<-10) ≈ 0
         } else {
             self.g_l * self.delta_t * exp_arg.exp()
         };
@@ -171,7 +175,7 @@ impl Neuron for CAdExNeuron {
         if self.state.v >= self.state.threshold {
             // Spike!
             self.state.v = self.state.v_reset;
-            self.g_w += self.b;  // Spike-triggered adaptation increment (conductance)
+            self.g_w += self.b; // Spike-triggered adaptation increment (conductance)
             self.refract_counter = self.refractory_period;
             self.state.last_spike = self.refractory_period as u16;
             true
@@ -207,14 +211,14 @@ mod tests {
         assert_eq!(neuron.c, 281.0);
         assert_eq!(neuron.g_l, 30.0);
         assert_eq!(neuron.e_l, -70.6);
-        assert_eq!(neuron.g_w, 0.0);  // Starts at 0
+        assert_eq!(neuron.g_w, 0.0); // Starts at 0
     }
 
     #[test]
     fn test_cadex_spiking() {
         let mut neuron = CAdExNeuron::new(0);
-        let dt = 0.1;  // 0.1 ms timestep
-        let input = 2000.0;  // Strong input (increased to overcome adaptation)
+        let dt = 0.1; // 0.1 ms timestep
+        let input = 2000.0; // Strong input (increased to overcome adaptation)
 
         let mut spike_count = 0;
         for _i in 0..1000 {
@@ -224,7 +228,10 @@ mod tests {
         }
 
         assert!(spike_count > 0, "Neuron should spike with strong input");
-        assert!(spike_count < 200, "Should show adaptation (not constant firing)");
+        assert!(
+            spike_count < 200,
+            "Should show adaptation (not constant firing)"
+        );
     }
 
     #[test]
@@ -251,7 +258,7 @@ mod tests {
         let mut rs = CAdExNeuron::regular_spiking(1);
 
         let dt = 0.1;
-        let input = 1500.0;  // Strong enough to overcome adaptation
+        let input = 1500.0; // Strong enough to overcome adaptation
 
         let mut fs_spikes = 0;
         let mut rs_spikes = 0;
@@ -266,14 +273,17 @@ mod tests {
         }
 
         // Fast-spiking should fire more due to weaker adaptation
-        assert!(fs_spikes > rs_spikes, "Fast-spiking should fire more than regular spiking");
+        assert!(
+            fs_spikes > rs_spikes,
+            "Fast-spiking should fire more than regular spiking"
+        );
     }
 
     #[test]
     fn test_adapting_variant() {
         let mut adapt = CAdExNeuron::adapting(0);
         let dt = 0.1;
-        let input = 2500.0;  // Needs strong input due to strong adaptation
+        let input = 2500.0; // Needs strong input due to strong adaptation
 
         let mut spike_times = Vec::new();
         for t in 0..2000 {
@@ -294,7 +304,7 @@ mod tests {
     fn test_bursting_variant() {
         let mut burst = CAdExNeuron::bursting(0);
         let dt = 0.1;
-        let input = 1800.0;  // Strong input for bursting
+        let input = 1800.0; // Strong input for bursting
 
         let mut spike_times = Vec::new();
         for t in 0..3000 {
@@ -308,11 +318,15 @@ mod tests {
             let mut short_isis = 0;
             for i in 1..spike_times.len() {
                 let isi = spike_times[i] - spike_times[i - 1];
-                if isi < 20 {  // Less than 2ms = within burst
+                if isi < 20 {
+                    // Less than 2ms = within burst
                     short_isis += 1;
                 }
             }
-            assert!(short_isis > 0, "Bursting neuron should have some short ISIs");
+            assert!(
+                short_isis > 0,
+                "Bursting neuron should have some short ISIs"
+            );
         }
     }
 
@@ -320,7 +334,7 @@ mod tests {
     fn test_refractory_period() {
         let mut neuron = CAdExNeuron::new(0);
         let dt = 0.1;
-        let input = 1000.0;  // Very strong input
+        let input = 1000.0; // Very strong input
 
         // Force spike
         neuron.state.v = neuron.state.threshold + 1.0;
@@ -329,6 +343,9 @@ mod tests {
 
         // During refractory period, should not spike even with strong input
         let spiked_during_refract = neuron.update(dt, input);
-        assert!(!spiked_during_refract, "Should not spike during refractory period");
+        assert!(
+            !spiked_during_refract,
+            "Should not spike during refractory period"
+        );
     }
 }
