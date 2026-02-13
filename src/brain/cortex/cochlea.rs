@@ -286,7 +286,10 @@ mod tests {
         }
 
         // Should resonate (output scale depends on gain normalization)
-        assert!(max_out > 0.0, "Filter should produce non-zero output at center freq");
+        assert!(
+            max_out > 0.0,
+            "Filter should produce non-zero output at center freq"
+        );
     }
 
     #[test]
