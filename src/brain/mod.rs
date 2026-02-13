@@ -2588,7 +2588,10 @@ mod tests {
         println!("  Input: 'testing brain' → Output: '{}'", response3);
 
         // Response may be empty depending on vocabulary/sequence generator state
-        assert!(response1.len() < 10000, "process_text should return bounded string");
+        assert!(
+            response1.len() < 10000,
+            "process_text should return bounded string"
+        );
 
         let lang_stats = brain.stats();
         println!(
@@ -2678,7 +2681,10 @@ mod tests {
         // Test retrieval (may be None in attractor dynamics)
         let query = vec![0.0; wm_dim];
         let retrieved = brain.working_memory.retrieve(&query);
-        println!("  ✓ Retrieval: {}", if retrieved.is_some() { "ok" } else { "none" });
+        println!(
+            "  ✓ Retrieval: {}",
+            if retrieved.is_some() { "ok" } else { "none" }
+        );
 
         // ========== PHASE 6: MOTOR LEARNING (CEREBELLUM) ==========
         println!("\n📍 PHASE 6: Motor Learning (Cerebellum)");
@@ -2848,26 +2854,11 @@ mod tests {
                 "Working Memory",
                 final_stats.working_memory.stored_patterns >= 0,
             ),
-            (
-                "Hippocampus",
-                final_stats.hippocampus.buffer_size > 0,
-            ),
-            (
-                "Basal Ganglia",
-                final_stats.basal_ganglia.n_striatum > 0,
-            ),
-            (
-                "Amygdala",
-                final_stats.amygdala.total_neurons > 0,
-            ),
-            (
-                "Cerebellum",
-                final_stats.cerebellum.total_synapses > 0,
-            ),
-            (
-                "Oscillations",
-                final_stats.oscillations.theta_freq > 0.0,
-            ),
+            ("Hippocampus", final_stats.hippocampus.buffer_size > 0),
+            ("Basal Ganglia", final_stats.basal_ganglia.n_striatum > 0),
+            ("Amygdala", final_stats.amygdala.total_neurons > 0),
+            ("Cerebellum", final_stats.cerebellum.total_synapses > 0),
+            ("Oscillations", final_stats.oscillations.theta_freq > 0.0),
             (
                 "Neuromodulation",
                 final_stats.neuromodulation.ach_level >= 0.0,
@@ -2876,14 +2867,8 @@ mod tests {
                 "Homeostasis",
                 final_stats.homeostasis.criticality_score >= 0.0,
             ),
-            (
-                "Sleep",
-                final_stats.sleep.total_sleep_time >= 0.0,
-            ),
-            (
-                "RSTDP",
-                final_stats.rstdp.num_synapses >= 0,
-            ),
+            ("Sleep", final_stats.sleep.total_sleep_time >= 0.0),
+            ("RSTDP", final_stats.rstdp.num_synapses >= 0),
             (
                 "ETDP",
                 final_stats.etdp.num_pre_events >= 0 && final_stats.etdp.num_post_events >= 0,
@@ -2896,14 +2881,8 @@ mod tests {
                 "Structural",
                 final_stats.structural_plasticity.active_synapses >= 0,
             ),
-            (
-                "Predictive",
-                final_stats.predictive.n_levels > 0,
-            ),
-            (
-                "Language",
-                final_stats.language.ventral_concepts >= 0,
-            ),
+            ("Predictive", final_stats.predictive.n_levels > 0),
+            ("Language", final_stats.language.ventral_concepts >= 0),
         ];
 
         for (system, ok) in &checks {
