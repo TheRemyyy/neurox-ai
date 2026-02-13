@@ -48,6 +48,12 @@ pub struct BarrelCortex {
     pub attention_focus: (usize, usize), // (row, col) attended barrel
 }
 
+impl Default for BarrelCortex {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BarrelCortex {
     /// Create new barrel cortex with 5×5 whisker array
     pub fn new() -> Self {
@@ -128,9 +134,9 @@ impl BarrelCortex {
 
         // 6. Extract L2/3 population activity
         let mut activity_map = vec![vec![0.0; self.n_cols]; self.n_rows];
-        for row in 0..self.n_rows {
-            for col in 0..self.n_cols {
-                activity_map[row][col] = self.barrels[row][col].get_l23_activity();
+        for (row, row_slice) in activity_map.iter_mut().enumerate().take(self.n_rows) {
+            for (col, cell) in row_slice.iter_mut().enumerate().take(self.n_cols) {
+                *cell = self.barrels[row][col].get_l23_activity();
             }
         }
 
@@ -142,15 +148,15 @@ impl BarrelCortex {
         // Pre-compute L2/3 activities
         let mut l23_activities = vec![vec![0.0; self.n_cols]; self.n_rows];
 
-        for row in 0..self.n_rows {
-            for col in 0..self.n_cols {
-                l23_activities[row][col] = self.barrels[row][col].get_l23_activity();
+        for (row, row_slice) in l23_activities.iter_mut().enumerate().take(self.n_rows) {
+            for (col, cell) in row_slice.iter_mut().enumerate().take(self.n_cols) {
+                *cell = self.barrels[row][col].get_l23_activity();
             }
         }
 
         // Apply lateral influences
-        for row in 0..self.n_rows {
-            for col in 0..self.n_cols {
+        for (row, row_slice) in l23_activities.iter().enumerate().take(self.n_rows) {
+            for (col, _) in row_slice.iter().enumerate().take(self.n_cols) {
                 // Surround suppression from neighbors
                 let mut surround_input = 0.0;
 
@@ -238,9 +244,9 @@ impl CorticalBarrel {
             layer4: Layer4::new(600),     // 600 granule/spiny stellate
             layer5: Layer5::new(300),     // 300 pyramidal neurons
             layer6: Layer6::new(200),     // 200 pyramidal neurons
-            pv_interneurons: (0..100).map(|i| PVInterneuron::new(i)).collect(),
-            sst_interneurons: (0..80).map(|i| SSTInterneuron::new(i)).collect(),
-            vip_interneurons: (0..20).map(|i| VIPInterneuron::new(i)).collect(),
+            pv_interneurons: (0..100).map(PVInterneuron::new).collect(),
+            sst_interneurons: (0..80).map(SSTInterneuron::new).collect(),
+            vip_interneurons: (0..20).map(VIPInterneuron::new).collect(),
             gain: 1.0,
         }
     }

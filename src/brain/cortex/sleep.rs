@@ -72,6 +72,12 @@ pub struct SleepConsolidation {
     pub memories_consolidated: usize,
 }
 
+impl Default for SleepConsolidation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SleepConsolidation {
     /// Create new sleep consolidation system
     pub fn new() -> Self {
@@ -284,7 +290,7 @@ impl SleepConsolidation {
     }
 
     /// Integrate memories into schemas during REM sleep
-    fn integrate_schemas(&mut self, dt: f32) {
+    fn integrate_schemas(&mut self, _dt: f32) {
         // REM sleep: integrate recent memories into existing knowledge structures
         // This is where generalization and abstraction occur
 
@@ -295,7 +301,7 @@ impl SleepConsolidation {
         for (i, exp) in self.memory_buffer.iter().enumerate() {
             context_groups
                 .entry(exp.context.clone())
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(i);
         }
 

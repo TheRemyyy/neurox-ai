@@ -464,7 +464,7 @@ impl DualStreamLanguage {
     }
 
     /// Produce output
-    pub fn produce(&mut self, semantic_input: &[f32], length: usize) -> Vec<Vec<f32>> {
+    pub fn produce(&mut self, semantic_input: &[f32], _length: usize) -> Vec<Vec<f32>> {
         self.dorsal.produce(semantic_input)
     }
 
@@ -497,7 +497,7 @@ impl DualStreamLanguage {
                     .cloned(),
             ) {
                 // Combined pattern for concept learning
-                let mut combined: Vec<f32> = center_emb
+                let combined: Vec<f32> = center_emb
                     .iter()
                     .zip(context_emb.iter())
                     .map(|(a, b)| (a + b) / 2.0)
@@ -516,7 +516,7 @@ impl DualStreamLanguage {
     }
 
     fn add_association(&mut self, from: usize, to: usize, strength: f32) {
-        let associations = self.word_associations.entry(from).or_insert_with(Vec::new);
+        let associations = self.word_associations.entry(from).or_default();
 
         // Check if association already exists
         if let Some(pos) = associations.iter().position(|(idx, _)| *idx == to) {

@@ -105,6 +105,16 @@ pub struct MolecularInterneuron {
     pub neuron: LIFNeuron,
 }
 
+/// Connectivity layout: MF→GrC, GoC→GrC, GrC→PkC, CF→PkC, MLI→PkC, total_synapses
+type CerebellarConnectivity = (
+    Vec<Vec<usize>>,
+    Vec<Vec<usize>>,
+    Vec<Vec<(usize, f32)>>,
+    Vec<usize>,
+    Vec<Vec<usize>>,
+    usize,
+);
+
 impl CerebellarHemisphere {
     /// Create new cerebellar hemisphere with biological architecture
     pub fn new(hemisphere_id: usize) -> Self {
@@ -191,16 +201,7 @@ impl CerebellarHemisphere {
     }
 
     /// Build biological connectivity patterns
-    fn build_connectivity_with_seed(
-        seed: u64,
-    ) -> (
-        Vec<Vec<usize>>,        // MF → GrC
-        Vec<Vec<usize>>,        // GoC → GrC
-        Vec<Vec<(usize, f32)>>, // GrC → PkC with weights
-        Vec<usize>,             // CF → PkC
-        Vec<Vec<usize>>,        // MLI → PkC
-        usize,                  // Total synapses
-    ) {
+    fn build_connectivity_with_seed(seed: u64) -> CerebellarConnectivity {
         use rand::Rng;
         use rand::SeedableRng;
         let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
@@ -245,20 +246,6 @@ impl CerebellarHemisphere {
         )
     }
 
-    /// Build biological connectivity patterns (legacy - uses random seed)
-    fn build_connectivity() -> (
-        Vec<Vec<usize>>,        // MF → GrC
-        Vec<Vec<usize>>,        // GoC → GrC
-        Vec<Vec<(usize, f32)>>, // GrC → PkC with weights
-        Vec<usize>,             // CF → PkC
-        Vec<Vec<usize>>,        // MLI → PkC
-        usize,                  // Total synapses
-    ) {
-        use rand::Rng;
-        let seed = rand::thread_rng().gen();
-        Self::build_connectivity_with_seed(seed)
-    }
-
     /// Update cerebellar hemisphere for one timestep
     ///
     /// # Arguments
@@ -300,11 +287,9 @@ impl CerebellarHemisphere {
 
             // Inhibitory input from Golgi cells
             for go in &self.golgi_cells {
-                if self.go_to_gr[go.id].contains(&i) {
-                    if go.neuron.voltage() > -60.0 {
-                        // Active Golgi cell
-                        input_current -= go.inhibition_strength;
-                    }
+                if self.go_to_gr[go.id].contains(&i) && go.neuron.voltage() > -60.0 {
+                    // Active Golgi cell
+                    input_current -= go.inhibition_strength;
                 }
             }
 

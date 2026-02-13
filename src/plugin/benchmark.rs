@@ -2,20 +2,29 @@
 //!
 //! MNIST benchmark with quantization support.
 
+#[cfg(feature = "cuda")]
 use crate::brain::datasets::{download_mnist, MNISTDataset};
+#[cfg(feature = "cuda")]
 use crate::brain::learning::quantization::QuantizedWeights;
+#[cfg(feature = "cuda")]
 use crate::brain::learning::STDPConfig;
+#[cfg(feature = "cuda")]
 use crate::brain::simulation::Simulator;
+#[cfg(feature = "cuda")]
 use crate::brain::training::{MNISTTrainer, TrainingConfig};
 use crate::config::BenchmarkConfig;
+#[cfg(feature = "cuda")]
 use crate::{CudaContext, ProceduralConnectivity, SparseConnectivity};
+#[cfg(feature = "cuda")]
 use std::sync::Arc;
 
-// CLI Colors - white, gray, light blue only
+#[cfg(feature = "cuda")]
 const COLOR_RESET: &str = "\x1b[0m";
-const COLOR_WHITE: &str = "\x1b[37m";
-const COLOR_GRAY: &str = "\x1b[90m";
+#[cfg(feature = "cuda")]
 const COLOR_LIGHT_BLUE: &str = "\x1b[94m";
+#[cfg(feature = "cuda")]
+const COLOR_GRAY: &str = "\x1b[90m";
+#[cfg(feature = "cuda")]
 const BOLD: &str = "\x1b[1m";
 
 /// Benchmark plugin for MNIST evaluation
@@ -29,28 +38,32 @@ impl BenchmarkPlugin {
         Self { config }
     }
 
+    /// Configuration used by this plugin
+    pub fn config(&self) -> &BenchmarkConfig {
+        &self.config
+    }
+
     /// Run the MNIST benchmark
     pub fn run(
         &self,
-        data_dir: Option<&str>,
-        epochs: Option<usize>,
-        bits: Option<u8>,
-        neurons: Option<usize>,
-        duration: Option<f32>,
-        isi: Option<f32>,
+        _data_dir: Option<&str>,
+        _epochs: Option<usize>,
+        _bits: Option<u8>,
+        _neurons: Option<usize>,
+        _duration: Option<f32>,
+        _isi: Option<f32>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         #[cfg(not(feature = "cuda"))]
         return Err("Benchmark requires CUDA. Build with --features cuda.".into());
 
         #[cfg(feature = "cuda")]
         {
-            // Use CLI args or config defaults
-            let data_dir = data_dir.unwrap_or(&self.config.data_dir);
-            let epochs = epochs.unwrap_or(self.config.epochs);
-            let bits = bits.unwrap_or(self.config.bits);
-            let neurons = neurons.unwrap_or(self.config.neurons);
-            let duration = duration.unwrap_or(self.config.presentation_duration);
-            let isi = isi.unwrap_or(self.config.isi);
+            let data_dir = _data_dir.unwrap_or(&self.config.data_dir);
+            let epochs = _epochs.unwrap_or(self.config.epochs);
+            let bits = _bits.unwrap_or(self.config.bits);
+            let neurons = _neurons.unwrap_or(self.config.neurons);
+            let duration = _duration.unwrap_or(self.config.presentation_duration);
+            let isi = _isi.unwrap_or(self.config.isi);
 
             println!(
                 "{}╔════════════════════════════════════════════════════════════╗",
@@ -136,7 +149,7 @@ impl BenchmarkPlugin {
         println!();
 
         println!("{}Initializing GPU...{}", COLOR_GRAY, COLOR_RESET);
-        let cuda_ctx = Arc::new(CudaContext::default()?);
+        let cuda_ctx = Arc::new(CudaContext::default_context()?);
         let device_info = cuda_ctx.device_info()?;
         let device_name = device_info.lines().next().unwrap_or("Unknown GPU");
         println!("  {}", device_name);
@@ -299,7 +312,7 @@ impl BenchmarkPlugin {
         println!();
 
         println!("{}Initializing GPU...{}", COLOR_GRAY, COLOR_RESET);
-        let cuda_ctx = Arc::new(CudaContext::default()?);
+        let cuda_ctx = Arc::new(CudaContext::default_context()?);
         let device_info = cuda_ctx.device_info()?;
         let device_name = device_info.lines().next().unwrap_or("Unknown GPU");
         println!("  {}", device_name);
@@ -397,6 +410,7 @@ impl BenchmarkPlugin {
         Ok(())
     }
 
+    #[cfg(feature = "cuda")]
     fn print_results(&self, final_acc: f32, quant_acc: f32, bits: u8, compression: f32) {
         println!();
         println!(

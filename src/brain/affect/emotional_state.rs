@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Primary emotions based on Plutchik's wheel
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum Emotion {
     // === PRIMARY EMOTIONS ===
     Joy,
@@ -50,13 +50,8 @@ pub enum Emotion {
     Aggressiveness,
 
     /// Neutral/baseline state
+    #[default]
     Neutral,
-}
-
-impl Default for Emotion {
-    fn default() -> Self {
-        Emotion::Neutral
-    }
 }
 
 impl Emotion {
@@ -497,7 +492,7 @@ impl EmotionalStateMachine {
                 // Check source emotion constraint
                 let source_ok = transition
                     .from_emotion
-                    .map_or(true, |from| self.current_state.dominant == from);
+                    .is_none_or(|from| self.current_state.dominant == from);
 
                 if source_ok {
                     self.current_state

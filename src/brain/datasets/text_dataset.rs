@@ -380,7 +380,7 @@ impl TextDataset {
     /// Add raw text (multiple sentences, split by punctuation)
     pub fn add_text(&mut self, text: &str) {
         // Split by sentence-ending punctuation
-        for sentence in text.split(|c| c == '.' || c == '!' || c == '?') {
+        for sentence in text.split(['.', '!', '?']) {
             let trimmed = sentence.trim();
             if !trimmed.is_empty() {
                 self.add_sentence(trimmed);
@@ -419,9 +419,9 @@ impl TextDataset {
                 let start = i.saturating_sub(self.window_size);
                 let end = (i + self.window_size + 1).min(sentence.len());
 
-                for j in start..end {
+                for (j, word) in sentence.iter().enumerate().skip(start).take(end.saturating_sub(start)) {
                     if i != j {
-                        if let Some(&context_idx) = self.word_to_idx.get(&sentence[j]) {
+                        if let Some(&context_idx) = self.word_to_idx.get(word) {
                             pairs.push((center_idx, context_idx));
                         }
                     }

@@ -19,7 +19,8 @@ impl CudaContext {
         Err(CUDA_DISABLED_MSG.into())
     }
 
-    pub fn default() -> Result<Self, Box<dyn std::error::Error>> {
+    /// Create default context (device 0). Use this instead of Default to get Result.
+    pub fn default_context() -> Result<Self, Box<dyn std::error::Error>> {
         Self::new(0)
     }
 
@@ -56,7 +57,7 @@ pub struct KernelConfig {
 impl KernelConfig {
     pub fn for_neurons(n_neurons: usize) -> Self {
         let threads_per_block = 256u32;
-        let blocks = ((n_neurons as u32 + threads_per_block - 1) / threads_per_block).max(1);
+        let blocks = (n_neurons as u32).div_ceil(threads_per_block).max(1);
         Self {
             threads_per_block,
             blocks,

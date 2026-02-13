@@ -39,6 +39,11 @@ impl BrainMonitor {
         }
     }
 
+    /// Number of samples kept in history buffers
+    pub fn history_size(&self) -> usize {
+        self.history_size
+    }
+
     /// Update history with new brain stats
     pub fn update_history(&mut self, stats: &crate::brain::BrainStats) {
         push_history(
@@ -228,15 +233,13 @@ impl ChatPlugin {
             }
 
             // Chat processing
-            mode = "PROCESSING".to_string();
-
             let response = brain.process_text(input);
 
             for _ in 0..self.config.post_processing_iterations {
                 brain.update(self.config.brain_update_dt);
             }
 
-            println!("{}{} >{} {}", BOLD, "NEUROX", COLOR_RESET, response);
+            println!("{}NEUROX >{} {}", BOLD, COLOR_RESET, response);
 
             mode = "INTERACTIVE".to_string();
         }
@@ -345,9 +348,8 @@ impl ChatPlugin {
 
                 println!();
                 println!(
-                    "{}{} >{} Loading: {} ({})",
+                    "{}TRAIN >{} Loading: {} ({})",
                     BOLD,
-                    "TRAIN",
                     COLOR_RESET,
                     file_path,
                     if is_json {

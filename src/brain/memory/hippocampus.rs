@@ -44,12 +44,14 @@ impl PartialEq for MemoryEvent {
 impl Eq for MemoryEvent {}
 impl PartialOrd for MemoryEvent {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.priority.partial_cmp(&other.priority)
+        Some(self.cmp(other))
     }
 }
 impl Ord for MemoryEvent {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.partial_cmp(other).unwrap_or(Ordering::Equal)
+        self.priority
+            .partial_cmp(&other.priority)
+            .unwrap_or(Ordering::Equal)
     }
 }
 
@@ -313,7 +315,7 @@ impl Hippocampus {
         // Iterate through rows (target neurons)
         // Note: SparseConnectivity structure optimization needed for speed here,
         // but iterating row_ptr is standard CSR logic.
-        for target in 0..output_dim {
+        for (target, cell) in output.iter_mut().enumerate().take(output_dim) {
             if target >= weights.row_ptr.len() - 1 {
                 break;
             }
@@ -321,16 +323,13 @@ impl Hippocampus {
             let start = weights.row_ptr[target] as usize;
             let end = weights.row_ptr[target + 1] as usize;
 
-            let mut sum = 0.0;
-            for i in start..end {
-                let source = weights.col_idx[i] as usize;
-                let w = weights.weights[i];
-
-                if source < input.len() {
-                    sum += input[source] * w;
-                }
-            }
-            output[target] = sum;
+            let sum: f32 = (start..end)
+                .filter_map(|i| {
+                    let source = weights.col_idx[i] as usize;
+                    (source < input.len()).then(|| input[source] * weights.weights[i])
+                })
+                .sum();
+            *cell = sum;
         }
         output
     }
@@ -401,11 +400,9 @@ impl Hippocampus {
     fn learn_readout(&mut self, ca3_output: &[f32], target_pattern: &[f32]) {
         let weights = &mut self.ca3_ca1_weights;
 
-        for target in 0..self.pattern_dim {
+        for (target, &target_val) in target_pattern.iter().enumerate().take(self.pattern_dim) {
             let start = weights.row_ptr[target] as usize;
             let end = weights.row_ptr[target + 1] as usize;
-
-            let target_val = target_pattern[target];
 
             for i in start..end {
                 let source = weights.col_idx[i] as usize;

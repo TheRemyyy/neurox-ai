@@ -164,9 +164,8 @@ impl VesiclePools {
         }
 
         if calcium > self.ca_threshold {
-            let ca_factor = ((calcium / self.ca_threshold).powf(self.ca_cooperativity))
-                / (1.0 + (calcium / self.ca_threshold).powf(self.ca_cooperativity));
-            ca_factor
+            ((calcium / self.ca_threshold).powf(self.ca_cooperativity))
+                / (1.0 + (calcium / self.ca_threshold).powf(self.ca_cooperativity))
         } else {
             0.0
         }

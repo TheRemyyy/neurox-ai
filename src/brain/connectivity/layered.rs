@@ -278,7 +278,7 @@ impl LayeredConnectivity {
 
         // For each neuron, find all its outgoing connections
         for neuron_id in 0..self.n_neurons {
-            let start_nnz = col_idx.len();
+            let _start_nnz = col_idx.len();
 
             // Find which layer this neuron is in
             if let Some(layer_idx) = self.find_layer(neuron_id) {

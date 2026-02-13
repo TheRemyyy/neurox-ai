@@ -36,6 +36,12 @@ pub struct Metacognition {
     pub uncertainty_markers: Vec<String>,
 }
 
+impl Default for Metacognition {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Metacognition {
     pub fn new() -> Self {
         Self {

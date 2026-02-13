@@ -138,7 +138,7 @@ impl HeterosynapticPlasticity {
 
             astrocyte_coverage
                 .entry(nearest_astro)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(syn_idx);
         }
 

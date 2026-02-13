@@ -103,9 +103,9 @@ impl MNISTImage {
 
             // Generate Poisson spike train
             let mut rng = rand::thread_rng();
-            for t in 0..n_timesteps {
+            for row in spike_train.iter_mut().take(n_timesteps) {
                 if rand::Rng::gen::<f32>(&mut rng) < spike_prob {
-                    spike_train[t][pixel_idx] = true;
+                    row[pixel_idx] = true;
                 }
             }
         }
@@ -369,14 +369,14 @@ impl MNISTDataset {
 
         // Create images
         let mut images = Vec::with_capacity(n_images);
-        for i in 0..n_images {
+        for (i, &label) in labels.iter().enumerate().take(n_images) {
             let start = i * pixels_per_image;
             let end = start + pixels_per_image;
             let pixels = all_pixels[start..end].to_vec();
 
             images.push(MNISTImage {
                 pixels,
-                label: labels[i],
+                label,
                 width,
                 height,
             });
@@ -401,12 +401,12 @@ impl MNISTDataset {
 
     /// Number of training batches
     pub fn n_train_batches(&self, batch_size: usize) -> usize {
-        (self.train_images.len() + batch_size - 1) / batch_size
+        self.train_images.len().div_ceil(batch_size)
     }
 
     /// Number of test batches
     pub fn n_test_batches(&self, batch_size: usize) -> usize {
-        (self.test_images.len() + batch_size - 1) / batch_size
+        self.test_images.len().div_ceil(batch_size)
     }
 }
 

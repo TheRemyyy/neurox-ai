@@ -364,7 +364,7 @@ impl BrainLoader {
 
         let learning_rate = 0.1;
         let batch_size = 100;
-        let total_batches = (pairs.len() + batch_size - 1) / batch_size;
+        let total_batches = pairs.len().div_ceil(batch_size);
 
         for (batch_idx, chunk) in pairs.chunks(batch_size).enumerate() {
             let brain_pairs: Vec<(usize, usize)> = chunk

@@ -146,7 +146,6 @@ use std::sync::Arc;
 /// Complete neuromorphic brain with maximum biological accuracy
 ///
 /// Integrates ALL biological systems for near-human-level cognitive architecture
-
 // === ARCHITECTURE CONSTANTS ===
 /// Number of synapses in heterosynaptic plasticity system
 const HETEROSYNAPTIC_SYNAPSES: usize = 10000;
@@ -361,6 +360,16 @@ pub struct NeuromorphicBrain {
 }
 
 impl NeuromorphicBrain {
+    /// Whether GPU acceleration is available
+    pub fn has_gpu(&self) -> bool {
+        self.gpu_device.is_some()
+    }
+
+    /// Reward history for RL (state -> last reward)
+    pub fn reward_history(&self) -> &Arc<DashMap<usize, f32>> {
+        &self.reward_history
+    }
+
     /// Create new neuromorphic brain with FULL biological accuracy
     ///
     /// # Arguments
@@ -643,8 +652,8 @@ impl NeuromorphicBrain {
             .update(dt, attention_level, prediction_error, 0.3, false);
 
         // 5. Modulate learning rate based on ACh (encoding vs consolidation)
-        let base_lr = 0.01;
-        let effective_lr = self.neuromodulation.effective_learning_rate(base_lr);
+        let _base_lr = 0.01;
+        let _effective_lr = self.neuromodulation.effective_learning_rate(_base_lr);
 
         // 6. Store in working memory with attention gating
         let wm_stored = self.working_memory.store(&semantics, attention_level);
@@ -661,7 +670,7 @@ impl NeuromorphicBrain {
         // 8. Process through enhanced predictive hierarchy
         let level0_size = self.predictive.levels[0].layer4.len();
         let input_pattern = self.pad_or_truncate(&semantics, level0_size);
-        let errors = self.predictive.process(&input_pattern, dt);
+        let _errors = self.predictive.process(&input_pattern, dt);
 
         // 9. Apply interneuron sparse coding
         let mut activity = semantics.clone();
@@ -673,7 +682,7 @@ impl NeuromorphicBrain {
 
         // 11. Select action via basal ganglia (for response type)
         let state = self.get_state_representation();
-        let action = self.basal_ganglia.select_action(&state, dt);
+        let _action = self.basal_ganglia.select_action(&state, dt);
 
         // 12. Update homeostasis (BCM, synaptic scaling, criticality)
         let firing_rate = activity.iter().sum::<f32>() / activity.len() as f32;
@@ -686,6 +695,7 @@ impl NeuromorphicBrain {
         // Process text for emotional content and update state
         self.emotional_state.process_input(text, dt);
         self.emotional_state.update(dt);
+        let _ = self.compute_sentiment(&semantics);
         let _emotional_stats = self.emotional_state.stats();
 
         // 14. Curiosity-Driven Learning
@@ -740,7 +750,7 @@ impl NeuromorphicBrain {
         // Store relations between concepts for later inference
         if words.len() >= 2 {
             use crate::brain::reasoning::abstract_reasoning::{Fact, Relation};
-            let fact = Fact::new(&words[0], Relation::Similar, &words[1]);
+            let fact = Fact::new(words[0], Relation::Similar, words[1]);
             self.abstract_reasoning.add_fact(fact);
         }
 
@@ -782,13 +792,18 @@ impl NeuromorphicBrain {
                 // Generate response using IFG planner
                 let generated = self.generate_sentence(intent);
 
-                // If lexicon is empty (untrained), return simple acknowledgment based on mood
+                // If lexicon is empty (untrained), try semantic generation or mood fallback
                 if generated.is_empty() {
-                    match current_mood {
-                        "happy" => "☺".to_string(),
-                        "sad" => "...".to_string(),
-                        "angry" => "!".to_string(),
-                        _ => "?".to_string(),
+                    let semantic_fallback = self.generate_response_text(&semantics, 10);
+                    if !semantic_fallback.is_empty() && !semantic_fallback.starts_with('[') {
+                        semantic_fallback
+                    } else {
+                        match current_mood {
+                            "happy" => "☺".to_string(),
+                            "sad" => "...".to_string(),
+                            "angry" => "!".to_string(),
+                            _ => "?".to_string(),
+                        }
                     }
                 } else {
                     generated
@@ -851,7 +866,7 @@ impl NeuromorphicBrain {
     pub fn learn_from_reward(
         &mut self,
         state: &[f32],
-        action: usize,
+        _action: usize,
         reward: f32,
         next_state: &[f32],
     ) {
@@ -1344,7 +1359,6 @@ impl NeuromorphicBrain {
         // Plan sentence structure based on response intent
         self.ifg_planner.plan_sentence(response_intent);
 
-        let mut rng = rand::thread_rng();
         let dopamine = self.neuromodulation.dopamine_level;
         let serotonin = self.neuromodulation.serotonin.level;
         let norepinephrine = self.neuromodulation.norepinephrine.level;
@@ -1362,9 +1376,8 @@ impl NeuromorphicBrain {
                 .lexicon
                 .get_by_pos(required_pos)
                 .into_iter()
-                .cloned()
-                // Filter by bond level - some words require high attachment
                 .filter(|w| w.requires_bond <= current_bond)
+                .cloned()
                 .collect();
 
             // Filter by responds_to (words that make sense as response to this input)
@@ -1662,7 +1675,7 @@ impl NeuromorphicBrain {
 
         // 6. Update amygdala (emotional processing)
         // Use active pattern count as a simple environmental context proxy
-        let context = self.working_memory.active_count() as usize;
+        let context = self.working_memory.active_count();
         let cs_input = vec![attention; 10]; // Conditioned stimulus from attention
         let us_present = if pred_error > 0.5 { 1.0 } else { 0.0 }; // Unconditioned stimulus from error
         let fear_output = self.amygdala.update(dt, &cs_input, us_present, context);
@@ -1923,9 +1936,9 @@ impl NeuromorphicBrain {
         } else {
             // Fallback: use oscillatory pattern
             let phase = (self.time * 0.01) % (2.0 * std::f32::consts::PI);
-            for i in 0..v1_height {
-                for j in 0..v1_width {
-                    visual_input[i][j] = VISUAL_PATTERN_BASELINE
+            for (i, row) in visual_input.iter_mut().enumerate().take(v1_height) {
+                for cell in row.iter_mut().take(v1_width) {
+                    *cell = VISUAL_PATTERN_BASELINE
                         + VISUAL_PATTERN_AMPLITUDE
                             * ((i as f32 / VISUAL_PATTERN_FREQUENCY + phase).sin());
                 }
@@ -1944,11 +1957,10 @@ impl NeuromorphicBrain {
                 Ok(gpu_output) => {
                     // Reshape GPU output [128×128×4] back to Vec<Vec<Vec<f32>>>
                     let mut output_3d = vec![vec![vec![0.0; 4]; v1_height]; v1_width];
-                    for x in 0..v1_width {
-                        for y in 0..v1_height {
-                            for ori in 0..4 {
-                                let idx = x * v1_height * 4 + y * 4 + ori;
-                                output_3d[x][y][ori] = gpu_output[idx];
+                    for (x, row) in output_3d.iter_mut().enumerate().take(v1_width) {
+                        for (y, col) in row.iter_mut().enumerate().take(v1_height) {
+                            for (ori, cell) in col.iter_mut().enumerate().take(4) {
+                                *cell = gpu_output[x * v1_height * 4 + y * 4 + ori];
                             }
                         }
                     }

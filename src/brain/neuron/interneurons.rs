@@ -359,7 +359,7 @@ impl InterneuronCircuit {
         let vip_active = self.vip_neurons.iter().any(|n| n.state.v > -60.0);
 
         // Apply to each pyramidal neuron
-        for (_i, inh) in inhibition.iter_mut().enumerate() {
+        for inh in inhibition.iter_mut() {
             // PV creates gamma-phase dependent inhibition
             let gamma_modulated_pv =
                 pv_inhibition * (1.0 + 0.5 * (self.gamma_phase * 2.0 * std::f32::consts::PI).cos());

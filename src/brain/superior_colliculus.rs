@@ -107,8 +107,7 @@ impl SCNeuron {
         let distance = (dx * dx + dy * dy).sqrt();
 
         // Gaussian receptive field
-        let response = (-(distance * distance) / (2.0 * self.rf_size * self.rf_size)).exp();
-        response
+        (-(distance * distance) / (2.0 * self.rf_size * self.rf_size)).exp()
     }
 
     /// Update neuron activity

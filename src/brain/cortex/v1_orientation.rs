@@ -174,9 +174,7 @@ impl V1OrientationSystem {
         let relay_output = self.relay.process(dt, &self.retina);
 
         // 3. V1 simple cells (orientation selectivity via recurrent inhibition)
-        let orientation_energy = self.v1.process(dt, &relay_output, timestep);
-
-        orientation_energy
+        self.v1.process(dt, &relay_output, timestep)
     }
 
     /// Get orientation map for visualization
@@ -250,6 +248,9 @@ impl RetinaLayer {
     }
 }
 
+/// Center and surround weight maps for LGN receptive fields
+type V1WeightMaps = (Vec<Vec<Vec<f32>>>, Vec<Vec<Vec<f32>>>);
+
 impl RelayLayer {
     fn new(width: usize, height: usize) -> Self {
         let neurons: Vec<Vec<LIFNeuron>> = (0..width)
@@ -283,7 +284,7 @@ impl RelayLayer {
         rf_size: usize,
         sigma_center: f32,
         sigma_surround: f32,
-    ) -> (Vec<Vec<Vec<f32>>>, Vec<Vec<Vec<f32>>>) {
+    ) -> V1WeightMaps {
         let mut center_weights = vec![vec![vec![0.0; rf_size]; rf_size]; width * height];
         let mut surround_weights = vec![vec![vec![0.0; rf_size]; rf_size]; width * height];
 
@@ -318,15 +319,14 @@ impl RelayLayer {
 
     fn process(&mut self, dt: f32, retina: &RetinaLayer) -> Vec<Vec<f32>> {
         let mut output = vec![vec![0.0; self.height]; self.width];
+        let rf_size = 5;
+        let half_size = rf_size / 2;
 
-        for x in 0..self.width {
-            for y in 0..self.height {
+        for (x, row) in output.iter_mut().enumerate().take(self.width) {
+            for (y, cell) in row.iter_mut().enumerate().take(self.height) {
                 // Center-surround receptive field
                 let mut center_input = 0.0;
                 let mut surround_input = 0.0;
-
-                let rf_size = 5;
-                let half_size = rf_size / 2;
 
                 for i in 0..rf_size {
                     for j in 0..rf_size {
@@ -348,10 +348,10 @@ impl RelayLayer {
 
                 // Update neuron
                 if self.neurons[x][y].update(dt, net_input * 10.0) {
-                    output[x][y] = 1.0;
+                    *cell = 1.0;
                 } else {
-                    output[x][y] = self.neurons[x][y].voltage() + 70.0; // Normalize to 0-1
-                    output[x][y] = (output[x][y] / 15.0).clamp(0.0, 1.0);
+                    let v = self.neurons[x][y].voltage() + 70.0;
+                    *cell = (v / 15.0).clamp(0.0, 1.0);
                 }
             }
         }
@@ -431,68 +431,71 @@ impl V1Layer {
         let mut orientation_energy =
             vec![vec![vec![0.0; self.n_orientations]; self.height]; self.width];
 
-        // Update simple cells with recurrent inhibition
-        for x in 0..self.width {
-            for y in 0..self.height {
-                // Pre-compute inputs before mutation
-                let mut ff_inputs = Vec::new();
-                let mut inhibitions = Vec::new();
+        // Pre-compute feedforward and inhibition inputs (read-only pass)
+        let ff_inputs: Vec<Vec<Vec<f32>>> = self
+            .simple_cells
+            .iter()
+            .map(|row| {
+                row.iter()
+                    .map(|cell_list| {
+                        cell_list
+                            .iter()
+                            .map(|c| self.compute_gabor_response(c, relay_input))
+                            .collect()
+                    })
+                    .collect()
+            })
+            .collect();
+        let inhibitions: Vec<Vec<Vec<f32>>> = self
+            .simple_cells
+            .iter()
+            .enumerate()
+            .map(|(x, row)| {
+                row.iter()
+                    .enumerate()
+                    .map(|(y, cell_list)| {
+                        cell_list
+                            .iter()
+                            .map(|c| self.compute_recurrent_inhibition(x, y, c.preferred_orientation))
+                            .collect()
+                    })
+                    .collect()
+            })
+            .collect();
 
-                for cell in &self.simple_cells[x][y] {
-                    let ff_input = self.compute_gabor_response(cell, relay_input);
-                    let inhibition =
-                        self.compute_recurrent_inhibition(x, y, cell.preferred_orientation);
-                    ff_inputs.push(ff_input);
-                    inhibitions.push(inhibition);
-                }
-
-                // Now mutate cells
-                for (ori_idx, cell) in self.simple_cells[x][y].iter_mut().enumerate() {
-                    let ff_input = ff_inputs[ori_idx];
-                    let inhibition = inhibitions[ori_idx];
-
-                    // Net input
-                    let net_input = (ff_input - inhibition).max(0.0);
-
-                    // Update neuron
+        // Update simple cells (mutation pass)
+        for (x, row) in self.simple_cells.iter_mut().enumerate() {
+            for (y, cell_list) in row.iter_mut().enumerate() {
+                let ff = &ff_inputs[x][y];
+                let inh = &inhibitions[x][y];
+                for (ori_idx, cell) in cell_list.iter_mut().enumerate() {
+                    let net_input = (ff[ori_idx] - inh[ori_idx]).max(0.0);
                     if cell.neuron.update(dt, net_input) {
                         cell.last_spike = timestep;
                         cell.response = 1.0;
                     } else {
                         cell.response *= 0.95;
                     }
-
-                    // Accumulate orientation energy (quadrature energy)
-                    let ori_channel = ori_idx / 2; // 2 phases per orientation
+                    let ori_channel = ori_idx / 2;
                     if ori_channel < self.n_orientations {
                         orientation_energy[x][y][ori_channel] += cell.response * cell.response;
                     }
                 }
 
-                // Update complex cells (energy model)
-                for complex in &mut self.complex_cells[x][y] {
-                    // Sum squared responses from simple cells (energy)
+                for complex in self.complex_cells[x][y].iter_mut() {
                     let mut energy = 0.0;
-                    for simple in &self.simple_cells[x][y] {
-                        if (simple.preferred_orientation - complex.preferred_orientation).abs()
-                            < 0.1
+                    for simple in cell_list.iter() {
+                        if (simple.preferred_orientation - complex.preferred_orientation).abs() < 0.1
                         {
                             energy += simple.response * simple.response;
                         }
                     }
-
                     complex.response = energy.sqrt();
                 }
 
-                // Update interneurons
-                for inter in &mut self.interneurons[x][y] {
-                    // Driven by local simple cell activity
-                    let local_activity: f32 = self.simple_cells[x][y]
-                        .iter()
-                        .map(|c| c.response)
-                        .sum::<f32>()
-                        / self.simple_cells[x][y].len() as f32;
-
+                let local_activity: f32 =
+                    cell_list.iter().map(|c| c.response).sum::<f32>() / cell_list.len() as f32;
+                for inter in self.interneurons[x][y].iter_mut() {
                     inter.neuron.update(dt, local_activity * 5.0);
                     inter.activity = if inter.neuron.voltage() > -60.0 {
                         1.0
@@ -504,10 +507,10 @@ impl V1Layer {
         }
 
         // Take sqrt for final energy
-        for x in 0..self.width {
-            for y in 0..self.height {
-                for ori in 0..self.n_orientations {
-                    orientation_energy[x][y][ori] = orientation_energy[x][y][ori].sqrt();
+        for row in orientation_energy.iter_mut().take(self.width) {
+            for col in row.iter_mut().take(self.height) {
+                for cell in col.iter_mut().take(self.n_orientations) {
+                    *cell = (*cell).sqrt();
                 }
             }
         }
@@ -533,12 +536,12 @@ impl V1Layer {
         response.max(0.0)
     }
 
-    fn compute_recurrent_inhibition(&self, x: usize, y: usize, orientation: f32) -> f32 {
+    fn compute_recurrent_inhibition(&self, x: usize, y: usize, _orientation: f32) -> f32 {
         let mut inhibition = 0.0;
-        let radius = 3;
+        let radius: i32 = 3;
 
-        for dx in -(radius as i32)..=(radius as i32) {
-            for dy in -(radius as i32)..=(radius as i32) {
+        for dx in -radius..=radius {
+            for dy in -radius..=radius {
                 let nx = (x as i32 + dx).max(0).min(self.width as i32 - 1) as usize;
                 let ny = (y as i32 + dy).max(0).min(self.height as i32 - 1) as usize;
 
@@ -588,20 +591,18 @@ impl SimpleCell {
         let center = size as f32 / 2.0;
         let sigma = size as f32 / 6.0;
 
-        for i in 0..size {
-            for j in 0..size {
+        for (i, row) in rf.iter_mut().enumerate().take(size) {
+            for (j, cell) in row.iter_mut().enumerate().take(size) {
                 let x = i as f32 - center;
                 let y = j as f32 - center;
 
-                // Rotate coordinates
                 let x_rot = x * orientation.cos() + y * orientation.sin();
                 let y_rot = -x * orientation.sin() + y * orientation.cos();
 
-                // Gabor function
                 let gaussian = (-(x_rot * x_rot + y_rot * y_rot) / (2.0 * sigma * sigma)).exp();
                 let sinusoid = (2.0 * PI * frequency * x_rot + phase).cos();
 
-                rf[i][j] = gaussian * sinusoid;
+                *cell = gaussian * sinusoid;
             }
         }
 

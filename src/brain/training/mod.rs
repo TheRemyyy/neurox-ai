@@ -3,16 +3,20 @@
 //! Implements Triplet STDP training with Winner-Take-All dynamics
 
 use crate::brain::datasets::MNISTImage;
-use crate::brain::learning::quantization::QuantizationConfig;
-use crate::brain::learning::{HomeostaticPlasticity, STDPConfig, STPDynamics, TripletSTDP};
+use crate::brain::learning::STDPConfig;
+#[cfg(feature = "cuda")]
+use crate::brain::learning::{HomeostaticPlasticity, STPDynamics, TripletSTDP};
 #[cfg(feature = "cuda")]
 use crate::brain::simulation::Simulator;
 #[cfg(feature = "cuda")]
 use cudarc::driver::DeviceSlice;
+#[cfg(feature = "cuda")]
 use indicatif::{ProgressBar, ProgressStyle};
+#[cfg(feature = "cuda")]
 use std::collections::HashMap;
 
 /// Maps neuron ID to list of (connected_neuron_id, weight_index)
+#[cfg(feature = "cuda")]
 #[derive(Debug, Clone)]
 struct ConnectivityMap {
     /// Outgoing connections: pre_id -> [(post_id, weight_idx)]
@@ -21,6 +25,7 @@ struct ConnectivityMap {
     incoming: Vec<Vec<(usize, usize)>>,
 }
 
+#[cfg(feature = "cuda")]
 impl ConnectivityMap {
     fn new(n_neurons: usize) -> Self {
         Self {
@@ -38,9 +43,7 @@ impl ConnectivityMap {
 
             for w_idx in start..end {
                 let col = col_idx[w_idx] as usize;
-                // Outgoing from row to col
                 map.outgoing[row].push((col, w_idx));
-                // Incoming to col from row
                 map.incoming[col].push((row, w_idx));
             }
         }

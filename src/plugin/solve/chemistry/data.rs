@@ -9,6 +9,12 @@ pub struct Element {
     pub mass: f64, // g/mol
 }
 
+impl std::fmt::Display for Element {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} ({})", self.name, self.number)
+    }
+}
+
 /// Thermodynamic Data for Compounds (at 298K, 1 atm)
 #[derive(Debug, Clone)]
 pub struct ThermoData {

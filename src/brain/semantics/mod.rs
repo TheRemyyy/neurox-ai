@@ -431,8 +431,8 @@ mod tests {
     fn test_embedding_layer() {
         let mut emb = EmbeddingLayer::new(100, 50);
 
-        emb.add_word("hello".to_string());
-        emb.add_word("world".to_string());
+        emb.add_word("hello");
+        emb.add_word("world");
 
         assert!(emb.get_embedding("hello").is_some());
         assert_eq!(emb.get_embedding("hello").unwrap().len(), 50);
@@ -473,8 +473,8 @@ mod tests {
     fn test_semantic_system() {
         let mut system = SemanticSystem::new(50, 20, 100);
 
-        system.embeddings.add_word("cat".to_string());
-        system.embeddings.add_word("dog".to_string());
+        system.embeddings.add_word("cat");
+        system.embeddings.add_word("dog");
 
         let processed = system.process_word("cat");
         assert!(processed.is_some());
@@ -525,7 +525,7 @@ impl ParaphraseDetector {
     /// Load paraphrases from training data (keywords field)
     pub fn load_from_keywords(&mut self, input: &str, keywords: &[String], intent: &str) {
         if !keywords.is_empty() {
-            let mut all_alternatives: Vec<String> = keywords.iter().cloned().collect();
+            let mut all_alternatives: Vec<String> = keywords.to_vec();
             // Remove canonical from alternatives if present
             all_alternatives.retain(|k| k != input);
             self.add_group(input.to_string(), all_alternatives, intent.to_string());
@@ -714,13 +714,7 @@ impl IntentClusteringSystem {
 
     /// Classify input to best matching cluster
     pub fn classify(&self, input: &str) -> Option<&IntentCluster> {
-        // First try keyword match
-        for cluster in &self.clusters {
-            if cluster.matches(input) {
-                return Some(cluster);
-            }
-        }
-        None
+        self.clusters.iter().find(|c| c.matches(input))
     }
 
     /// Classify using embeddings (semantic similarity)

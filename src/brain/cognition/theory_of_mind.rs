@@ -62,17 +62,9 @@ pub struct Intention {
 }
 
 /// Belief state (collection of beliefs)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct BeliefState {
     pub beliefs: Vec<Belief>,
-}
-
-impl Default for BeliefState {
-    fn default() -> Self {
-        Self {
-            beliefs: Vec::new(),
-        }
-    }
 }
 
 impl BeliefState {
@@ -291,7 +283,7 @@ impl TheoryOfMind {
     }
 
     /// Predict what an agent will do
-    pub fn predict_action(&self, agent_id: AgentId, context: &[f32]) -> Option<ActionPrediction> {
+    pub fn predict_action(&self, agent_id: AgentId, _context: &[f32]) -> Option<ActionPrediction> {
         let model = self.agent_models.get(&agent_id)?;
 
         // Simple prediction based on desires and beliefs

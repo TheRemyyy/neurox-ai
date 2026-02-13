@@ -250,7 +250,7 @@ impl EnhancedEpisodicMemory {
         for tag in &episode.emotional_tags {
             self.emotional_index
                 .entry(*tag)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(id);
         }
 

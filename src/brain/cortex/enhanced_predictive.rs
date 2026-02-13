@@ -193,7 +193,7 @@ impl LaminarLayer {
     fn apply_lateral(&self, activity: &[f32]) -> Vec<f32> {
         let mut output = vec![0.0; self.n_neurons];
 
-        for target in 0..self.n_neurons {
+        for (target, cell) in output.iter_mut().enumerate().take(self.n_neurons) {
             let start = self.lateral_connections.row_ptr[target] as usize;
             let end = self.lateral_connections.row_ptr[target + 1] as usize;
 
@@ -202,7 +202,7 @@ impl LaminarLayer {
                 let weight = self.lateral_connections.weights[syn_id];
 
                 if source < activity.len() {
-                    output[target] += weight * activity[source];
+                    *cell += weight * activity[source];
                 }
             }
         }
@@ -322,7 +322,7 @@ impl EnhancedPredictiveHierarchy {
             };
 
             // Forward pass at this level
-            let (prediction, error) = self.levels[i].forward(&current_input, &top_down, dt);
+            let (_prediction, error) = self.levels[i].forward(&current_input, &top_down, dt);
 
             errors.push(error.clone());
 

@@ -342,13 +342,18 @@ impl BasalGanglia {
     ///
     /// # Returns
     /// Selected action index
+    pub fn action_values(&self) -> &Arc<DashMap<usize, f32>> {
+        &self.action_values
+    }
+
+    /// Select action based on Go/NoGo balance
     pub fn select_action(&mut self, state: &[f32], dt: f32) -> usize {
         // Compute Go and NoGo signals for each action
         let mut go_signals = vec![0.0; self.n_actions];
         let mut nogo_signals = vec![0.0; self.n_actions];
 
         // Process through striatum
-        for (i, neuron) in self.striatum.iter_mut().enumerate() {
+        for neuron in self.striatum.iter_mut() {
             // Input from state (simplified - in reality would be cortical input)
             let input_current = state.iter().sum::<f32>() / state.len() as f32;
 
@@ -394,7 +399,7 @@ impl BasalGanglia {
         }
 
         // Compute action probabilities using softmax over (Go - NoGo)
-        let mut action_scores: Vec<f32> = go_signals
+        let action_scores: Vec<f32> = go_signals
             .iter()
             .zip(nogo_signals.iter())
             .map(|(go, nogo)| go - nogo)
@@ -430,7 +435,7 @@ impl BasalGanglia {
     /// Update after receiving reward
     ///
     /// Computes TD error and applies dopamine-modulated plasticity
-    pub fn update(&mut self, reward: f32, next_state_value: f32, dt: f32) {
+    pub fn update(&mut self, reward: f32, next_state_value: f32, _dt: f32) {
         // Compute TD error
         let td_error = self.dopamine.compute_td_error(reward, next_state_value);
 

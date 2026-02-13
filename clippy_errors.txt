@@ -1,0 +1,654 @@
+﻿cargo :     Checking neurox-ai v1.0.2 (C:\Users\wNyro_\Documents\Projects\Systems\neurox-ai)
+At C:\Users\wNyro_\AppData\Local\Temp\ps-script-f85006aa-2b2c-48be-a2c6-f5fdce1d3214.ps1:103 char:60
++ ... neurox-ai"; cargo clippy --no-default-features -- -D warnings 2>&1 |  ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (    Checking ne...tems\neurox-ai):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+error: the loop variable `i` is used to index `rf`
+   --> src\brain\cortex\v1_orientation.rs:594:18
+    |
+594 |         for i in 0..size {
+    |                  ^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#needless_range
+_loop
+    = note: `-D clippy::needless-range-loop` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::needless_range_loop)]`
+help: consider using an iterator and enumerate()
+    |
+594 -         for i in 0..size {
+594 +         for (i, <item>) in rf.iter_mut().enumerate().take(size) {
+    |
+
+error: the loop variable `j` is used to index `rf`
+   --> src\brain\cortex\v1_orientation.rs:595:22
+    |
+595 |             for j in 0..size {
+    |                      ^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#needless_range
+_loop
+help: consider using an iterator and enumerate()
+    |
+595 -             for j in 0..size {
+595 +             for (j, <item>) in rf.iter_mut().enumerate().take(size) {
+    |
+
+error: the loop variable `i` is used to index `inputs`
+   --> src\brain\cortex\working_memory.rs:247:22
+    |
+247 |             for i in 0..n {
+    |                      ^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#needless_range
+_loop
+help: consider using an iterator and enumerate()
+    |
+247 -             for i in 0..n {
+247 +             for (i, <item>) in inputs.iter_mut().enumerate().take(n) {
+    |
+
+error: the loop variable `j` is used to index `sim_neurons`
+   --> src\brain\cortex\working_memory.rs:248:26
+    |
+248 |                 for j in 0..n {
+    |                          ^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#needless_range
+_loop
+help: consider using an iterator and enumerate()
+    |
+248 -                 for j in 0..n {
+248 +                 for (j, <item>) in sim_neurons.iter().enumerate().take(n) {
+    |
+
+error: the loop variable `i` is used to index `recurrent_inputs`
+   --> src\brain\cortex\working_memory.rs:296:18
+    |
+296 |         for i in 0..n {
+    |                  ^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#needless_range
+_loop
+help: consider using an iterator and enumerate()
+    |
+296 -         for i in 0..n {
+296 +         for (i, <item>) in recurrent_inputs.iter_mut().enumerate().take(n) {
+    |
+
+error: the loop variable `j` is used to index `activity`
+   --> src\brain\cortex\working_memory.rs:298:22
+    |
+298 |             for j in 0..n {
+    |                      ^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#needless_range
+_loop
+help: consider using an iterator and enumerate()
+    |
+298 -             for j in 0..n {
+298 +             for (j, <item>) in activity.iter().enumerate().take(n) {
+    |
+
+error: you should consider adding a `Default` implementation for `Metacognition`
+  --> src\brain\cortex\metacognition.rs:40:5
+   |
+40 | /     pub fn new() -> Self {
+41 | |         Self {
+42 | |             state: MetacognitiveState::default(),
+43 | |             history: Vec::new(),
+...  |
+47 | |     }
+   | |_____^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#new_without_def
+ault
+   = note: `-D clippy::new-without-default` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::new_without_default)]`
+help: try adding this
+   |
+39 + impl Default for Metacognition {
+40 +     fn default() -> Self {
+41 +         Self::new()
+42 +     }
+43 + }
+   |
+
+error: the loop variable `t` is only used to index `spike_train`
+   --> src\brain\datasets\mnist.rs:106:22
+    |
+106 |             for t in 0..n_timesteps {
+    |                      ^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#needless_range
+_loop
+help: consider using an iterator
+    |
+106 -             for t in 0..n_timesteps {
+106 +             for <item> in spike_train.iter_mut().take(n_timesteps) {
+    |
+
+error: the loop variable `i` is used to index `labels`
+   --> src\brain\datasets\mnist.rs:372:18
+    |
+372 |         for i in 0..n_images {
+    |                  ^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#needless_range
+_loop
+help: consider using an iterator and enumerate()
+    |
+372 -         for i in 0..n_images {
+372 +         for (i, <item>) in labels.iter().enumerate().take(n_images) {
+    |
+
+error: manually reimplementing `div_ceil`
+   --> src\brain\datasets\mnist.rs:404:9
+    |
+404 |         (self.train_images.len() + batch_size - 1) / batch_size
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using `.div_ceil()`: `self.train_i
+mages.len().div_ceil(batch_size)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#manual_div_cei
+l
+    = note: `-D clippy::manual-div-ceil` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::manual_div_ceil)]`
+
+error: manually reimplementing `div_ceil`
+   --> src\brain\datasets\mnist.rs:409:9
+    |
+409 |         (self.test_images.len() + batch_size - 1) / batch_size
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using `.div_ceil()`: `self.test_ima
+ges.len().div_ceil(batch_size)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#manual_div_cei
+l
+
+error: this manual char comparison can be written more succinctly
+   --> src\brain\datasets\text_dataset.rs:383:36
+    |
+383 |         for sentence in text.split(|c| c == '.' || c == '!' || c == '?') {
+    |                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using an array of `char`: 
+`['.', '!', '?']`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#manual_pattern
+_char_comparison
+    = note: `-D clippy::manual-pattern-char-comparison` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::manual_pattern_char_comparison)]`
+
+error: the loop variable `j` is used to index `sentence`
+   --> src\brain\datasets\text_dataset.rs:422:26
+    |
+422 |                 for j in start..end {
+    |                          ^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#needless_range
+_loop
+help: consider using an iterator and enumerate()
+    |
+422 -                 for j in start..end {
+422 +                 for (j, <item>) in sentence.iter().enumerate().take(end).skip(start) {
+    |
+
+error: use of `or_insert_with` to construct default value
+   --> src\brain\language\dual_stream.rs:519:63
+    |
+519 |         let associations = self.word_associations.entry(from).or_insert_with(Vec::new);
+    |                                                               ^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `or_default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#unwrap_or_defa
+ult
+    = note: `-D clippy::unwrap-or-default` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::unwrap_or_default)]`
+
+error: you should consider adding a `Default` implementation for `BeamCandidate`
+  --> src\brain\language\sequence_generator.rs:49:5
+   |
+49 | /     pub fn new() -> Self {
+50 | |         Self {
+51 | |             tokens: Vec::new(),
+52 | |             score: 0.0,
+...  |
+55 | |     }
+   | |_____^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#new_without_def
+ault
+help: try adding this
+   |
+48 + impl Default for BeamCandidate {
+49 +     fn default() -> Self {
+50 +         Self::new()
+51 +     }
+52 + }
+   |
+
+error: implementation of inherent method `to_string(&self) -> String` for type `brain::language::sequence_generator::Be
+amCandidate`
+  --> src\brain\language\sequence_generator.rs:67:5
+   |
+67 | /     pub fn to_string(&self) -> String {
+68 | |         self.tokens.join(" ")
+69 | |     }
+   | |_____^
+   |
+   = help: implement trait `Display` for type `brain::language::sequence_generator::BeamCandidate` instead
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#inherent_to_str
+ing
+   = note: `-D clippy::inherent-to-string` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::inherent_to_string)]`
+
+error: use of `or_insert_with` to construct default value
+   --> src\brain\learning\heterosynaptic.rs:141:18
+    |
+141 |                 .or_insert_with(Vec::new)
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `or_default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#unwrap_or_defa
+ult
+
+error: clamp-like pattern without using clamp function
+   --> src\brain\learning\stdp.rs:225:36
+    |
+225 |         self.calcium[synapse_id] = (ca + d_ca * dt).max(0.0).min(5.0); // Clamp to biological range
+    |                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace with clamp: `(ca + d_ca * dt)
+.clamp(0.0, 5.0)`
+    |
+    = note: clamp will panic if max < min, min.is_nan(), or max.is_nan()
+    = note: clamp returns NaN if the input is NaN
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#manual_clamp
+    = note: `-D clippy::manual-clamp` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::manual_clamp)]`
+
+error: you should consider adding a `Default` implementation for `STDPTrace`
+  --> src\brain\learning\mod.rs:67:5
+   |
+67 | /     pub fn new() -> Self {
+68 | |         Self {
+69 | |             a_pre: 0.0,
+70 | |             a_post1: 0.0,
+...  |
+73 | |     }
+   | |_____^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#new_without_def
+ault
+help: try adding this
+   |
+66 + impl Default for STDPTrace {
+67 +     fn default() -> Self {
+68 +         Self::new()
+69 +     }
+70 + }
+   |
+
+error: manual implementation of an assign operation
+   --> src\brain\learning\mod.rs:150:9
+    |
+150 |         self.x_s = self.x_s * (1.0 - self.u_s);
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace it with: `self.x_s *= (1.0 - self.u_s)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#assign_op_patt
+ern
+    = note: `-D clippy::assign-op-pattern` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::assign_op_pattern)]`
+
+error: use of `or_insert_with` to construct default value
+   --> src\brain\memory\enhanced_episodic.rs:253:18
+    |
+253 |                 .or_insert_with(Vec::new)
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `or_default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#unwrap_or_defa
+ult
+
+error: non-canonical implementation of `partial_cmp` on an `Ord` type
+  --> src\brain\memory\hippocampus.rs:45:1
+   |
+45 | /  impl PartialOrd for MemoryEvent {
+46 | |      fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+   | | _____________________________________________________________-
+47 | ||         self.priority.partial_cmp(&other.priority)
+48 | ||     }
+   | ||_____- help: change this to: `{ Some(self.cmp(other)) }`
+49 | |  }
+   | |__^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#non_canonical_p
+artial_ord_impl
+   = note: `-D clippy::non-canonical-partial-ord-impl` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::non_canonical_partial_ord_impl)]`
+
+error: the loop variable `target` is used to index `output`
+   --> src\brain\memory\hippocampus.rs:316:23
+    |
+316 |         for target in 0..output_dim {
+    |                       ^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#needless_range
+_loop
+help: consider using an iterator and enumerate()
+    |
+316 -         for target in 0..output_dim {
+316 +         for (target, <item>) in output.iter_mut().enumerate().take(output_dim) {
+    |
+
+error: the loop variable `target` is used to index `target_pattern`
+   --> src\brain\memory\hippocampus.rs:404:23
+    |
+404 |         for target in 0..self.pattern_dim {
+    |                       ^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#needless_range
+_loop
+help: consider using an iterator and enumerate()
+    |
+404 -         for target in 0..self.pattern_dim {
+404 +         for (target, <item>) in target_pattern.iter().enumerate().take(self.pattern_dim) {
+    |
+
+error: use of `or_insert_with` to construct default value
+   --> src\brain\memory\knowledge_graph.rs:236:14
+    |
+236 |             .or_insert_with(Vec::new)
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `or_default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#unwrap_or_defa
+ult
+
+error: use of `or_insert_with` to construct default value
+   --> src\brain\memory\knowledge_graph.rs:240:14
+    |
+240 |             .or_insert_with(Vec::new)
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `or_default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#unwrap_or_defa
+ult
+
+error: usage of `contains_key` followed by `insert` on a `HashMap`
+   --> src\brain\memory\knowledge_graph.rs:362:21
+    |
+362 | /                     if !visited.contains_key(&edge.target) {
+363 | |                         visited.insert(edge.target, (node, edge.relation, edge.weight));
+364 | |                         queue.push_back((edge.target, depth + 1));
+...   |
+370 | |                     }
+    | |_____________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#map_entry
+    = note: `-D clippy::map-entry` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::map_entry)]`
+help: try
+    |
+362 ~                     if let std::collections::hash_map::Entry::Vacant(e) = visited.entry(edge.target) {
+363 +                         e.insert((node, edge.relation, edge.weight));
+364 +                         queue.push_back((edge.target, depth + 1));
+365 + 
+366 +                         if edge.target == end {
+367 +                             // Reconstruct path
+368 +                             return Some(self.reconstruct_path(&visited, start, end));
+369 +                         }
+370 +                     }
+    |
+
+error: use of `or_insert_with` to construct default value
+   --> src\brain\memory\knowledge_graph.rs:488:18
+    |
+488 |                 .or_insert_with(Vec::new)
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `or_default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#unwrap_or_defa
+ult
+
+error: use of `or_insert_with` to construct default value
+   --> src\brain\memory\knowledge_graph.rs:492:18
+    |
+492 |                 .or_insert_with(Vec::new)
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `or_default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#unwrap_or_defa
+ult
+
+error: you seem to use `.enumerate()` and immediately discard the index
+   --> src\brain\neuron\interneurons.rs:362:47
+    |
+362 |         for (_i, inh) in inhibition.iter_mut().enumerate() {
+    |                                               ^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#unused_enumera
+te_index
+    = note: `-D clippy::unused-enumerate-index` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::unused_enumerate_index)]`
+help: remove the `.enumerate()` call
+    |
+362 -         for (_i, inh) in inhibition.iter_mut().enumerate() {
+362 +         for inh in inhibition.iter_mut() {
+    |
+
+error: you should consider adding a `Default` implementation for `ReasoningChain`
+   --> src\brain\reasoning\abstract_reasoning.rs:128:5
+    |
+128 | /     pub fn new() -> Self {
+129 | |         Self {
+130 | |             steps: Vec::new(),
+131 | |             final_conclusion: None,
+...   |
+134 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#new_without_de
+fault
+help: try adding this
+    |
+127 + impl Default for ReasoningChain {
+128 +     fn default() -> Self {
+129 +         Self::new()
+130 +     }
+131 + }
+    |
+
+error: this `map_or` can be simplified
+   --> src\brain\reasoning\abstract_reasoning.rs:345:31
+    |
+345 |                 let s_match = subject.map_or(true, |s| f.subject == s);
+    |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#unnecessary_ma
+p_or
+    = note: `-D clippy::unnecessary-map-or` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::unnecessary_map_or)]`
+help: use is_none_or instead
+    |
+345 -                 let s_match = subject.map_or(true, |s| f.subject == s);
+345 +                 let s_match = subject.is_none_or(|s| f.subject == s);
+    |
+
+error: this `map_or` can be simplified
+   --> src\brain\reasoning\abstract_reasoning.rs:346:31
+    |
+346 |                 let r_match = relation.map_or(true, |r| f.relation == r);
+    |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#unnecessary_ma
+p_or
+help: use is_none_or instead
+    |
+346 -                 let r_match = relation.map_or(true, |r| f.relation == r);
+346 +                 let r_match = relation.is_none_or(|r| f.relation == r);
+    |
+
+error: this `map_or` can be simplified
+   --> src\brain\reasoning\abstract_reasoning.rs:347:31
+    |
+347 |                 let o_match = object.map_or(true, |o| f.object == o);
+    |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#unnecessary_ma
+p_or
+help: use is_none_or instead
+    |
+347 -                 let o_match = object.map_or(true, |o| f.object == o);
+347 +                 let o_match = object.is_none_or(|o| f.object == o);
+    |
+
+error: called `iter().cloned().collect()` on a slice to create a `Vec`. Calling `to_vec()` is both faster and more read
+able
+   --> src\brain\semantics\mod.rs:528:61
+    |
+528 |             let mut all_alternatives: Vec<String> = keywords.iter().cloned().collect();
+    |                                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `.to_vec()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#iter_cloned_co
+llect
+    = note: `-D clippy::iter-cloned-collect` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::iter_cloned_collect)]`
+
+error: manual implementation of `Iterator::find`
+   --> src\brain\semantics\mod.rs:718:9
+    |
+718 | /         for cluster in &self.clusters {
+719 | |             if cluster.matches(input) {
+720 | |                 return Some(cluster);
+...   |
+723 | |         None
+    | |____________^ help: replace with an iterator: `self.clusters.iter().find(|&cluster| cluster.matches(input)).map(
+|v| v as _)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#manual_find
+    = note: `-D clippy::manual-find` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::manual_find)]`
+
+error: returning the result of a `let` binding from a block
+   --> src\brain\synapse\vesicles.rs:169:13
+    |
+167 | /             let ca_factor = ((calcium / self.ca_threshold).powf(self.ca_cooperativity))
+168 | |                 / (1.0 + (calcium / self.ca_threshold).powf(self.ca_cooperativity));
+    | |____________________________________________________________________________________- unnecessary `let` binding
+169 |               ca_factor
+    |               ^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#let_and_return
+    = note: `-D clippy::let-and-return` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::let_and_return)]`
+help: return the expression directly
+    |
+167 ~             
+168 ~             ((calcium / self.ca_threshold).powf(self.ca_cooperativity))
+169 +                 / (1.0 + (calcium / self.ca_threshold).powf(self.ca_cooperativity))
+    |
+
+error: unnecessarily eager cloning of iterator items
+    --> src\brain\mod.rs:1375:53
+     |
+1375 |                let all_pos_words: Vec<AnnotatedWord> = self
+     |  ______________________________________________________^
+1376 | |                  .lexicon
+1377 | |                  .get_by_pos(required_pos)
+1378 | |                  .into_iter()
+     | | _____________________________-
+1379 | ||                 .cloned()
+1380 | ||                 // Filter by bond level - some words require high attachment
+1381 | ||                 .filter(|w| w.requires_bond <= current_bond)
+     | ||____________________________________________________________^
+     |  |____________________________________________________________|
+     |                                                               help: try: `.filter(|&w| w.requires_bond <= curren
+t_bond).cloned()`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#iter_overeage
+r_cloned
+     = note: `-D clippy::iter-overeager-cloned` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::iter_overeager_cloned)]`
+
+error: the loop variable `i` is used to index `visual_input`
+    --> src\brain\mod.rs:1940:22
+     |
+1940 |             for i in 0..v1_height {
+     |                      ^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#needless_rang
+e_loop
+help: consider using an iterator and enumerate()
+     |
+1940 -             for i in 0..v1_height {
+1940 +             for (i, <item>) in visual_input.iter_mut().enumerate().take(v1_height) {
+     |
+
+error: the loop variable `j` is only used to index `visual_input`
+    --> src\brain\mod.rs:1941:26
+     |
+1941 |                 for j in 0..v1_width {
+     |                          ^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#needless_rang
+e_loop
+help: consider using an iterator
+     |
+1941 -                 for j in 0..v1_width {
+1941 +                 for <item> in visual_input.iter_mut().take(v1_width) {
+     |
+
+error: the loop variable `x` is used to index `output_3d`
+    --> src\brain\mod.rs:1961:30
+     |
+1961 |                     for x in 0..v1_width {
+     |                              ^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#needless_rang
+e_loop
+help: consider using an iterator and enumerate()
+     |
+1961 -                     for x in 0..v1_width {
+1961 +                     for (x, <item>) in output_3d.iter_mut().enumerate().take(v1_width) {
+     |
+
+error: the loop variable `y` is used to index `output_3d`
+    --> src\brain\mod.rs:1962:34
+     |
+1962 |                         for y in 0..v1_height {
+     |                                  ^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#needless_rang
+e_loop
+help: consider using an iterator and enumerate()
+     |
+1962 -                         for y in 0..v1_height {
+1962 +                         for (y, <item>) in output_3d.iter_mut().enumerate().take(v1_height) {
+     |
+
+error: the loop variable `ori` is used to index `output_3d`
+    --> src\brain\mod.rs:1963:40
+     |
+1963 | ...                   for ori in 0..4 {
+     |                                  ^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#needless_rang
+e_loop
+help: consider using an iterator and enumerate()
+     |
+1963 -                             for ori in 0..4 {
+1963 +                             for (ori, <item>) in output_3d.iter_mut().enumerate().take(4) {
+     |
+
+error: this `if` statement can be collapsed
+  --> src\plugin\solve\math\parser.rs:60:13
+   |
+60 | /             if input.starts_with('(') {
+61 | |                 if Self::is_fully_enclosed(input) {
+62 | |                     return Self::parse_recursive(&input[1..input.len() - 1]);
+63 | |                 }
+64 | |             }
+   | |_____________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#collapsible_if
+   = note: `-D clippy::collapsible-if` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::collapsible_if)]`
+help: collapse nested if block
+   |
+60 ~             if input.starts_with('(')
+61 ~                 && Self::is_fully_enclosed(input) {
+62 |                     return Self::parse_recursive(&input[1..input.len() - 1]);
+63 ~                 }
+   |
+
+error: could not compile `neurox-ai` (lib) due to 44 previous errors

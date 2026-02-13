@@ -76,6 +76,11 @@ impl CudaContext {
         Self::new(0)
     }
 
+    /// Create default context (device 0). Prefer this over default() to avoid confusion with Default.
+    pub fn default_context() -> Result<Self, Box<dyn std::error::Error>> {
+        Self::default()
+    }
+
     /// Get device information
     pub fn device_info(&self) -> Result<String, Box<dyn std::error::Error>> {
         let name = self.device.name()?;
@@ -172,7 +177,7 @@ mod tests {
     #[test]
     #[ignore] // Only run if CUDA is available
     fn test_cuda_init() {
-        let ctx = CudaContext::default();
+        let ctx = CudaContext::default_context();
         assert!(ctx.is_ok());
 
         if let Ok(ctx) = ctx {
@@ -184,7 +189,7 @@ mod tests {
     #[test]
     #[ignore]
     fn test_memory_allocation() {
-        let ctx = CudaContext::default().unwrap();
+        let ctx = CudaContext::default_context().unwrap();
         let slice: CudaSlice<f32> = ctx.allocate(1000).unwrap();
         assert_eq!(slice.len(), 1000);
     }

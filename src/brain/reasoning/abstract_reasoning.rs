@@ -124,6 +124,12 @@ pub struct ReasoningChain {
     pub overall_confidence: f32,
 }
 
+impl Default for ReasoningChain {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ReasoningChain {
     pub fn new() -> Self {
         Self {
@@ -342,9 +348,9 @@ impl AbstractReasoning {
         self.facts
             .iter()
             .filter(|f| {
-                let s_match = subject.map_or(true, |s| f.subject == s);
-                let r_match = relation.map_or(true, |r| f.relation == r);
-                let o_match = object.map_or(true, |o| f.object == o);
+                let s_match = subject.is_none_or(|s| f.subject == s);
+                let r_match = relation.is_none_or(|r| f.relation == r);
+                let o_match = object.is_none_or(|o| f.object == o);
                 s_match && r_match && o_match
             })
             .collect()

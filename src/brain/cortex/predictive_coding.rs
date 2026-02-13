@@ -113,12 +113,12 @@ impl PredictiveCodingLayer {
         // 3. Update Error Units (Superficial Pyramidal)
         // dV_e/dt = Input - Prediction - Leak
         let mut error_rates = Vec::with_capacity(n);
-        for i in 0..n {
+        for (i, inhib) in inhibition.iter().enumerate().take(n) {
             let sensory_input = input.get(i).cloned().unwrap_or(0.0);
 
             // Current = (Input - Inhibition) * Precision_Gain
             // Precision acts as a gain control on the mismatch signal
-            let mismatch_current = (sensory_input - inhibition[i]) * self.precision;
+            let mismatch_current = (sensory_input - inhib) * self.precision;
 
             // Integrate Error Neuron
             self.error[i].update(dt, mismatch_current);
@@ -131,8 +131,7 @@ impl PredictiveCodingLayer {
         // 4. Update Prediction Units (Deep Pyramidal) via Local Feedback
         // They need to move to minimize the error they just caused.
         // dV_p/dt = Error * W_feedback + Top_Down - Leak
-        for i in 0..n {
-            let error_signal = error_rates[i];
+        for (i, error_signal) in error_rates.iter().enumerate().take(n) {
             let feedback_current = error_signal * self.error_to_prediction_weights[i];
 
             // Note: Top-down is handled in 'backward' or separate phase in this architecture,
@@ -158,7 +157,7 @@ impl PredictiveCodingLayer {
         // Assuming CSR structure: row_ptr maps target neurons
         let w = &self.top_down_weights;
 
-        for target_idx in 0..self.n_neurons {
+        for (target_idx, cell) in dendritic_input.iter_mut().enumerate().take(self.n_neurons) {
             if target_idx >= w.row_ptr.len() - 1 {
                 break;
             }
@@ -173,13 +172,13 @@ impl PredictiveCodingLayer {
                     sum += top_down[source_idx] * w.weights[k];
                 }
             }
-            dendritic_input[target_idx] = sum;
+            *cell = sum;
         }
 
         // Apply apical input to Prediction Neurons
-        for i in 0..self.n_neurons {
+        for (i, dend) in dendritic_input.iter().enumerate().take(self.n_neurons) {
             // Top-down input drives the neuron towards the prior
-            self.prediction[i].update(dt, dendritic_input[i]);
+            self.prediction[i].update(dt, *dend);
         }
     }
 
@@ -207,7 +206,7 @@ impl PredictiveCodingLayer {
             .map(|n| (n.state.v + 65.0).max(0.0))
             .collect();
 
-        for target_idx in 0..self.n_neurons {
+        for (target_idx, post_activity) in error_rates.iter().enumerate().take(self.n_neurons) {
             if target_idx >= w.row_ptr.len() - 1 {
                 break;
             }
@@ -215,7 +214,7 @@ impl PredictiveCodingLayer {
             let start = w.row_ptr[target_idx] as usize;
             let end = w.row_ptr[target_idx + 1] as usize;
 
-            let post_activity = error_rates[target_idx]; // Post-synaptic is the Error unit (conceptually guiding the update)
+            // Post-synaptic is the Error unit (conceptually guiding the update)
 
             for k in start..end {
                 let source_idx = w.col_idx[k] as usize;
@@ -223,7 +222,7 @@ impl PredictiveCodingLayer {
                     let pre_activity = top_down_input[source_idx];
 
                     // Hebbian Update minimizing Free Energy
-                    let delta = learning_rate * post_activity * pre_activity;
+                    let delta = learning_rate * *post_activity * pre_activity;
                     w.weights[k] += delta;
 
                     // Weight decay / Normalization

@@ -244,12 +244,10 @@ impl WorkingMemory {
             let mut inputs = vec![0.0; n];
 
             // Compute recurrent input
-            for i in 0..n {
-                for j in 0..n {
-                    if sim_neurons[j].in_up_state {
-                        // Using state as proxy for rate
-                        let weight = self.recurrent_weights[i * n + j];
-                        inputs[i] += weight;
+            for (i, input) in inputs.iter_mut().enumerate().take(n) {
+                for (j, neuron) in sim_neurons.iter().enumerate().take(n) {
+                    if neuron.in_up_state {
+                        *input += self.recurrent_weights[i * n + j];
                     }
                 }
             }
@@ -293,12 +291,14 @@ impl WorkingMemory {
 
         // Optimization: In a real sparse system, we wouldn't do O(N^2)
         // But for WM (size ~1000), this is negligible.
-        for i in 0..n {
-            let mut sum = 0.0;
-            for j in 0..n {
-                sum += self.recurrent_weights[i * n + j] * activity[j];
-            }
-            recurrent_inputs[i] = sum;
+        for (i, cell) in recurrent_inputs.iter_mut().enumerate().take(n) {
+            let sum: f32 = activity
+                .iter()
+                .enumerate()
+                .take(n)
+                .map(|(j, &a)| self.recurrent_weights[i * n + j] * a)
+                .sum();
+            *cell = sum;
         }
 
         // 2. Calculate Global Inhibition (Negative Feedback)

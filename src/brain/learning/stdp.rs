@@ -222,7 +222,7 @@ impl CalciumBasedPlasticity {
         // d[Ca²⁺]/dt = -[Ca²⁺]/τCa + ηNMDA·INMDA + ηVDCC·IVDCC
         let d_ca = -ca / self.tau_ca + self.eta_nmda * nmda_current + self.eta_vdcc * vdcc_current;
 
-        self.calcium[synapse_id] = (ca + d_ca * dt).max(0.0).min(5.0); // Clamp to biological range
+        self.calcium[synapse_id] = (ca + d_ca * dt).clamp(0.0, 5.0); // Clamp to biological range
     }
 
     /// Calculate weight change based on calcium level

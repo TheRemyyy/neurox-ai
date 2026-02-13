@@ -233,11 +233,11 @@ impl KnowledgeGraph {
 
         self.outgoing
             .entry(source)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(edge.clone());
         self.incoming
             .entry(target)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(edge);
     }
 
@@ -359,8 +359,8 @@ impl KnowledgeGraph {
 
             if let Some(edges) = self.outgoing.get(&node) {
                 for edge in edges {
-                    if !visited.contains_key(&edge.target) {
-                        visited.insert(edge.target, (node, edge.relation, edge.weight));
+                    if let std::collections::hash_map::Entry::Vacant(e) = visited.entry(edge.target) {
+                        e.insert((node, edge.relation, edge.weight));
                         queue.push_back((edge.target, depth + 1));
 
                         if edge.target == end {
@@ -485,11 +485,11 @@ impl KnowledgeGraph {
         for edge in &new_edges {
             self.outgoing
                 .entry(edge.source)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(edge.clone());
             self.incoming
                 .entry(edge.target)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(edge.clone());
         }
 

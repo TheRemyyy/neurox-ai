@@ -63,6 +63,12 @@ pub struct STDPTrace {
     pub a_post2: f32,
 }
 
+impl Default for STDPTrace {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl STDPTrace {
     pub fn new() -> Self {
         Self {
@@ -147,7 +153,7 @@ impl STPDynamics {
         self.u_s = self.u_s + self.u_0 * (1.0 - self.u_s);
 
         // Update resources (depression)
-        self.x_s = self.x_s * (1.0 - self.u_s);
+        self.x_s *= 1.0 - self.u_s;
 
         r_s
     }

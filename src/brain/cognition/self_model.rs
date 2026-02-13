@@ -131,7 +131,7 @@ impl CapabilityModel {
     pub fn update(&mut self, domain: CapabilityDomain, success: bool) {
         self.capabilities
             .entry(domain)
-            .or_insert_with(CapabilityEstimate::default)
+            .or_default()
             .update(success);
     }
 
@@ -216,7 +216,7 @@ impl BehavioralProfile {
         let key_clone = key.clone();
         self.response_patterns
             .entry(key)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(response.to_string());
 
         // Limit stored patterns

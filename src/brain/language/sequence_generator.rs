@@ -45,6 +45,12 @@ pub struct BeamCandidate {
     pub finished: bool,
 }
 
+impl Default for BeamCandidate {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BeamCandidate {
     pub fn new() -> Self {
         Self {
@@ -63,9 +69,11 @@ impl BeamCandidate {
             finished: false,
         }
     }
+}
 
-    pub fn to_string(&self) -> String {
-        self.tokens.join(" ")
+impl std::fmt::Display for BeamCandidate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.tokens.join(" "))
     }
 }
 

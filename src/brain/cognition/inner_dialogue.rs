@@ -91,7 +91,7 @@ impl Perspective {
     }
 
     /// Generate response from this perspective
-    pub fn generate_response(&mut self, input: &str, context: &[String]) -> String {
+    pub fn generate_response(&mut self, input: &str, _context: &[String]) -> String {
         self.reasoning.clear();
 
         let response = match self.bias {

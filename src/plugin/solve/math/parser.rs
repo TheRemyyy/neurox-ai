@@ -57,10 +57,8 @@ impl Parser {
                 return Ok(Expr::Exp(Box::new(Self::parse_recursive(inner)?)));
             }
             // Just parentheses (expr)
-            if input.starts_with('(') {
-                if Self::is_fully_enclosed(input) {
-                    return Self::parse_recursive(&input[1..input.len() - 1]);
-                }
+            if input.starts_with('(') && Self::is_fully_enclosed(input) {
+                return Self::parse_recursive(&input[1..input.len() - 1]);
             }
         }
 

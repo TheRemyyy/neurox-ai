@@ -130,6 +130,12 @@ pub struct InnerHairCell {
     adaptation: f32,
 }
 
+impl Default for InnerHairCell {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl InnerHairCell {
     pub fn new() -> Self {
         Self {
