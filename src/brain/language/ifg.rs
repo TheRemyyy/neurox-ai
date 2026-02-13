@@ -443,7 +443,11 @@ mod tests {
 
     #[test]
     fn test_lexicon() {
-        let lex = Lexicon::new();
+        let mut lex = Lexicon::new();
+        lex.add_word(AnnotatedWord::new("ahoj", PartOfSpeech::Interjection));
+        lex.add_word(AnnotatedWord::new("běžet", PartOfSpeech::Verb));
+        lex.add_word(AnnotatedWord::new("myslet", PartOfSpeech::Verb));
+
         let verbs = lex.get_by_pos(PartOfSpeech::Verb);
         assert!(!verbs.is_empty());
 

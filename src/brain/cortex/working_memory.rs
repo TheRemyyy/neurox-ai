@@ -399,8 +399,10 @@ mod tests {
         neuron.update(1.0, 0.1, 0.0);
         assert!(!neuron.in_up_state);
 
-        // Strong input -> UP state
-        neuron.update(1.0, 1.0, 0.0);
+        // Strong input for many steps so NMDA builds above threshold (tau_nmda = 100, threshold = 0.5)
+        for _ in 0..80 {
+            neuron.update(1.0, 1.0, 0.0);
+        }
         assert!(neuron.in_up_state);
 
         // Remove input -> Should persist (Bistability)

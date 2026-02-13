@@ -664,6 +664,15 @@ mod tests {
     fn test_emotional_transitions() {
         let mut esm = EmotionalStateMachine::new();
 
+        // Add transition: greeting pattern -> Joy (no transitions by default)
+        esm.add_transition(EmotionTransition {
+            trigger_threshold: 0.5,
+            from_emotion: None,
+            to_emotion: Emotion::Joy,
+            intensity: 0.8,
+            trigger_patterns: vec!["ahoj".into(), "čau".into()],
+        });
+
         // Process greeting
         esm.process_input("Ahoj!", 0.1);
 
