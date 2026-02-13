@@ -11,8 +11,17 @@ pub fn run(
     context: Option<usize>,
     sensitivity: Option<f32>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Load config from file or use defaults
-    let mut config = ConfigLoader::load_chat_config().unwrap_or_default();
+    // Load config from file or use defaults (propagate parse errors, use default only for missing file)
+    let mut config = match ConfigLoader::load_chat_config() {
+        Ok(c) => c,
+        Err(e) => {
+            if std::path::Path::new("cfg/chat.json").exists() {
+                return Err(e);
+            }
+            log::info!("Using default chat config (cfg/chat.json not found)");
+            ChatConfig::default()
+        }
+    };
 
     // Apply CLI overrides
     if let Some(v) = vocab {

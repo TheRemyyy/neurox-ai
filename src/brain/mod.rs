@@ -30,6 +30,7 @@ pub mod connectivity;
 pub mod cortex;
 pub mod cuda;
 pub mod datasets;
+pub mod simulation;
 pub mod language;
 pub mod learning;
 pub mod memory;
@@ -40,7 +41,6 @@ pub mod oscillations;
 pub mod reasoning;
 pub mod semantics;
 pub mod serialization;
-pub mod simulation;
 pub mod spatial;
 pub mod synapse;
 pub mod training;
@@ -59,9 +59,12 @@ use self::cortex::{
     MotionProcessingSystem, NeuromorphicCochlea, SleepConsolidation, SleepStats,
     V1OrientationSystem, WorkingMemory,
 };
+#[cfg(feature = "cuda")]
 use self::cuda::{
     motion_kernels::GpuMotionSystem, v1_kernels::GpuV1OrientationSystem, GpuCognitiveSystem,
 };
+#[cfg(not(feature = "cuda"))]
+use self::cuda::{GpuCognitiveSystem, GpuMotionSystem, GpuV1OrientationSystem};
 use self::language::{
     AnnotatedWord, DualStreamLanguage, DualStreamStats, IFGSyntacticPlanner, IntentType, Lexicon,
 };
@@ -131,7 +134,10 @@ pub use self::simulation::{OptimizationStats, Simulator};
 pub use self::spatial::{GridCell, PlaceCell, SpatialSystem as SpatSystem};
 pub use self::training::{train_mnist, MNISTTrainer, TrainingConfig};
 
+#[cfg(feature = "cuda")]
 use cudarc::driver::CudaDevice;
+#[cfg(not(feature = "cuda"))]
+use crate::brain::cuda::CudaDeviceStub as CudaDevice;
 use dashmap::DashMap;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -466,12 +472,10 @@ impl NeuromorphicBrain {
         let attention = AttentionSystem::new(pattern_dim, connectivity, 2.0);
 
         // === GPU INITIALIZATION ===
+        #[cfg(feature = "cuda")]
         let (gpu_device, gpu_v1, gpu_motion, gpu_cognitive) = match CudaDevice::new(0) {
             Ok(device) => {
                 log::info!("🚀 GPU ACCELERATION ENABLED!");
-                // Note: CudaDevice::new already returns Arc<CudaDevice>
-
-                // Create context wrapper
                 let context = match CudaContext::new(0) {
                     Ok(ctx) => Some(ctx),
                     Err(e) => {
@@ -479,8 +483,6 @@ impl NeuromorphicBrain {
                         None
                     }
                 };
-
-                // Initialize GPU V1 (100x faster)
                 let gpu_v1 = match GpuV1OrientationSystem::new(device.clone(), 128, 128, 4) {
                     Ok(v1) => {
                         log::info!("  ✓ GPU V1 Orientation: 100× speedup (200ms → 2ms)");
@@ -491,8 +493,6 @@ impl NeuromorphicBrain {
                         None
                     }
                 };
-
-                // Initialize GPU Motion (80x faster)
                 let gpu_motion = match GpuMotionSystem::new(device.clone(), 128, 128, 4, 4) {
                     Ok(motion) => {
                         log::info!("  ✓ GPU Motion Processing: 80× speedup (40ms → 0.5ms)");
@@ -503,8 +503,6 @@ impl NeuromorphicBrain {
                         None
                     }
                 };
-
-                // Initialize GPU Cognitive System (New!)
                 let gpu_cognitive = if let Some(ctx) = context {
                     match GpuCognitiveSystem::new(&ctx, 1000, pattern_dim) {
                         Ok(cog) => {
@@ -519,7 +517,6 @@ impl NeuromorphicBrain {
                 } else {
                     None
                 };
-
                 (Some(device), gpu_v1, gpu_motion, gpu_cognitive)
             }
             Err(e) => {
@@ -528,6 +525,13 @@ impl NeuromorphicBrain {
                 (None, None, None, None)
             }
         };
+        #[cfg(not(feature = "cuda"))]
+        let (gpu_device, gpu_v1, gpu_motion, gpu_cognitive): (
+            Option<Arc<CudaDevice>>,
+            Option<GpuV1OrientationSystem>,
+            Option<GpuMotionSystem>,
+            Option<GpuCognitiveSystem>,
+        ) = (None, None, None, None);
 
         Self {
             sensory,

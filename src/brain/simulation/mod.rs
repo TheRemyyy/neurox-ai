@@ -1,14 +1,19 @@
-//! Simulation engine for spiking neural networks
+//! Simulation engine for spiking neural networks (GPU when CUDA enabled).
 
 pub mod event_queue;
 
 pub use event_queue::{EventQueue, SpikeEvent, DelayBuffer};
 
+#[cfg(feature = "cuda")]
 use crate::brain::cuda::{CudaContext, KernelConfig};
+#[cfg(feature = "cuda")]
 use crate::brain::connectivity::SparseConnectivity;
+#[cfg(feature = "cuda")]
 use cudarc::driver::{CudaSlice, DeviceSlice};
+#[cfg(feature = "cuda")]
 use std::sync::Arc;
 
+#[cfg(feature = "cuda")]
 /// Main simulator for GPU-accelerated SNN
 pub struct Simulator {
     /// CUDA context
@@ -52,6 +57,7 @@ pub struct Simulator {
     sparsity_threshold: f32,
 }
 
+#[cfg(feature = "cuda")]
 /// GPU-resident sparse connectivity
 pub struct SparseConnectivityGPU {
     pub(crate) row_ptr: CudaSlice<i32>,
@@ -60,6 +66,7 @@ pub struct SparseConnectivityGPU {
     n_synapses: usize,
 }
 
+#[cfg(feature = "cuda")]
 impl SparseConnectivityGPU {
     /// Get total number of synapses
     pub fn n_synapses(&self) -> usize {
@@ -84,7 +91,7 @@ impl SparseConnectivityGPU {
     }
 }
 
-
+#[cfg(feature = "cuda")]
 impl Simulator {
     /// Create new simulator
     pub fn new(
@@ -553,6 +560,7 @@ impl Simulator {
     }
 }
 
+#[cfg(feature = "cuda")]
 /// Optimization statistics
 #[derive(Debug, Clone)]
 pub struct OptimizationStats {
@@ -564,9 +572,15 @@ pub struct OptimizationStats {
     pub mode: String,
 }
 
+#[cfg(feature = "cuda")]
 struct InitialState {
     membrane_v: Vec<f32>,
     thresholds: Vec<f32>,
     tau_m: Vec<f32>,
     v_reset: Vec<f32>,
 }
+
+#[cfg(not(feature = "cuda"))]
+mod stub;
+#[cfg(not(feature = "cuda"))]
+pub use stub::*;

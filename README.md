@@ -36,9 +36,8 @@ NeuroxAI is a high-performance neuromorphic computing platform that simulates bi
 ## Requirements
 
 - **Rust** 1.75 or later
-- **CUDA Toolkit** 12.6 or later
-- **NVIDIA GPU** with Compute Capability 7.0+ (RTX series recommended)
-- **Windows/Linux** (macOS not supported due to CUDA)
+- **CUDA (optional)**: For GPU acceleration, install **CUDA Toolkit** 12.6+ and use an **NVIDIA GPU** (Compute Capability 7.0+, RTX recommended). Without CUDA, build with `--no-default-features` for a CPU-only binary (brain runs, no MNIST benchmark/training).
+- **Windows/Linux** (macOS not supported when using CUDA)
 
 ## <a id="installation"></a>Installation
 
@@ -47,8 +46,11 @@ NeuroxAI is a high-performance neuromorphic computing platform that simulates bi
 git clone https://github.com/TheRemyyy/neurox-ai.git
 cd neurox-ai
 
-# Build in release mode
+# Build in release mode (with CUDA, default)
 cargo build --release
+
+# Build without CUDA (no NVIDIA stack required)
+cargo build --release --no-default-features
 ```
 
 ## <a id="usage"></a>Usage

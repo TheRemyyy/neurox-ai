@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] - 2025-02-13
+
+### Added
+
+- **Optional CUDA**: Feature flag `cuda` (default on). Build without NVIDIA stack using `cargo build --no-default-features`. CPU-only binary runs the full brain; MNIST benchmark and training return a clear error when CUDA is not compiled in.
+- **CI**: GitHub Actions workflow (`.github/workflows/ci.yml`) — `cargo fmt --check`, `cargo clippy`, `cargo test`, `cargo build --release` all run without default features on `master`/`main`.
+- **Integration tests**: `tests/cli_info.rs`, `tests/cli_chat.rs`, `tests/brain_integration.rs` for CLI info, chat flow, and high-level brain creation/update without GPU.
+
+### Changed
+
+- **Error handling**: Chat command uses `Result` for config loading (propagates parse errors when `cfg/chat.json` exists; uses defaults only when file is missing). Info command handles missing CUDA gracefully and prints a message instead of failing. Benchmark returns an explicit error when run without the `cuda` feature.
+- **README**: Requirements and installation updated to describe optional CUDA and CPU-only build.
+
 ## [1.0.1] - 2025-12-31
 
 ### Added

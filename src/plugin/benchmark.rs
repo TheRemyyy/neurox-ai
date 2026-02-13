@@ -39,6 +39,11 @@ impl BenchmarkPlugin {
         duration: Option<f32>,
         isi: Option<f32>,
     ) -> Result<(), Box<dyn std::error::Error>> {
+        #[cfg(not(feature = "cuda"))]
+        return Err("Benchmark requires CUDA. Build with --features cuda.".into());
+
+        #[cfg(feature = "cuda")]
+        {
         // Use CLI args or config defaults
         let data_dir = data_dir.unwrap_or(&self.config.data_dir);
         let epochs = epochs.unwrap_or(self.config.epochs);
@@ -103,8 +108,10 @@ impl BenchmarkPlugin {
         }
 
         Ok(())
+        }
     }
 
+    #[cfg(feature = "cuda")]
     fn run_synthetic_benchmark(
         &self,
         epochs: usize,
@@ -246,6 +253,7 @@ impl BenchmarkPlugin {
         Ok(())
     }
 
+    #[cfg(feature = "cuda")]
     fn run_real_benchmark(
         &self,
         data_dir: &str,

@@ -1,6 +1,6 @@
 [package]
 name = "neurox-ai" 
-version = "1.0.1"
+version = "1.0.2"
 edition = "2021"
 authors = ["TheRemyyy", "Aegis Labs"]
 description = "GPU-accelerated neuromorphic computing platform with biologically-inspired spiking neural networks"
@@ -10,9 +10,14 @@ readme = "README.md"
 keywords = ["neuromorphic", "spiking-neural-networks", "cuda", "machine-learning", "neuroscience"]
 categories = ["science", "simulation", "hardware-support"]
 
+[features]
+default = ["cuda"]
+# Enable CUDA GPU acceleration (requires NVIDIA GPU + toolkit). Disable for CPU-only build.
+cuda = ["dep:cudarc"]
+
 [dependencies]
-# GPU acceleration - CUDA 12.6 compatible
-cudarc = { version = "0.12", features = ["cuda-12060", "cublas", "curand"] }
+# GPU acceleration - CUDA 12.6 compatible (optional, see feature "cuda")
+cudarc = { version = "0.12", features = ["cuda-12060", "cublas", "curand"], optional = true }
 
 # Numerical computing
 ndarray = "0.16"

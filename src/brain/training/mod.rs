@@ -5,7 +5,9 @@
 use crate::brain::datasets::MNISTImage;
 use crate::brain::learning::quantization::QuantizationConfig;
 use crate::brain::learning::{HomeostaticPlasticity, STDPConfig, STPDynamics, TripletSTDP};
+#[cfg(feature = "cuda")]
 use crate::brain::simulation::Simulator;
+#[cfg(feature = "cuda")]
 use cudarc::driver::DeviceSlice;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::collections::HashMap;
@@ -112,7 +114,8 @@ pub struct TrainingStats {
     pub weight_std: f32,
 }
 
-/// MNIST Trainer with Triplet STDP + Supervision
+/// MNIST Trainer with Triplet STDP + Supervision (requires CUDA)
+#[cfg(feature = "cuda")]
 pub struct MNISTTrainer {
     /// Training configuration
     config: TrainingConfig,
@@ -149,6 +152,22 @@ pub struct MNISTTrainer {
     weight_changes: Vec<f32>,
 }
 
+/// Stub MNISTTrainer when CUDA is disabled (cannot train without GPU).
+#[cfg(not(feature = "cuda"))]
+pub struct MNISTTrainer;
+
+#[cfg(not(feature = "cuda"))]
+impl MNISTTrainer {
+    pub fn new(
+        _simulator: crate::brain::simulation::Simulator,
+        _config: TrainingConfig,
+        _stdp_config: STDPConfig,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
+        Err("MNIST training requires CUDA. Build with --features cuda.".into())
+    }
+}
+
+#[cfg(feature = "cuda")]
 impl MNISTTrainer {
     /// Create new MNIST trainer
     pub fn new(simulator: Simulator, config: TrainingConfig, stdp_config: STDPConfig) -> Self {
@@ -727,7 +746,8 @@ impl MNISTTrainer {
     }
 }
 
-/// Full training pipeline
+/// Full training pipeline (requires CUDA).
+#[cfg(feature = "cuda")]
 pub fn train_mnist(
     simulator: Simulator,
     train_images: &[MNISTImage],
@@ -780,4 +800,15 @@ pub fn train_mnist(
     log::info!("Training complete!");
 
     Ok(trainer)
+}
+
+/// Stub when CUDA is disabled.
+#[cfg(not(feature = "cuda"))]
+pub fn train_mnist(
+    _simulator: crate::brain::simulation::Simulator,
+    _train_images: &[MNISTImage],
+    _test_images: &[MNISTImage],
+    _config: TrainingConfig,
+) -> Result<MNISTTrainer, Box<dyn std::error::Error>> {
+    Err("MNIST training requires CUDA. Build with --features cuda.".into())
 }

@@ -16,7 +16,14 @@ impl InfoPlugin {
 
     /// Display system and GPU information
     pub fn display_info(&self) -> Result<(), Box<dyn std::error::Error>> {
-        let cuda_ctx = Arc::new(CudaContext::default()?);
+        let cuda_ctx = match CudaContext::default() {
+            Ok(ctx) => Arc::new(ctx),
+            Err(e) => {
+                println!("CUDA not available: {}", e);
+                println!("Build with --features cuda for GPU support.");
+                return Ok(());
+            }
+        };
         println!("{}", cuda_ctx.device_info()?);
         Ok(())
     }
