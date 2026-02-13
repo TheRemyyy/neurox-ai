@@ -456,7 +456,9 @@ impl V1Layer {
                     .map(|(y, cell_list)| {
                         cell_list
                             .iter()
-                            .map(|c| self.compute_recurrent_inhibition(x, y, c.preferred_orientation))
+                            .map(|c| {
+                                self.compute_recurrent_inhibition(x, y, c.preferred_orientation)
+                            })
                             .collect()
                     })
                     .collect()
@@ -485,7 +487,8 @@ impl V1Layer {
                 for complex in self.complex_cells[x][y].iter_mut() {
                     let mut energy = 0.0;
                     for simple in cell_list.iter() {
-                        if (simple.preferred_orientation - complex.preferred_orientation).abs() < 0.1
+                        if (simple.preferred_orientation - complex.preferred_orientation).abs()
+                            < 0.1
                         {
                             energy += simple.response * simple.response;
                         }

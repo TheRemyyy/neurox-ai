@@ -231,14 +231,8 @@ impl KnowledgeGraph {
             timestamp: self.current_time,
         };
 
-        self.outgoing
-            .entry(source)
-            .or_default()
-            .push(edge.clone());
-        self.incoming
-            .entry(target)
-            .or_default()
-            .push(edge);
+        self.outgoing.entry(source).or_default().push(edge.clone());
+        self.incoming.entry(target).or_default().push(edge);
     }
 
     /// Query relationships from an entity
@@ -359,7 +353,8 @@ impl KnowledgeGraph {
 
             if let Some(edges) = self.outgoing.get(&node) {
                 for edge in edges {
-                    if let std::collections::hash_map::Entry::Vacant(e) = visited.entry(edge.target) {
+                    if let std::collections::hash_map::Entry::Vacant(e) = visited.entry(edge.target)
+                    {
                         e.insert((node, edge.relation, edge.weight));
                         queue.push_back((edge.target, depth + 1));
 

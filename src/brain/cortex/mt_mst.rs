@@ -247,7 +247,11 @@ impl MiddleTemporal {
         // Update direction-selective cells
         for x in 0..self.width {
             for y in 0..self.height {
-                for (dir_idx, cell) in self.direction_cells[x][y].iter_mut().enumerate().take(self.n_directions) {
+                for (dir_idx, cell) in self.direction_cells[x][y]
+                    .iter_mut()
+                    .enumerate()
+                    .take(self.n_directions)
+                {
                     // Compute spatiotemporal filter response
                     let input = if x < v1_complex.len() && y < v1_complex[0].len() {
                         // Use orientation-aligned V1 input

@@ -248,10 +248,7 @@ impl EnhancedEpisodicMemory {
 
         // Index by emotion
         for tag in &episode.emotional_tags {
-            self.emotional_index
-                .entry(*tag)
-                .or_default()
-                .push(id);
+            self.emotional_index.entry(*tag).or_default().push(id);
         }
 
         // Add to temporal index

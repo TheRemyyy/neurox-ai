@@ -129,10 +129,7 @@ impl CapabilityModel {
 
     /// Update capability after task
     pub fn update(&mut self, domain: CapabilityDomain, success: bool) {
-        self.capabilities
-            .entry(domain)
-            .or_default()
-            .update(success);
+        self.capabilities.entry(domain).or_default().update(success);
     }
 
     /// Overall capability score
