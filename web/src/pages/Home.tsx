@@ -72,44 +72,20 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Key Modules Grid */}
-      <section className="space-y-16">
-        <div className="text-center space-y-4">
+      {/* Key Modules */}
+      <section className="space-y-12">
+        <div>
           <h2 className="text-4xl font-bold tracking-tight">Biological systems</h2>
-          <p className="text-text-secondary max-w-xl mx-auto">A complete cognitive stack, from hardware to consciousness.</p>
+          <p className="text-text-secondary mt-2 max-w-xl">A complete cognitive stack, from hardware to consciousness.</p>
         </div>
-        <div className="grid md:grid-cols-3 gap-8">
-          <ModuleCard
-            icon={Cpu}
-            title="Laminar Cortex"
-            desc="6-layer microcircuitry implementing predictive coding. Minimizing free energy across 5 hierarchical levels."
-          />
-          <ModuleCard
-            icon={Activity}
-            title="Dopaminergic RL"
-            desc="Basal ganglia loops for action selection. Real-time TD-learning modulated by dopamine bursts and pauses."
-          />
-          <ModuleCard
-            icon={MessageSquare}
-            title="Dual-Stream Language"
-            desc="Ventral and dorsal pathways for sound-to-meaning and sound-to-articulation mapping. GPT-1.0 capability in SNN."
-          />
-          <ModuleCard
-            icon={GitMerge}
-            title="Synaptic Plasticity"
-            desc="Triplet STDP, BCM theory, and homeostatic scaling. The network physically rewires itself based on activity."
-          />
-          <ModuleCard
-            icon={Compass}
-            title="Cognitive Maps"
-            desc="Grid cells and place cells provide a metric coordinate system for both spatial navigation and abstract reasoning."
-          />
-          <ModuleCard
-            icon={Dna}
-            title="Active Dendrites"
-            desc="NMDA plateau potentials turn single neurons into 2-layer networks, boosting computational capacity by 5x."
-          />
-        </div>
+        <ul className="divide-y divide-border">
+          <ModuleRow icon={Cpu} title="Laminar Cortex" desc="6-layer microcircuitry implementing predictive coding. Minimizing free energy across 5 hierarchical levels." />
+          <ModuleRow icon={Activity} title="Dopaminergic RL" desc="Basal ganglia loops for action selection. Real-time TD-learning modulated by dopamine bursts and pauses." />
+          <ModuleRow icon={MessageSquare} title="Dual-Stream Language" desc="Ventral and dorsal pathways for sound-to-meaning and sound-to-articulation mapping. GPT-1.0 capability in SNN." />
+          <ModuleRow icon={GitMerge} title="Synaptic Plasticity" desc="Triplet STDP, BCM theory, and homeostatic scaling. The network physically rewires itself based on activity." />
+          <ModuleRow icon={Compass} title="Cognitive Maps" desc="Grid cells and place cells provide a metric coordinate system for both spatial navigation and abstract reasoning." />
+          <ModuleRow icon={Dna} title="Active Dendrites" desc="NMDA plateau potentials turn single neurons into 2-layer networks, boosting computational capacity by 5x." />
+        </ul>
       </section>
 
       {/* Philosophy Callout */}
@@ -139,16 +115,18 @@ function StatCard({ label, value, sub }: { label: string, value: string, sub: st
   );
 }
 
-function ModuleCard({ icon: Icon, title, desc }: { icon: any, title: string, desc: string }) {
+function ModuleRow({ icon: Icon, title, desc }: { icon: any, title: string, desc: string }) {
   return (
-    <div className="p-8 rounded-2xl bg-surface/30 border border-border hover:border-accent/30 transition-all group">
-      <div className="w-12 h-12 rounded-lg bg-background border border-border flex items-center justify-center mb-6 group-hover:border-accent/50 transition-all shadow-sm">
-        <Icon className="text-text-secondary group-hover:text-accent transition-colors" size={24} />
+    <li className="flex gap-5 py-5 first:pt-0 group">
+      <span className="shrink-0 mt-0.5 text-text-secondary group-hover:text-accent transition-colors">
+        <Icon size={20} strokeWidth={1.75} />
+      </span>
+      <div className="min-w-0">
+        <h3 className="text-base font-semibold text-white tracking-tight">{title}</h3>
+        <p className="text-text-secondary text-sm leading-relaxed mt-1">
+          {desc}
+        </p>
       </div>
-      <h3 className="text-xl font-semibold text-white mb-3 tracking-tight">{title}</h3>
-      <p className="text-text-secondary leading-relaxed font-medium">
-        {desc}
-      </p>
-    </div>
+    </li>
   );
 }
