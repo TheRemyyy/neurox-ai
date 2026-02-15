@@ -30,7 +30,7 @@ function renderMathInMarkdown(md: string): { processed: string; blockPlaceholder
   };
 
   const parts = md.split(/(```[\s\S]*?```)/g);
-  const processed = parts.map((part, i) => replacer(part, part.startsWith('```'))).join('');
+  const processed = parts.map((part) => replacer(part, part.startsWith('```'))).join('');
   return { processed, blockPlaceholders, inlinePlaceholders };
 }
 
