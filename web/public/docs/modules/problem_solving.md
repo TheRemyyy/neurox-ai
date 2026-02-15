@@ -4,7 +4,7 @@ The **Cognitive Symbolic Engine** acts as the "System 2" reasoning cortex for Ne
 
 It bridges the gap between biological plausibility and the need for exact analytical answers in AGI systems.
 
-## 📐 Symbolic Math Engine
+## Symbolic Math Engine
 The `MathSolver` is not a calculator; it is a recursive **Abstract Syntax Tree (AST)** processor capable of algebraic manipulation.
 
 ### Capabilities
@@ -13,7 +13,7 @@ The `MathSolver` is not a calculator; it is a recursive **Abstract Syntax Tree (
 *   **AST Simplification**: intelligently reduces expressions.
 *   **Self-Verification (Reality Check)**: After solving an equation, the engine performs a **back-substitution** (LHS vs RHS check) to prove the result's validity.
 
-## 🧪 Computational Chemistry
+## Computational Chemistry
 The `ChemistrySolver` integrates a static database of physical properties with linear algebra solvers to simulate chemical reasoning.
 
 ### Capabilities

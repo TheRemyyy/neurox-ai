@@ -1,10 +1,55 @@
 import { useEffect, useState } from 'react';
 import { marked } from 'marked';
 import hljs from 'highlight.js';
+import katex from 'katex';
 import 'highlight.js/styles/github-dark.css';
+import 'katex/dist/katex.min.css';
 
 interface MarkdownViewerProps {
   path: string;
+}
+
+function renderMathInMarkdown(md: string): { processed: string; blockPlaceholders: string[]; inlinePlaceholders: string[] } {
+  const blockPlaceholders: string[] = [];
+  const inlinePlaceholders: string[] = [];
+
+  const replacer = (segment: string, inCodeBlock: boolean) => {
+    if (inCodeBlock) return segment;
+    let out = segment;
+    out = out.replace(/\$\$([\s\S]*?)\$\$/g, (_, formula) => {
+      const i = blockPlaceholders.length;
+      blockPlaceholders.push(formula.trim());
+      return `\u200B<!--MATH_BLOCK_${i}-->\u200B`;
+    });
+    out = out.replace(/\$([^\$\n]+)\$/g, (_, formula) => {
+      const i = inlinePlaceholders.length;
+      inlinePlaceholders.push(formula.trim());
+      return `\u200B<!--MATH_INLINE_${i}-->\u200B`;
+    });
+    return out;
+  };
+
+  const parts = md.split(/(```[\s\S]*?```)/g);
+  const processed = parts.map((part, i) => replacer(part, part.startsWith('```'))).join('');
+  return { processed, blockPlaceholders, inlinePlaceholders };
+}
+
+function applyRenderedMath(
+  html: string,
+  blockPlaceholders: string[],
+  inlinePlaceholders: string[]
+): string {
+  const opts = { throwOnError: false };
+  let out = html;
+  blockPlaceholders.forEach((formula, i) => {
+    const rendered = katex.renderToString(formula, { ...opts, displayMode: true });
+    out = out.replace(`\u200B<!--MATH_BLOCK_${i}-->\u200B`, rendered);
+  });
+  inlinePlaceholders.forEach((formula, i) => {
+    const rendered = katex.renderToString(formula, { ...opts, displayMode: false });
+    out = out.replace(`\u200B<!--MATH_INLINE_${i}-->\u200B`, rendered);
+  });
+  return out;
 }
 
 export const MarkdownViewer = ({ path }: MarkdownViewerProps) => {
@@ -16,9 +61,10 @@ export const MarkdownViewer = ({ path }: MarkdownViewerProps) => {
     fetch(path)
       .then((res) => res.text())
       .then((text) => {
-        // Set options for better gfm support and line breaks
-        const html = marked.parse(text, { breaks: true, gfm: true }) as string;
-        setContent(html);
+        const { processed: textWithPlaceholders, blockPlaceholders, inlinePlaceholders } = renderMathInMarkdown(text);
+        const html = marked.parse(textWithPlaceholders, { breaks: true, gfm: true }) as string;
+        const withMath = applyRenderedMath(html, blockPlaceholders, inlinePlaceholders);
+        setContent(withMath);
         setLoading(false);
       })
       .catch((err) => {

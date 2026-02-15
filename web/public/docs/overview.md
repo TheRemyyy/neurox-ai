@@ -14,7 +14,7 @@ NeuroxAI is built on the hypothesis that **General Intelligence** emerges not fr
 
 ## Key Features
 
-### 🧠 Whole-Brain Architecture
+### Whole-Brain Architecture
 We move beyond simple "layers" to simulate distinct brain organs:
 *   **Cortex**: 6-layer microcircuitry with predictive coding.
 *   **Hippocampus**: Fast episodic memory encoding and replay.
@@ -22,24 +22,24 @@ We move beyond simple "layers" to simulate distinct brain organs:
 *   **Cerebellum**: Fine-motor control and error correction.
 *   **Thalamus**: The "switchboard" of consciousness and attention.
 
-### 🧠 Cognitive Symbolic Engine
+### Cognitive Symbolic Engine
 *   **Symbolic Math**: AST-based engine for calculus (`diff`), algebra, and simplification.
 *   **Scientific Reasoning**: Stoichiometry, molar mass calculation, and step-by-step chemical analysis.
 
-### 📊 Benchmarks
+### Benchmarks
 *   **MNIST**: Integrated benchmarking suite with quantization (4/8-bit) and synthetic data generation.
 
-### ⚡ Synaptic & Structural Plasticity
+### Synaptic & Structural Plasticity
 *   **STDP (Spike-Timing-Dependent Plasticity)**: Hebbian learning based on millisecond-precise timing.
 *   **Neuromodulation**: Dopamine (reward), Serotonin (patience), Norepinephrine (arousal), and Acetylcholine (attention) dynamically modulate learning rates and thresholds.
 *   **Structural Plasticity**: The network physically rewires itself—growing new synapses and pruning unused ones based on activity.
 
-### 🚀 High-Performance Engineering
+### High-Performance Engineering
 *   **Rust Core**: Zero-cost abstractions and memory safety without garbage collection pauses.
 *   **CUDA Acceleration**: Custom GPU kernels for V1 visual processing and massive matrix operations, achieving **100x speedups** over CPU execution.
 *   **Sparse Computing**: Optimized data structures for handling the <1% sparsity of biological neural activity.
 
-### 🧬 The Semantic Genome
+### The Semantic Genome
 NeuroxAI is not trained on raw text noise. It uses a structured **Semantic Genome** (`data/czech_training.json`) that maps words directly to:
 *   **Neuro-Impacts**: How words affect Dopamine, Oxytocin, and Stress levels.
 *   **Pragmatics**: Rules for social interaction and logical flow.

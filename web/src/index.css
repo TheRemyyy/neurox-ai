@@ -62,6 +62,17 @@ body {
   letter-spacing: -0.025em;
 }
 
+.prose .katex {
+  color: var(--color-text-primary);
+  font-size: 1.05em;
+}
+
+.prose .katex-display {
+  margin: 0.75em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 4px;
