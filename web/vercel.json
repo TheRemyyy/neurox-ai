@@ -1,8 +1,15 @@
 {
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    {
+      "source": "/((?!assets/)(?!.*\\.md$).*)",
+      "destination": "/index.html"
+    }
   ],
   "redirects": [
-    { "source": "/docs/:path*.md", "destination": "/docs/:path*", "permanent": true }
+    {
+      "source": "/docs/:path*.md",
+      "destination": "/docs/:path*",
+      "permanent": true
+    }
   ]
 }
