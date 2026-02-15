@@ -68,7 +68,7 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
           </button>
         </div>
         
-        <nav className="flex-1 p-4 space-y-6 text-sm">
+        <nav className="flex-1 p-4 space-y-2 text-sm">
           {navItems.map((group, i) => (
             <div key={i} className="space-y-2">
               {group.icon ? (
