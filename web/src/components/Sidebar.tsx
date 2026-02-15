@@ -8,29 +8,29 @@ import {
 
 const navItems = [
   { label: 'Introduction', path: '/', icon: Brain },
-  { label: 'CLI Reference', path: '/docs/cli_reference.md', icon: Terminal },
-  { label: 'Architecture', path: '/docs/architecture/system_overview.md', icon: Cpu },
+  { label: 'CLI Reference', path: '/docs/cli_reference', icon: Terminal },
+  { label: 'Architecture', path: '/docs/architecture/system_overview', icon: Cpu },
   { 
     label: 'Modules', 
     items: [
-      { label: 'Cortical Hierarchy', path: '/docs/modules/cortical_hierarchy.md', icon: Layers },
-      { label: 'Subcortical Systems', path: '/docs/modules/subcortical_systems.md', icon: Dna },
-      { label: 'Spatial Navigation', path: '/docs/modules/spatial_navigation.md', icon: Compass },
-      { label: 'Neuron Models', path: '/docs/modules/neuron_models.md', icon: Zap },
-      { label: 'Cognitive Upgrades', path: '/docs/modules/cognitive_upgrades.md', icon: TrendingUp },
-      { label: 'Reasoning & Motivation', path: '/docs/modules/reasoning_motivation.md', icon: Lightbulb },
-      { label: 'Problem Solving', path: '/docs/modules/problem_solving.md', icon: Calculator },
-      { label: 'MNIST Benchmark', path: '/docs/modules/mnist_benchmark.md', icon: Activity },
+      { label: 'Cortical Hierarchy', path: '/docs/modules/cortical_hierarchy', icon: Layers },
+      { label: 'Subcortical Systems', path: '/docs/modules/subcortical_systems', icon: Dna },
+      { label: 'Spatial Navigation', path: '/docs/modules/spatial_navigation', icon: Compass },
+      { label: 'Neuron Models', path: '/docs/modules/neuron_models', icon: Zap },
+      { label: 'Cognitive Upgrades', path: '/docs/modules/cognitive_upgrades', icon: TrendingUp },
+      { label: 'Reasoning & Motivation', path: '/docs/modules/reasoning_motivation', icon: Lightbulb },
+      { label: 'Problem Solving', path: '/docs/modules/problem_solving', icon: Calculator },
+      { label: 'MNIST Benchmark', path: '/docs/modules/mnist_benchmark', icon: Activity },
     ]
   },
   {
     label: 'Internals',
     items: [
-      { label: 'Plasticity', path: '/docs/internals/plasticity.md', icon: GitMerge },
-      { label: 'Neuromodulation', path: '/docs/internals/neuromodulation.md', icon: FlaskConical },
-      { label: 'GPU Acceleration', path: '/docs/internals/gpu_acceleration.md', icon: HardDrive },
-      { label: 'Language & Cognition', path: '/docs/internals/language_cognition.md', icon: MessageSquare },
-      { label: 'Data & Training', path: '/docs/internals/data_training.md', icon: Database },
+      { label: 'Plasticity', path: '/docs/internals/plasticity', icon: GitMerge },
+      { label: 'Neuromodulation', path: '/docs/internals/neuromodulation', icon: FlaskConical },
+      { label: 'GPU Acceleration', path: '/docs/internals/gpu_acceleration', icon: HardDrive },
+      { label: 'Language & Cognition', path: '/docs/internals/language_cognition', icon: MessageSquare },
+      { label: 'Data & Training', path: '/docs/internals/data_training', icon: Database },
     ]
   }
 ];

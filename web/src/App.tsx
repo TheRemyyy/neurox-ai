@@ -11,24 +11,23 @@ const MarkdownViewer = lazy(() => import('./components/MarkdownViewer').then(mod
 
 const allPages = [
   { label: 'Introduction', path: '/' },
-  { label: 'Changelog', path: '/docs/CHANGELOG.md' },
-  { label: 'CLI Reference', path: '/docs/cli_reference.md' },
-  { label: 'Architecture', path: '/docs/architecture/system_overview.md' },
-  { label: 'Cortical Hierarchy', path: '/docs/modules/cortical_hierarchy.md' },
-  { label: 'Subcortical Systems', path: '/docs/modules/subcortical_systems.md' },
-  { label: 'Spatial Navigation', path: '/docs/modules/spatial_navigation.md' },
-  { label: 'Neuron Models', path: '/docs/modules/neuron_models.md' },
-  { label: 'Cognitive Upgrades', path: '/docs/modules/cognitive_upgrades.md' },
-  { label: 'Reasoning & Motivation', path: '/docs/modules/reasoning_motivation.md' },
-  { label: 'Problem Solving', path: '/docs/modules/problem_solving.md' },
-  { label: 'MNIST Benchmark', path: '/docs/modules/mnist_benchmark.md' },
-  { label: 'Plasticity', path: '/docs/internals/plasticity.md' },
-  { label: 'Neuromodulation', path: '/docs/internals/neuromodulation.md' },
-
-  { label: 'GPU Acceleration', path: '/docs/internals/gpu_acceleration.md' },
-  { label: 'Spiking CNN', path: '/docs/modules/spiking_cnn.md' },
-  { label: 'Language & Cognition', path: '/docs/internals/language_cognition.md' },
-  { label: 'Data & Training', path: '/docs/internals/data_training.md' },
+  { label: 'Changelog', path: '/docs/CHANGELOG' },
+  { label: 'CLI Reference', path: '/docs/cli_reference' },
+  { label: 'Architecture', path: '/docs/architecture/system_overview' },
+  { label: 'Cortical Hierarchy', path: '/docs/modules/cortical_hierarchy' },
+  { label: 'Subcortical Systems', path: '/docs/modules/subcortical_systems' },
+  { label: 'Spatial Navigation', path: '/docs/modules/spatial_navigation' },
+  { label: 'Neuron Models', path: '/docs/modules/neuron_models' },
+  { label: 'Cognitive Upgrades', path: '/docs/modules/cognitive_upgrades' },
+  { label: 'Reasoning & Motivation', path: '/docs/modules/reasoning_motivation' },
+  { label: 'Problem Solving', path: '/docs/modules/problem_solving' },
+  { label: 'MNIST Benchmark', path: '/docs/modules/mnist_benchmark' },
+  { label: 'Plasticity', path: '/docs/internals/plasticity' },
+  { label: 'Neuromodulation', path: '/docs/internals/neuromodulation' },
+  { label: 'GPU Acceleration', path: '/docs/internals/gpu_acceleration' },
+  { label: 'Spiking CNN', path: '/docs/modules/spiking_cnn' },
+  { label: 'Language & Cognition', path: '/docs/internals/language_cognition' },
+  { label: 'Data & Training', path: '/docs/internals/data_training' },
 ];
 
 const LoadingScreen = () => (
@@ -91,11 +90,12 @@ const DocsNavigation = () => {
 
 const DocsPage = () => {
   const location = useLocation();
-  const path = location.pathname === '/' ? '/docs/overview.md' : location.pathname;
+  const routePath = location.pathname === '/' ? '/' : location.pathname;
+  const fetchPath = routePath === '/' ? '/docs/overview.md' : `${routePath}.md`;
   return (
     <PageWrapper>
       <Suspense fallback={<LoadingScreen />}>
-        <MarkdownViewer path={path} />
+        <MarkdownViewer path={fetchPath} />
       </Suspense>
       <DocsNavigation />
     </PageWrapper>

@@ -36,7 +36,7 @@ export default function Home() {
             transition={{ delay: 0.3 }}
             className="flex flex-wrap gap-4 pt-4"
           >
-            <Link to="/docs/architecture/system_overview.md" className="h-12 px-8 rounded-lg bg-accent text-background font-bold hover:opacity-90 transition-all flex items-center gap-2">
+            <Link to="/docs/architecture/system_overview" className="h-12 px-8 rounded-lg bg-accent text-background font-bold hover:opacity-90 transition-all flex items-center gap-2">
               Explore Architecture <ArrowRight size={18} />
             </Link>
             <a href="https://github.com/TheRemyyy/neurox-ai" target="_blank" rel="noopener noreferrer" className="h-12 px-8 rounded-lg border border-border hover:border-accent/30 text-text-primary font-medium transition-all flex items-center gap-2">
@@ -96,7 +96,7 @@ export default function Home() {
           Intelligence is not a single algorithm. It is an orchestrated set of specialized systems, shaped by evolution.
         </p>
         <div className="pt-4 flex justify-center">
-          <Link to="/docs/internals/data_training.md" className="flex items-center gap-2 text-accent font-semibold text-sm hover:underline">
+          <Link to="/docs/internals/data_training" className="flex items-center gap-2 text-accent font-semibold text-sm hover:underline">
             Read the Semantic Genome <ArrowRight size={16} />
           </Link>
         </div>
