@@ -2,11 +2,18 @@ import { useEffect, useState } from 'react';
 import { marked } from 'marked';
 import hljs from 'highlight.js';
 import katex from 'katex';
+import docsMap from '../generated/docsMap.json';
 import 'highlight.js/styles/github-dark.css';
 import 'katex/dist/katex.min.css';
 
 interface MarkdownViewerProps {
   path: string;
+}
+
+function processMdToHtml(text: string): string {
+  const { processed: textWithPlaceholders, blockPlaceholders, inlinePlaceholders } = renderMathInMarkdown(text);
+  const html = marked.parse(textWithPlaceholders, { breaks: true, gfm: true }) as string;
+  return applyRenderedMath(html, blockPlaceholders, inlinePlaceholders);
 }
 
 function renderMathInMarkdown(md: string): { processed: string; blockPlaceholders: string[]; inlinePlaceholders: string[] } {
@@ -59,13 +66,16 @@ export const MarkdownViewer = ({ path }: MarkdownViewerProps) => {
 
   useEffect(() => {
     setLoading(true);
+    const bundled = (docsMap as Record<string, string>)[path];
+    if (bundled !== undefined) {
+      setContent(processMdToHtml(bundled));
+      setLoading(false);
+      return;
+    }
     fetch(path)
       .then((res) => res.text())
       .then((text) => {
-        const { processed: textWithPlaceholders, blockPlaceholders, inlinePlaceholders } = renderMathInMarkdown(text);
-        const html = marked.parse(textWithPlaceholders, { breaks: true, gfm: true }) as string;
-        const withMath = applyRenderedMath(html, blockPlaceholders, inlinePlaceholders);
-        setContent(withMath);
+        setContent(processMdToHtml(text));
         setLoading(false);
       })
       .catch((err) => {
