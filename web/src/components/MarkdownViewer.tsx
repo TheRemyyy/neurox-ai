@@ -43,7 +43,8 @@ function applyRenderedMath(
   let out = html;
   blockPlaceholders.forEach((formula, i) => {
     const rendered = katex.renderToString(formula, { ...opts, displayMode: true });
-    out = out.replace(`\u200B<!--MATH_BLOCK_${i}-->\u200B`, rendered);
+    const wrapped = `<span class="katex-block-wrapper">${rendered}</span>`;
+    out = out.replace(`\u200B<!--MATH_BLOCK_${i}-->\u200B`, wrapped);
   });
   inlinePlaceholders.forEach((formula, i) => {
     const rendered = katex.renderToString(formula, { ...opts, displayMode: false });

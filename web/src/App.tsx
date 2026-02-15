@@ -107,7 +107,7 @@ function App() {
 
   return (
     <Router>
-      <div className="flex min-h-screen bg-background text-text-primary selection:bg-accent/30 font-sans antialiased text-[15px]">
+      <div className="flex h-screen min-h-0 bg-background text-text-primary selection:bg-accent/30 font-sans antialiased text-[15px]">
         {/* Mobile Header */}
         <div className="lg:hidden fixed top-0 left-0 right-0 h-14 border-b border-border bg-background/80 backdrop-blur-md z-30 flex items-center px-4 justify-between">
           <div className="flex items-center gap-2">
@@ -126,7 +126,7 @@ function App() {
 
         <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
 
-        <main className="flex-1 overflow-y-auto pt-14 lg:pt-0">
+        <main className="flex-1 min-h-0 overflow-y-auto pt-14 lg:pt-0">
           <AnimatePresence mode="wait">
             <Routes>
               <Route path="/" element={<PageWrapper><Home /></PageWrapper>} />

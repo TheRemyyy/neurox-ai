@@ -25,18 +25,21 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-body {
+html, body {
   margin: 0;
-  min-width: 320px;
+  padding: 0;
   min-height: 100vh;
   width: 100%;
+  overflow: hidden;
 }
 
 #root {
   width: 100%;
   height: 100vh;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .prose {
@@ -67,10 +70,37 @@ body {
   font-size: 1.05em;
 }
 
-.prose .katex-display {
+/* Wrapper prevents KaTeX display from creating extra scrollable height */
+.prose .katex-block-wrapper {
+  display: block;
   margin: 0.75em 0;
+  max-width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.prose .katex-block-wrapper .katex-display {
+  margin: 0;
+  padding: 0.25em 0;
+  display: inline-block;
+  min-height: 0;
+}
+
+.prose .katex-block-wrapper .katex-display > .katex {
+  display: inline-block;
+  white-space: nowrap;
+  max-width: none;
+}
+
+/* Prevent KaTeX tables/SVG from creating extra document height */
+.prose .katex-block-wrapper table,
+.prose .katex-block-wrapper .katex-html {
+  display: block;
+  max-width: 100%;
+}
+.prose .katex-block-wrapper .katex-display {
+  contain: layout;
 }
 
 /* Custom Scrollbar */
